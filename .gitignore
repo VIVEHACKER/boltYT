@@ -1,2 +1,3 @@
 .harness/
 .claude/
+node_modules/
