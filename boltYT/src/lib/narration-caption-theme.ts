@@ -1,0 +1,108 @@
+import type { CSSProperties } from "react";
+import type { NewsSurfaceTone } from "./news-surface-theme";
+
+export type NarrationCaptionWordState = "active" | "past" | "future";
+
+function hexToRgba(hex: string, alpha: number) {
+	const normalized = hex.replace("#", "");
+	if (normalized.length !== 6) return `rgba(255,255,255,${alpha})`;
+
+	const r = Number.parseInt(normalized.slice(0, 2), 16);
+	const g = Number.parseInt(normalized.slice(2, 4), 16);
+	const b = Number.parseInt(normalized.slice(4, 6), 16);
+
+	return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+export function isNarrationTimelineCueWord(word: string) {
+	return /\d{1,2}[.:]\d{2}|\d+일|당일|직후|이후|뒤|분 후|시간 후|오전|오후|새벽/u.test(
+		word,
+	);
+}
+
+export function getNarrationCaptionContainerToneStyle(params: {
+	tone?: NewsSurfaceTone;
+	accentColor: string;
+	hookBoost?: boolean;
+}): CSSProperties {
+	const { tone = "generic", accentColor, hookBoost = false } = params;
+	const glow = hexToRgba(accentColor, hookBoost ? 0.26 : 0.16);
+
+	switch (tone) {
+		case "witness":
+			return {
+				borderLeft: `3px solid ${hexToRgba(accentColor, 0.52)}`,
+				paddingLeft: 12,
+				boxShadow: `inset 1px 0 0 ${hexToRgba(accentColor, 0.16)}, 0 0 18px ${glow}`,
+			};
+		case "evidence":
+			return {
+				border: `1px dashed ${hexToRgba(accentColor, 0.34)}`,
+				boxShadow: `0 0 0 1px ${hexToRgba(accentColor, 0.12)}, 0 10px 28px ${hexToRgba(accentColor, 0.1)}`,
+				backgroundImage:
+					"repeating-linear-gradient(180deg, rgba(255,255,255,0.04) 0 1px, transparent 1px 10px)",
+			};
+		case "timeline":
+			return {
+				borderTop: `1px solid ${hexToRgba(accentColor, 0.34)}`,
+				borderBottom: `1px solid ${hexToRgba(accentColor, 0.24)}`,
+				boxShadow: `0 0 18px ${glow}`,
+			};
+		default:
+			return {};
+	}
+}
+
+export function getNarrationCaptionWordToneStyle(params: {
+	tone?: NewsSurfaceTone;
+	word: string;
+	state: NarrationCaptionWordState;
+	accentColor: string;
+}): CSSProperties {
+	const { tone = "generic", word, state, accentColor } = params;
+	const isTimelineCue = isNarrationTimelineCueWord(word);
+
+	switch (tone) {
+		case "witness":
+			return {
+				fontStyle: state === "future" ? "normal" : "italic",
+				transform:
+					state === "active"
+						? "translateX(-3px)"
+						: state === "past"
+							? "translateX(-1px)"
+							: undefined,
+				textShadow:
+					state === "active"
+						? `0 8px 22px ${hexToRgba(accentColor, 0.18)}`
+						: undefined,
+			};
+		case "evidence":
+			return state === "active" || state === "past"
+				? {
+						padding: "1px 6px",
+						borderRadius: 7,
+						background:
+							state === "active"
+								? hexToRgba(accentColor, 0.16)
+								: hexToRgba(accentColor, 0.08),
+						border: `1px solid ${hexToRgba(accentColor, state === "active" ? 0.28 : 0.14)}`,
+						transform: state === "active" ? "rotate(-1deg)" : undefined,
+					}
+				: {};
+		case "timeline":
+			return isTimelineCue && state !== "future"
+				? {
+						padding: "1px 7px",
+						borderRadius: 999,
+						background:
+							state === "active"
+								? hexToRgba(accentColor, 0.16)
+								: hexToRgba(accentColor, 0.08),
+						border: `1px solid ${hexToRgba(accentColor, 0.24)}`,
+					}
+				: {};
+		default:
+			return {};
+	}
+}
