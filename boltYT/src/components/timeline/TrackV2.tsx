@@ -7,6 +7,7 @@ import { Lock, Unlock, Volume2, VolumeX } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
 import type { TimelineClip, TimelineTrack } from "../../lib/timeline-model";
 import { clipsOnTrack } from "../../lib/timeline-model";
+import { useShallow } from "zustand/react/shallow";
 import { useTimelineStore } from "../../lib/timeline-store";
 import { ClipV2 } from "./ClipV2";
 import { VolumeEnvelope } from "./VolumeEnvelope";
@@ -25,7 +26,9 @@ export function TrackV2({
 	totalFrames,
 	onClipDoubleClick,
 }: Props) {
-	const project = useTimelineStore((s) => s.project);
+	const clips = useTimelineStore(
+		useShallow((s) => (s.project ? clipsOnTrack(s.project, track.id) : [])),
+	);
 	const setPlayhead = useTimelineStore((s) => s.setPlayhead);
 	const selectInRange = useTimelineStore((s) => s.selectInRange);
 	const clearSelection = useTimelineStore((s) => s.clearSelection);
@@ -35,8 +38,6 @@ export function TrackV2({
 
 	const lanesRef = useRef<HTMLButtonElement>(null);
 	const [rubberStart, setRubberStart] = useState<number | null>(null);
-
-	const clips = project ? clipsOnTrack(project, track.id) : [];
 
 	const onPointerDownLane = useCallback(
 		(e: React.PointerEvent<HTMLButtonElement>) => {

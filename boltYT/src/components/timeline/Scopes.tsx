@@ -21,6 +21,7 @@ import {
 } from "../../lib/histogram";
 import type { TimelineClip } from "../../lib/timeline-model";
 import { useTimelineStore } from "../../lib/timeline-store";
+import { useShallow } from "zustand/react/shallow";
 
 const SAMPLE_WIDTH = 256;
 const SAMPLE_HEIGHT = 144;
@@ -37,7 +38,7 @@ const cancelIdle: (id: number) => void =
 		: (id) => window.clearTimeout(id);
 
 export function Scopes() {
-	const selected = useTimelineStore((s) => s.selected());
+	const selected = useTimelineStore(useShallow((s) => s.selected()));
 	const clip = selected[0];
 
 	if (!clip || !clip.imageUrl) {
@@ -177,8 +178,7 @@ function useScopeFrame(
 	colorGraph?: ColorGraph,
 ): ScopeFrame | null {
 	const frameKey = useMemo(
-		() =>
-			imageUrl ? `${imageUrl}:${JSON.stringify(colorGraph ?? [])}` : null,
+		() => (imageUrl ? `${imageUrl}:${JSON.stringify(colorGraph ?? [])}` : null),
 		[imageUrl, colorGraph],
 	);
 	const [frameState, setFrameState] = useState<{

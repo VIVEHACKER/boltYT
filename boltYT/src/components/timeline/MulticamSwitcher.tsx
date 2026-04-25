@@ -11,6 +11,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { angleAtFrame } from "../../lib/multicam";
 import { findGroup } from "../../lib/multicam-timeline";
+import { useShallow } from "zustand/react/shallow";
 import { useTimelineStore } from "../../lib/timeline-store";
 import { useMulticamShortcuts } from "../../lib/use-multicam-shortcuts";
 
@@ -81,7 +82,7 @@ function MulticamHUD({ hud }: { hud: HudState | null }) {
 export function MulticamSwitcher() {
 	const project = useTimelineStore((s) => s.project);
 	const playhead = useTimelineStore((s) => s.playhead);
-	const selected = useTimelineStore((s) => s.selected());
+	const selected = useTimelineStore(useShallow((s) => s.selected()));
 	const setMulticamCut = useTimelineStore((s) => s.setMulticamCut);
 	const setActive = useTimelineStore((s) => s.setMulticamActiveAngle);
 	const setAudio = useTimelineStore((s) => s.setMulticamAudioAngle);

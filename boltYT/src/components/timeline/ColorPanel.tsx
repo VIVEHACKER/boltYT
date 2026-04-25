@@ -14,6 +14,7 @@ import { applyGraphToImage } from "../../lib/color-graph-canvas";
 import { parseCubeLut, specToSvgMatrix } from "../../lib/color-pipeline";
 import type { ColorGradeSpec } from "../../lib/timeline-model";
 import { useTimelineStore } from "../../lib/timeline-store";
+import { useShallow } from "zustand/react/shallow";
 import { ColorWheel } from "./ColorWheel";
 
 /** LUT 캐시 — 클립 spec 에는 lutId 만 저장, 실체는 이 맵에 */
@@ -30,7 +31,7 @@ const PRESETS: ColorGradePreset[] = [
 ];
 
 export function ColorPanel() {
-	const selected = useTimelineStore((s) => s.selected());
+	const selected = useTimelineStore(useShallow((s) => s.selected()));
 	const setColorGrade = useTimelineStore((s) => s.setColorGrade);
 
 	const clip = selected[0];

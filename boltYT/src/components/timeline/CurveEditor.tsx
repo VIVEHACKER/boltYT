@@ -14,6 +14,7 @@ import {
 	evaluateCurve,
 	type TransformProp,
 } from "../../lib/timeline-model";
+import { useShallow } from "zustand/react/shallow";
 import { useTimelineStore } from "../../lib/timeline-store";
 
 const EASE_CYCLE: Record<
@@ -451,7 +452,7 @@ function CurveRow({
 export function CurveEditor() {
 	const project = useTimelineStore((s) => s.project);
 	const playhead = useTimelineStore((s) => s.playhead);
-	const selected = useTimelineStore((s) => s.selected());
+	const selected = useTimelineStore(useShallow((s) => s.selected()));
 	const clip = selected.length === 1 ? selected[0] : undefined;
 
 	if (!project || !clip) {

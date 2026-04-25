@@ -222,11 +222,18 @@ function setupQuad(gl: WebGLRenderingContext, prog: WebGLProgram): void {
 	gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
 }
 
+// WebGL program 캐시 — canvas 당 하나의 program 을 재사용 (shader 재컴파일 방지).
+// WeakMap: canvas 가 GC 되면 자동 정리.
+const programCache = new WeakMap<
+	HTMLCanvasElement,
+	{ key: string; prog: WebGLProgram }
+>();
+
 /**
  * sourceCanvas → WebGL 색보정 처리 → canvas 에 출력.
  * WebGL 컨텍스트를 직접 생성하므로 canvas 는 WebGL canvas 여야 함.
  *
- * 색보정 program 은 외부에서 useMemo 로 캐싱하고 이 함수로 드로우만 처리.
+ * graph 가 변경된 경우에만 shader 재컴파일. 동일 graph → cached program 재사용.
  */
 export function applyColorGradeToCanvas(
 	canvas: HTMLCanvasElement,
@@ -240,7 +247,18 @@ export function applyColorGradeToCanvas(
 	canvas.height = sourceCanvas.height;
 	gl.viewport(0, 0, canvas.width, canvas.height);
 
-	const prog = createColorGradeProgram(gl, graph);
+	// graph 변경 시만 재컴파일 — JSON key 비교
+	const graphKey = JSON.stringify(graph);
+	const cached = programCache.get(canvas);
+	let prog: WebGLProgram | null;
+	if (cached?.key === graphKey) {
+		prog = cached.prog;
+	} else {
+		if (cached) gl.deleteProgram(cached.prog);
+		prog = createColorGradeProgram(gl, graph);
+		if (prog) programCache.set(canvas, { key: graphKey, prog });
+	}
+
 	if (prog) {
 		// biome-ignore lint/correctness/useHookAtTopLevel: gl.useProgram is a WebGL method, not a React hook
 		gl.useProgram(prog);
@@ -267,8 +285,7 @@ export function applyColorGradeToCanvas(
 		setupQuad(gl, prog);
 		gl.drawArrays(gl.TRIANGLES, 0, 6);
 
-		// 정리
+		// 텍스처만 정리 — program 은 캐시에서 재사용
 		gl.deleteTexture(tex);
-		gl.deleteProgram(prog);
 	}
 }

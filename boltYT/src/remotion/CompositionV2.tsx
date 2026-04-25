@@ -11,6 +11,7 @@
 
 import { useMemo } from "react";
 import { AbsoluteFill, Audio, Sequence, useCurrentFrame } from "remotion";
+import { useProcessedAudioUrl } from "../hooks/useProcessedAudioUrl";
 import { useProxyAvailable } from "../hooks/useProxyAvailable";
 import { compileColorGraphToCss } from "../lib/color-graph-css";
 import { isMulticamClipVisible } from "../lib/multicam-timeline";
@@ -94,10 +95,14 @@ function AudioClip({
 		[project, clip.trackId],
 	);
 	const soloActive = useMemo(() => anySolo(project), [project]);
-	// audioEffects 유무 메모이즈 — early return 전 (Rules of Hooks)
+	// audioEffects 전처리 — hooks는 early return 전에 (Rules of Hooks)
 	const hasAudioEffects = useMemo(
 		() => (clip.audioEffects?.length ?? 0) > 0,
 		[clip.audioEffects],
+	);
+	const processedAudioUrl = useProcessedAudioUrl(
+		clip.audioUrl,
+		hasAudioEffects ? clip.audioEffects : undefined,
 	);
 
 	if (!clip.audioUrl) return null;
@@ -109,26 +114,15 @@ function AudioClip({
 		if (group && clip.multicam.angle !== group.audioAngle) return null;
 	}
 
-	// audioEffects가 있으면 프리뷰에서는 volume 스케일링만 적용.
-	// 실제 이펙트는 audio-render.ts renderClipAudio에서 OfflineAudioContext 오프라인 처리.
-	const volumeFn = (f: number) => {
-		const base =
-			clipAudioVolume(clip, clip.startFrame + f) *
-			trackAudioFactor(track, soloActive, clip.startFrame + f);
-		// audioEffects 있을 때: gain 이펙트의 linear 합산으로 프리뷰 근사
-		if (hasAudioEffects && clip.audioEffects) {
-			const gainDb = clip.audioEffects
-				.filter((e) => e.kind === "gain")
-				.reduce((sum, e) => sum + (e.kind === "gain" ? e.db : 0), 0);
-			const gainLinear = gainDb !== 0 ? 10 ** (gainDb / 20) : 1;
-			return base * gainLinear;
-		}
-		return base;
-	};
+	// audioEffects는 useProcessedAudioUrl에서 OfflineAudioContext로 전처리됨.
+	// volumeFn은 envelope/track 자동화만 담당.
+	const volumeFn = (f: number) =>
+		clipAudioVolume(clip, clip.startFrame + f) *
+		trackAudioFactor(track, soloActive, clip.startFrame + f);
 
 	return (
 		<Sequence from={clip.startFrame} durationInFrames={clip.durationFrames}>
-			<Audio src={clip.audioUrl} volume={volumeFn} />
+			<Audio src={processedAudioUrl ?? ""} volume={volumeFn} />
 		</Sequence>
 	);
 }

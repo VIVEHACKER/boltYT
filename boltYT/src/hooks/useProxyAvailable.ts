@@ -44,27 +44,41 @@ export function useProxyAvailable(
 		let cancelled = false;
 		lastChecked.current = originalUrl;
 
-		requestProxyBuild(originalUrl).then((resp) => {
-			if (cancelled) return;
-			if (shouldUseProxy(resp)) {
-				setResultState({
-					originalUrl,
-					result: { proxyUrl: proxyUrlFor(originalUrl), isReady: true },
-				});
-			} else {
-				setResultState({
-					originalUrl,
-					result: { proxyUrl: null, isReady: false },
-				});
-			}
-		});
+		requestProxyBuild(originalUrl)
+			.then((resp) => {
+				if (cancelled) return;
+				if (shouldUseProxy(resp)) {
+					setResultState({
+						originalUrl,
+						result: { proxyUrl: proxyUrlFor(originalUrl), isReady: true },
+					});
+				} else {
+					setResultState({
+						originalUrl,
+						result: { proxyUrl: null, isReady: false },
+					});
+				}
+			})
+			.catch(() => {
+				// proxy 서버 다운 → 원본 URL fallback (isReady: false)
+				if (!cancelled) {
+					setResultState({
+						originalUrl,
+						result: { proxyUrl: null, isReady: false },
+					});
+				}
+			});
 
 		return () => {
 			cancelled = true;
 		};
 	}, [originalUrl]);
 
-	if (!originalUrl || shouldSkipProxy(originalUrl) || !isLocalMediaUrl(originalUrl)) {
+	if (
+		!originalUrl ||
+		shouldSkipProxy(originalUrl) ||
+		!isLocalMediaUrl(originalUrl)
+	) {
 		return { proxyUrl: null, isReady: false };
 	}
 

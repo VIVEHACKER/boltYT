@@ -114,23 +114,46 @@ export function analyzeAudioBuffer(buffer: AudioBuffer): BgmAnalysis {
 	return { bpm, beats, confidence };
 }
 
-/** URL에서 audio fetch + decode + analyze */
+/** URL에서 audio fetch + decode, 분석은 Web Worker에서 실행 */
 export async function analyzeBgmFromUrl(url: string): Promise<BgmAnalysis> {
 	try {
 		const res = await fetch(url);
 		if (!res.ok) return { bpm: 0, beats: [], confidence: 0 };
 		const arrayBuf = await res.arrayBuffer();
 
-		// AudioContext (Safari 호환)
 		const AudioCtx =
 			window.AudioContext ||
 			(window as unknown as { webkitAudioContext: typeof AudioContext })
 				.webkitAudioContext;
 		const ctx = new AudioCtx();
 		const audioBuffer = await ctx.decodeAudioData(arrayBuf);
-		const result = analyzeAudioBuffer(audioBuffer);
 		void ctx.close();
-		return result;
+
+		// Float32Array copy (transfer ownership to worker)
+		const channelData = new Float32Array(audioBuffer.getChannelData(0));
+
+		return await new Promise<BgmAnalysis>((resolve) => {
+			const worker = new Worker(
+				new URL("../workers/bgm-analyze.worker.ts", import.meta.url),
+				{ type: "module" },
+			);
+			worker.onmessage = (e: MessageEvent<BgmAnalysis>) => {
+				resolve(e.data);
+				worker.terminate();
+			};
+			worker.onerror = () => {
+				resolve({ bpm: 0, beats: [], confidence: 0 });
+				worker.terminate();
+			};
+			worker.postMessage(
+				{
+					channelData,
+					sampleRate: audioBuffer.sampleRate,
+					duration: audioBuffer.duration,
+				},
+				[channelData.buffer],
+			);
+		});
 	} catch (e) {
 		console.warn("BGM analysis failed:", e);
 		return { bpm: 0, beats: [], confidence: 0 };

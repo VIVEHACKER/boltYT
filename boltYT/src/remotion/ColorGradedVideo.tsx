@@ -32,7 +32,7 @@ export function ColorGradedVideo({
 	muted,
 }: ColorGradedVideoProps) {
 	// Remotion hooks — early return 전에 (Rules of Hooks)
-	useCurrentFrame();
+	const frame = useCurrentFrame();
 	useVideoConfig();
 
 	const videoRef = useRef<HTMLVideoElement>(null);
@@ -56,6 +56,7 @@ export function ColorGradedVideo({
 		return gl !== null;
 	}, []);
 
+	// rAF 루프: 재생 중 매 프레임 WebGL 색보정 적용
 	useEffect(() => {
 		const video = videoRef.current;
 		const outputCanvas = outputCanvasRef.current;
@@ -65,8 +66,6 @@ export function ColorGradedVideo({
 		if (!offCtx) return;
 
 		let active = true;
-
-		// local non-null refs captured from outer scope (all guarded above)
 		const oc = offscreenCanvas;
 		const ctx = offCtx;
 		const out = outputCanvas;
@@ -88,6 +87,25 @@ export function ColorGradedVideo({
 			cancelAnimationFrame(rafRef.current);
 		};
 	}, [offscreenCanvas, webglSupported, colorGraph, width, height]);
+
+	// Frame-driven draw: Remotion scrub/pause 시에도 색보정이 적용되도록.
+	// rAF callback 안에서 mutation — react-hooks/immutability rule 준수 (rAF tick 패턴과 동일)
+	useEffect(() => {
+		const video = videoRef.current;
+		const out = outputCanvasRef.current;
+		if (!video || !out || !offscreenCanvas || !webglSupported) return;
+		const offCtx = offscreenCanvas.getContext("2d");
+		if (!offCtx) return;
+		const oc = offscreenCanvas;
+		const ctx = offCtx;
+		const rafId = requestAnimationFrame(() => {
+			oc.width = video.videoWidth || width;
+			oc.height = video.videoHeight || height;
+			ctx.drawImage(video, 0, 0, oc.width, oc.height);
+			applyColorGradeToCanvas(out, oc, colorGraph);
+		});
+		return () => cancelAnimationFrame(rafId);
+	}, [frame, offscreenCanvas, webglSupported, colorGraph, width, height]);
 
 	// WebGL 미지원 → Remotion Video fallback
 	if (!webglSupported) {

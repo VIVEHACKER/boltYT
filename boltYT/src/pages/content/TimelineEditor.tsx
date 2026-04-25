@@ -30,7 +30,7 @@ import {
 	Trash2,
 	Undo2,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { AudioEffectsPanel } from "../../components/timeline/AudioEffectsPanel";
 import { ColorPanel } from "../../components/timeline/ColorPanel";
@@ -41,9 +41,10 @@ import { MulticamSwitcher } from "../../components/timeline/MulticamSwitcher";
 import { Scopes } from "../../components/timeline/Scopes";
 import { TimelineV2 } from "../../components/timeline/TimelineV2";
 import { TransformPanel } from "../../components/timeline/TransformPanel";
-import type { TimelineScene } from "../../lib/editor-store";
-import { ensureBlobUrls } from "../../lib/local-db";
-import { supabase } from "../../lib/supabase";
+import { useEditorPanels } from "../../hooks/useEditorPanels";
+import { useTimelineLoad } from "../../hooks/useTimelineLoad";
+import { useTimelineSave } from "../../hooks/useTimelineSave";
+import { useShallow } from "zustand/react/shallow";
 import { useTimelineStore } from "../../lib/timeline-store";
 import { useMulticamShortcuts } from "../../lib/use-multicam-shortcuts";
 import {
@@ -71,7 +72,6 @@ export default function TimelineEditor() {
 	const historyIndex = useTimelineStore((s) => s.historyIndex);
 	const historyLen = useTimelineStore((s) => s.history.length);
 
-	const loadFromScenes = useTimelineStore((s) => s.loadFromScenes);
 	const setZoom = useTimelineStore((s) => s.setZoom);
 	const setSnap = useTimelineStore((s) => s.setSnap);
 	const undo = useTimelineStore((s) => s.undo);
@@ -79,188 +79,39 @@ export default function TimelineEditor() {
 	const splitSelected = useTimelineStore((s) => s.splitSelectedAtPlayhead);
 	const deleteSelected = useTimelineStore((s) => s.deleteSelected);
 	const rippleDeleteSelected = useTimelineStore((s) => s.rippleDeleteSelected);
-	const toSceneRecords = useTimelineStore((s) => s.toSceneRecords);
-	const liveSceneIds = useTimelineStore((s) => s.liveSceneIds);
 	const toRemotionScenes = useTimelineStore((s) => s.toRemotionScenes);
-	const selected = useTimelineStore((s) => s.selected());
+	const selected = useTimelineStore(useShallow((s) => s.selected()));
 	const createMulticamGroupFromClips = useTimelineStore(
 		(s) => s.createMulticamGroupFromClips,
 	);
 	const disbandMulticamGroup = useTimelineStore((s) => s.disbandMulticamGroup);
 
-	// 숫자 키 1-9 로 멀티캠 angle 스위칭 (선택된 클립이 multicam 바인딩일 때만 활성)
 	useMulticamShortcuts();
 
-	// 멀티캠 그룹화 가능 조건: 2개+ 비디오 클립 선택, multicam 바인딩 아직 없음
 	const groupable = selected.filter((c) => c.kind === "video" && !c.multicam);
 	const canGroup = groupable.length >= 2;
 	const existingGroupId = selected.find((c) => c.multicam)?.multicam?.groupId;
 
-	const [loading, setLoading] = useState(true);
-	const [saving, setSaving] = useState(false);
-	const [message, setMessage] = useState<string | null>(null);
-	const [isShorts, setIsShorts] = useState(true);
-	const [mixerOpen, setMixerOpen] = useState(false);
-	const [colorOpen, setColorOpen] = useState(false);
-	const [scopesOpen, setScopesOpen] = useState(false);
-	const [transformOpen, setTransformOpen] = useState(false);
-	const [motionOpen, setMotionOpen] = useState(false);
-	const [curvesOpen, setCurvesOpen] = useState(false);
-	const [fxOpen, setFxOpen] = useState(false);
+	const { loading, isShorts, initialSceneIdsRef } = useTimelineLoad(scriptId);
+	const { saving, message, handleSave } = useTimelineSave(initialSceneIdsRef);
+	const {
+		mixerOpen,
+		setMixerOpen,
+		colorOpen,
+		setColorOpen,
+		scopesOpen,
+		setScopesOpen,
+		transformOpen,
+		setTransformOpen,
+		motionOpen,
+		setMotionOpen,
+		curvesOpen,
+		setCurvesOpen,
+		fxOpen,
+		setFxOpen,
+	} = useEditorPanels();
+
 	const playerRef = useRef(null);
-	/** 로드 시점의 DB sceneId 집합 — 저장 시 삭제 대상 계산 기준 */
-	const initialSceneIdsRef = useRef<Set<string>>(new Set());
-
-	useEffect(() => {
-		if (!scriptId) return;
-		setLoading(true);
-		void (async () => {
-			const [scenesRes, scriptRes] = await Promise.all([
-				supabase
-					.from("scenes")
-					.select("*")
-					.eq("script_id", scriptId)
-					.order("order_index"),
-				supabase
-					.from("scripts")
-					.select("format")
-					.eq("id", scriptId)
-					.maybeSingle(),
-			]);
-
-			const raw = scenesRes.data ?? [];
-			const { data: assets } = await supabase
-				.from("media_assets")
-				.select("scene_id, storage_path, status, type")
-				.in(
-					"scene_id",
-					raw.map((s) => s.id),
-				)
-				.eq("status", "complete");
-
-			const paths = (assets ?? [])
-				.map((a) => (a as { storage_path: string }).storage_path)
-				.filter((p: string) => p?.startsWith("scenes/"));
-			const blobMap = await ensureBlobUrls(paths);
-
-			const withAssets: TimelineScene[] = raw.map((s) => {
-				const pathOfType = (t: string) =>
-					(assets ?? []).find(
-						(a) =>
-							a.scene_id === s.id && a.type === t && a.status === "complete",
-					) as { storage_path?: string } | undefined;
-				const audioP = pathOfType("tts_audio")?.storage_path;
-				const imageP = pathOfType("image")?.storage_path;
-				const videoP = pathOfType("video")?.storage_path;
-				return {
-					...s,
-					audioUrl: audioP ? blobMap.get(audioP) : undefined,
-					imageUrl: imageP ? blobMap.get(imageP) : undefined,
-					videoUrl: videoP ? blobMap.get(videoP) : undefined,
-				} as TimelineScene;
-			});
-
-			const format = Boolean(
-				scriptRes.data &&
-					(scriptRes.data as { format?: string }).format === "shorts",
-			);
-			setIsShorts(format);
-
-			let bpm = 0;
-			let beats: number[] = [];
-			const bgmAnalysis = localStorage.getItem(`bgm_analysis_${scriptId}`);
-			if (bgmAnalysis) {
-				try {
-					const parsed = JSON.parse(bgmAnalysis) as {
-						bpm: number;
-						beats: number[];
-					};
-					bpm = parsed.bpm;
-					beats = parsed.beats;
-				} catch {
-					/* ignore */
-				}
-			}
-			const bgmUrl = localStorage.getItem(`bgm_url_${scriptId}`) ?? undefined;
-
-			// 로드 시점의 DB sceneId 스냅샷 (저장 시 삭제 대상 계산 기준)
-			initialSceneIdsRef.current = new Set(
-				withAssets.map((s) => s.id).filter(Boolean),
-			);
-
-			loadFromScenes(withAssets, {
-				scriptId,
-				fps: FPS,
-				width: format ? SHORTS_WIDTH : VIDEO_WIDTH,
-				height: format ? SHORTS_HEIGHT : VIDEO_HEIGHT,
-				bpm,
-				beats,
-				bgmUrl,
-			});
-			setLoading(false);
-		})();
-	}, [scriptId, loadFromScenes]);
-
-	const handleSave = useCallback(async () => {
-		setSaving(true);
-		setMessage(null);
-		try {
-			const plan = toSceneRecords();
-			const surviving = new Set(liveSceneIds());
-			// 1. UPDATE — 기존 씬의 편집 결과 반영
-			for (const r of plan.update) {
-				if (!r.id) continue;
-				await supabase
-					.from("scenes")
-					.update({
-						order_index: r.order_index,
-						duration_seconds: r.duration_seconds,
-						start_frame: r.start_frame,
-						edit_keyframes: r.edit_keyframes,
-						color_grade: r.color_grade,
-						transition: r.transition,
-					})
-					.eq("id", r.id);
-			}
-			// 2. INSERT — split/신규 추가된 씬
-			let inserted = 0;
-			if (plan.insert.length > 0) {
-				const { error } = await supabase.from("scenes").insert(plan.insert);
-				if (error) throw error;
-				inserted = plan.insert.length;
-			}
-			// 3. DELETE — 로드 시에 있었으나 지금 없는 씬
-			const toDelete: string[] = [];
-			for (const id of initialSceneIdsRef.current) {
-				if (!surviving.has(id)) toDelete.push(id);
-			}
-			if (toDelete.length > 0) {
-				const { error } = await supabase
-					.from("scenes")
-					.delete()
-					.in("id", toDelete);
-				if (error) throw error;
-			}
-			// 4. 새 기준선 갱신 (다음 저장이 새 씬을 다시 delete 하지 않도록)
-			initialSceneIdsRef.current = new Set([
-				...surviving,
-				// insert 된 씬은 DB 가 id 를 돌려주지 않는 이상 알 수 없으므로
-				// 다음 편집 세션까지는 reload 권장
-			]);
-			const msg = [
-				`업데이트 ${plan.update.length}`,
-				inserted > 0 ? `신규 ${inserted}` : null,
-				toDelete.length > 0 ? `삭제 ${toDelete.length}` : null,
-			]
-				.filter(Boolean)
-				.join(" · ");
-			setMessage(`저장 완료 — ${msg}`);
-		} catch (e) {
-			setMessage(e instanceof Error ? e.message : "저장 실패");
-		} finally {
-			setSaving(false);
-		}
-	}, [toSceneRecords, liveSceneIds]);
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: project 변경 감지 필수 — toRemotionScenes 는 zustand action 참조 고정
 	const remotionScenes = useMemo(

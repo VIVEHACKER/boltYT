@@ -6,9 +6,10 @@
  * - createColorGradeProgram: gl=null 방어 경로 확인
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { ColorGraph } from "./color-graph";
 import {
+	applyColorGradeToCanvas,
 	compileColorGraphToGLSL,
 	createColorGradeProgram,
 } from "./color-graph-webgl";
@@ -128,5 +129,127 @@ describe("createColorGradeProgram — node 환경 (WebGL 없음)", () => {
 			result = null;
 		}
 		expect(result).toBeNull();
+	});
+});
+
+// ─── WebGL program 캐싱 테스트 ────────────────────────────────────────────────
+
+function makeMockGl() {
+	const prog = {};
+	const shader = {};
+	const tex = {};
+	const buf = {};
+	return {
+		VERTEX_SHADER: 35633,
+		FRAGMENT_SHADER: 35632,
+		COMPILE_STATUS: 35713,
+		LINK_STATUS: 35714,
+		ARRAY_BUFFER: 34962,
+		TRIANGLES: 4,
+		FLOAT: 5126,
+		TEXTURE_2D: 3553,
+		RGBA: 6408,
+		UNSIGNED_BYTE: 5121,
+		TEXTURE_WRAP_S: 10242,
+		TEXTURE_WRAP_T: 10243,
+		TEXTURE_MIN_FILTER: 10241,
+		TEXTURE_MAG_FILTER: 10240,
+		CLAMP_TO_EDGE: 33071,
+		LINEAR: 9729,
+		STATIC_DRAW: 35044,
+		createShader: vi.fn(() => shader),
+		shaderSource: vi.fn(),
+		compileShader: vi.fn(),
+		getShaderParameter: vi.fn(() => true),
+		deleteShader: vi.fn(),
+		createProgram: vi.fn(() => prog),
+		attachShader: vi.fn(),
+		linkProgram: vi.fn(),
+		getProgramParameter: vi.fn(() => true),
+		deleteProgram: vi.fn(),
+		useProgram: vi.fn(),
+		createTexture: vi.fn(() => tex),
+		bindTexture: vi.fn(),
+		texParameteri: vi.fn(),
+		texImage2D: vi.fn(),
+		getUniformLocation: vi.fn(() => 0),
+		uniform1i: vi.fn(),
+		createBuffer: vi.fn(() => buf),
+		bindBuffer: vi.fn(),
+		bufferData: vi.fn(),
+		getAttribLocation: vi.fn(() => 0),
+		enableVertexAttribArray: vi.fn(),
+		vertexAttribPointer: vi.fn(),
+		drawArrays: vi.fn(),
+		deleteTexture: vi.fn(),
+		viewport: vi.fn(),
+	};
+}
+
+function makeMockCanvas(gl: ReturnType<typeof makeMockGl> | null = null) {
+	const canvas = {
+		width: 0,
+		height: 0,
+		getContext: vi.fn((type: string) => (type === "webgl" ? gl : null)),
+	};
+	return canvas as unknown as HTMLCanvasElement;
+}
+
+describe("applyColorGradeToCanvas — program 캐싱", () => {
+	it("WebGL 없으면 (null context) early return — throw 없음", () => {
+		const canvas = makeMockCanvas(null);
+		const src = makeMockCanvas(null);
+		expect(() =>
+			applyColorGradeToCanvas(canvas, src, [{ kind: "exposure", ev: 1 }]),
+		).not.toThrow();
+	});
+
+	it("동일 canvas + 동일 graph → createProgram 1회만 호출 (캐시 히트)", () => {
+		const gl = makeMockGl();
+		const canvas = makeMockCanvas(gl);
+		const src = makeMockCanvas(makeMockGl());
+		const graph: ColorGraph = [{ kind: "exposure", ev: 1 }];
+
+		applyColorGradeToCanvas(canvas, src, graph);
+		applyColorGradeToCanvas(canvas, src, graph);
+
+		// createProgram = shader 컴파일. 캐시 히트 시 1회만 호출되어야 함
+		expect(gl.createProgram).toHaveBeenCalledTimes(1);
+	});
+
+	it("동일 canvas + 다른 graph → createProgram 재호출 (캐시 미스)", () => {
+		const gl = makeMockGl();
+		const canvas = makeMockCanvas(gl);
+		const src = makeMockCanvas(makeMockGl());
+
+		applyColorGradeToCanvas(canvas, src, [{ kind: "exposure", ev: 1 }]);
+		applyColorGradeToCanvas(canvas, src, [{ kind: "exposure", ev: 2 }]);
+
+		expect(gl.createProgram).toHaveBeenCalledTimes(2);
+	});
+
+	it("graph 변경 시 이전 program deleteProgram 호출", () => {
+		const gl = makeMockGl();
+		const canvas = makeMockCanvas(gl);
+		const src = makeMockCanvas(makeMockGl());
+
+		applyColorGradeToCanvas(canvas, src, [{ kind: "exposure", ev: 1 }]);
+		applyColorGradeToCanvas(canvas, src, [{ kind: "contrast", amount: 0.5 }]);
+
+		// 첫 번째 program 을 두 번째 호출 시 삭제
+		expect(gl.deleteProgram).toHaveBeenCalledTimes(1);
+	});
+
+	it("draw 후 texture 만 삭제 — program 은 캐시에서 유지", () => {
+		const gl = makeMockGl();
+		const canvas = makeMockCanvas(gl);
+		const src = makeMockCanvas(makeMockGl());
+		const graph: ColorGraph = [{ kind: "saturation", amount: 0.3 }];
+
+		applyColorGradeToCanvas(canvas, src, graph);
+
+		expect(gl.deleteTexture).toHaveBeenCalledTimes(1);
+		// program 은 삭제하지 않음 (캐시 유지)
+		expect(gl.deleteProgram).not.toHaveBeenCalled();
 	});
 });
