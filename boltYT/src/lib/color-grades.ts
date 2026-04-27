@@ -142,6 +142,38 @@ export const COLOR_MATRICES: Record<
 	"nature-doc": NATURE_DOC,
 };
 
+/** 카테고리별 그룹 — UI 드롭다운에서 섹션 헤더로 사용 */
+export type ColorGradeCategory =
+	| "cinematic"
+	| "mood"
+	| "vintage"
+	| "documentary";
+
+export const COLOR_GRADE_CATEGORIES: Record<
+	Exclude<ColorGradePreset, "none">,
+	ColorGradeCategory
+> = {
+	"teal-orange": "cinematic",
+	"warm-film": "vintage",
+	"cold-noir": "mood",
+	"vibrant-pop": "cinematic",
+	"muted-doc": "documentary",
+	"retro-vhs": "vintage",
+	"cinematic-bleach": "cinematic",
+	"sunset-glow": "mood",
+	arctic: "mood",
+	"k-drama-soft": "mood",
+	"true-crime-noir": "mood",
+	"nature-doc": "documentary",
+};
+
+export const CATEGORY_LABELS: Record<ColorGradeCategory, string> = {
+	cinematic: "시네마틱",
+	mood: "무드",
+	vintage: "빈티지",
+	documentary: "다큐",
+};
+
 export const COLOR_GRADE_LABELS: Record<ColorGradePreset, string> = {
 	none: "원본",
 	"teal-orange": "시네마틱 (Teal & Orange)",

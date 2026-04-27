@@ -65,14 +65,40 @@ export const PIXABAY_QUERIES: Record<BgmMood, string[]> = {
 		"happy motivation",
 		"positive corporate",
 		"uplifting inspiring",
+		"urban beat hip hop",
+		"funky energetic pop",
 	],
 	epic: [
 		"epic cinematic trailer",
 		"hero epic orchestra",
 		"epic battle",
 		"powerful epic",
+		"cinematic epic build",
+		"epic orchestral hero",
 	],
-	sad: ["sad emotional piano", "melancholy ambient", "sad cinematic", "lonely"],
+	sad: [
+		"sad emotional piano",
+		"melancholy ambient",
+		"sad cinematic",
+		"lonely",
+		"lo-fi chill emotional",
+		"introspective ambient",
+	],
+	calm: [
+		"calm peaceful ambient",
+		"relaxing meditation",
+		"soft piano calm",
+		"peaceful acoustic",
+		"lo-fi chill study",
+		"warm acoustic guitar calm",
+	],
+	dark: [
+		"dark horror ambient",
+		"creepy suspense",
+		"scary atmospheric",
+		"haunted dark",
+		"ambient dark drone",
+	],
 };
 
 /** 사용자가 즐겨 쓰는 BGM을 mood별로 저장 (파일 업로드 시) */

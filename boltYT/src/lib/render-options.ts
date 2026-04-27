@@ -140,19 +140,19 @@ export const DEFAULT_PRESET: RenderQualityPreset = "high";
 
 /** UI 표시용 한국어 라벨 */
 export const QUALITY_LABELS: Record<RenderQualityPreset, string> = {
-	draft: "드래프트 (빠름)",
-	balanced: "표준",
-	high: "고화질",
-	archive: "아카이브 (최고)",
+	draft: "빠른 미리보기",
+	balanced: "표준 화질",
+	high: "고화질 (권장)",
+	archive: "최고 품질",
 	shorts_60: "쇼츠 60fps",
 };
 
 export const QUALITY_DESCRIPTIONS: Record<RenderQualityPreset, string> = {
-	draft: "~1/3 시간 · 4Mbps · HW 가속 · 검수용",
-	balanced: "기본 · 8Mbps · HW 가속 · SNS 업로드",
-	high: "12Mbps · SW 인코딩 · YouTube 권장",
-	archive: "20Mbps · SW 인코딩 · 원본 보관용",
-	shorts_60: "60fps · 16Mbps · HW 가속 · TikTok/Shorts",
+	draft: "약 3배 빠름 · 4 Mbps · 하드웨어 가속 · 빠른 검수에 적합",
+	balanced: "8 Mbps · 하드웨어 가속 · SNS 업로드용 균형 옵션",
+	high: "12 Mbps · 소프트웨어 인코딩 · YouTube 업로드 권장",
+	archive: "20 Mbps · 최고 화질 · 원본 보관 / 후속 편집용",
+	shorts_60: "60fps 부드러운 모션 · 16 Mbps · TikTok / 쇼츠 최적화",
 };
 
 export const HARDWARE_LABELS: Record<HardwareAccel, string> = {
