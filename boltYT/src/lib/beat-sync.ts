@@ -59,6 +59,39 @@ export function snapDurationToBeat(
 }
 
 /**
+ * 트랜지션 프레임 수를 비트 친화적 값으로 snap.
+ * BPM이 주어지면 1/4, 1/2, 1 비트 길이 중 가장 가까운 값으로 조정.
+ * BPM이 없거나 0 이하면 원본 반환.
+ */
+export function snapTransitionFramesToBeat(
+	originalFrames: number,
+	bpm: number,
+	fps = 30,
+): number {
+	if (bpm <= 0 || originalFrames <= 0) return originalFrames;
+	const oneBeat = beatFrames(bpm, fps);
+	const candidates = [
+		Math.max(1, Math.round(oneBeat / 4)),
+		Math.max(1, Math.round(oneBeat / 2)),
+		oneBeat,
+	];
+	let best = candidates[0];
+	let minDiff = Math.abs(originalFrames - best);
+	for (const c of candidates) {
+		const d = Math.abs(originalFrames - c);
+		if (d < minDiff) {
+			minDiff = d;
+			best = c;
+		}
+	}
+	// 원본과 너무 멀어지면 (>50% 차이) 원본 유지
+	if (Math.abs(best - originalFrames) > originalFrames * 0.5) {
+		return originalFrames;
+	}
+	return best;
+}
+
+/**
  * 실측된 비트 타임스탬프 배열에 가장 가까운 비트에 snap.
  * BPM 평균보다 실제 비트 위치가 정확함.
  */

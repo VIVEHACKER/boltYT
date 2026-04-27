@@ -252,8 +252,12 @@ function whipPan(direction: 1 | -1) {
 			extrapolateRight: "clamp",
 		});
 
-		// 고속 translateX (150% 이동) + 모션 블러 — 중간 지점에서 블러 최대
-		const blurAmount = Math.sin(progress * Math.PI) * 30; // 0 → 30 → 0
+		// 고속 translateX (150% 이동) + 모션 블러 — sin² 으로 더 sharp peak (artifact ↓)
+		const sinP = Math.sin(progress * Math.PI);
+		// asymmetric: 출발/도착에서 블러가 빠르게 사라짐 → tail artifact 방지
+		const blurAmount = sinP * sinP * 36; // 0 → 36 (peak) → 0
+		// 채도 살짝 ↓ 하면 모션 블러 시 색번짐 줄어듦
+		const sat = 1 - sinP * 0.15;
 
 		// Exiting: 현재 씬이 direction 방향으로 빠르게 사라짐
 		// Entering: 새 씬이 direction 반대에서 빠르게 들어옴
@@ -263,11 +267,11 @@ function whipPan(direction: 1 | -1) {
 		return {
 			entering: {
 				transform: `translateX(${enteringTx}%)`,
-				filter: `blur(${blurAmount}px)`,
+				filter: `blur(${blurAmount}px) saturate(${sat})`,
 			},
 			exiting: {
 				transform: `translateX(${exitingTx}%)`,
-				filter: `blur(${blurAmount}px)`,
+				filter: `blur(${blurAmount}px) saturate(${sat})`,
 			},
 		};
 	};

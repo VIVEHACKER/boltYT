@@ -18,7 +18,10 @@ export type ChunkedCaptionBgStyle =
 	| "pill"
 	| "block"
 	| "stroke"
-	| "glow";
+	| "glow"
+	| "ticker"
+	| "spotlight"
+	| "split_card";
 
 interface Props {
 	words: WordTiming[];
@@ -98,6 +101,48 @@ function getBgContainerStyle(
 	bgStyle: ChunkedCaptionBgStyle,
 	emphasis: boolean,
 ): React.CSSProperties {
+	if (bgStyle === "ticker") {
+		return {
+			background:
+				"linear-gradient(90deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.85) 100%)",
+			borderTop: "2px solid rgba(255,255,255,0.18)",
+			borderBottom: "2px solid rgba(255,255,255,0.18)",
+			padding: emphasis ? "10px 60px" : "7px 40px",
+			display: "flex",
+			gap: emphasis ? 10 : 6,
+			justifyContent: "center",
+			alignItems: "center",
+			width: "100%",
+			boxShadow: "0 0 24px rgba(0,0,0,0.55)",
+		};
+	}
+	if (bgStyle === "spotlight") {
+		return {
+			background:
+				"radial-gradient(ellipse at center, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.6) 60%, rgba(0,0,0,0) 100%)",
+			padding: emphasis ? "30px 80px" : "20px 50px",
+			display: "flex",
+			gap: emphasis ? 12 : 7,
+			flexWrap: "wrap",
+			justifyContent: "center",
+			alignItems: "center",
+		};
+	}
+	if (bgStyle === "split_card") {
+		return {
+			background:
+				"linear-gradient(135deg, rgba(20,20,30,0.92) 0%, rgba(20,20,30,0.92) 50%, rgba(40,30,60,0.88) 50%, rgba(40,30,60,0.88) 100%)",
+			borderRadius: 6,
+			padding: emphasis ? "16px 32px" : "11px 20px",
+			boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
+			border: "1px solid rgba(255,255,255,0.08)",
+			display: "flex",
+			gap: emphasis ? 11 : 6,
+			flexWrap: "wrap",
+			justifyContent: "center",
+			alignItems: "center",
+		};
+	}
 	if (bgStyle === "none" || bgStyle === "stroke" || bgStyle === "glow") {
 		return {
 			padding: 0,

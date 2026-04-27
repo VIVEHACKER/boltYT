@@ -42,6 +42,52 @@ export function getAudioContext(): AudioContext {
 }
 
 /**
+ * 머리/꼬리 무음 구간 트림. threshold(dBFS) 이하 샘플을 잘라낸다.
+ * 보호: 최소 100ms 패딩 유지 → 컷 끝에 자연스러운 호흡.
+ * 모든 채널에서 무음일 때만 트림.
+ */
+export function trimSilence(
+	input: AudioBuffer,
+	thresholdDb = -45,
+	paddingMs = 100,
+): AudioBuffer {
+	const sr = input.sampleRate;
+	const padSamples = Math.round((paddingMs / 1000) * sr);
+	const threshold = 10 ** (thresholdDb / 20);
+	const len = input.length;
+	const channels = input.numberOfChannels;
+
+	const isSilent = (i: number): boolean => {
+		for (let ch = 0; ch < channels; ch++) {
+			if (Math.abs(input.getChannelData(ch)[i]) > threshold) return false;
+		}
+		return true;
+	};
+
+	let head = 0;
+	while (head < len && isSilent(head)) head++;
+	let tail = len - 1;
+	while (tail > head && isSilent(tail)) tail--;
+
+	const start = Math.max(0, head - padSamples);
+	const end = Math.min(len, tail + 1 + padSamples);
+	const newLen = end - start;
+	if (newLen <= 0 || newLen === len) return input;
+
+	const out = new AudioBuffer({
+		numberOfChannels: channels,
+		length: newLen,
+		sampleRate: sr,
+	});
+	for (let ch = 0; ch < channels; ch++) {
+		const src = input.getChannelData(ch);
+		const dst = out.getChannelData(ch);
+		for (let i = 0; i < newLen; i++) dst[i] = src[start + i];
+	}
+	return out;
+}
+
+/**
  * RMS → dB 변환 후 target dB까지 gain 스케일 계산.
  * Target: -18 dBFS RMS ≈ -14 LUFS (speech)
  */
@@ -90,7 +136,9 @@ async function applyEffectsToBuffer(
 /**
  * 입력 오디오 버퍼 → DSP 체인 → PCM Float32 결과 AudioBuffer 반환.
  */
-async function applyDspChain(input: AudioBuffer): Promise<AudioBuffer> {
+async function applyDspChain(rawInput: AudioBuffer): Promise<AudioBuffer> {
+	// 머리/꼬리 무음 트림 — TTS 시작/끝의 0.3-1초 dead air 제거
+	const input = trimSilence(rawInput);
 	const makeupGain = computeNormalizeGain(input);
 
 	const offline = new OfflineAudioContext(

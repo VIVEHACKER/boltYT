@@ -163,6 +163,29 @@ export function matrixToSvgValues(m: ColorMatrix): string {
 	return m.join(" ");
 }
 
+/** Identity matrix — 색 변화 없음 */
+const IDENTITY: ColorMatrix = [
+	1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0,
+];
+
+/**
+ * 두 프리셋 사이 t∈[0,1] 보간된 행렬 반환.
+ * 씬 시작 시 from → 끝에 to 로 변환되는 시네마틱 그레이딩 트랜지션에 사용.
+ * "none" 은 IDENTITY 로 처리 → from="none" to="cold-noir" 면 깨끗한 이미지에서 차가운 톤으로.
+ */
+export function interpolateColorMatrices(
+	from: ColorGradePreset,
+	to: ColorGradePreset,
+	t: number,
+): ColorMatrix {
+	const a = from === "none" ? IDENTITY : COLOR_MATRICES[from];
+	const b = to === "none" ? IDENTITY : COLOR_MATRICES[to];
+	const clamped = Math.max(0, Math.min(1, t));
+	const out = new Array(20) as number[];
+	for (let i = 0; i < 20; i++) out[i] = a[i] * (1 - clamped) + b[i] * clamped;
+	return out as unknown as ColorMatrix;
+}
+
 /**
  * 레퍼런스 템플릿 visual_mood → 추천 color grade 프리셋.
  */
