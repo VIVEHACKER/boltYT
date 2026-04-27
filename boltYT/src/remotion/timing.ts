@@ -5,6 +5,24 @@ import { TRANSITION_FRAMES } from "./types";
 export const J_CUT_PRE_FRAMES = 4;
 export const L_CUT_POST_FRAMES = 6;
 
+/**
+ * 씬 mood 별 J/L-cut 프레임 — 페이싱 차별화.
+ * news: 짧고 정확 / story: 길고 매끄럽게 / fast pacing: 짧게 / horror: L 길게 (긴장 잔향)
+ */
+function getMoodCutFrames(scene?: RemotionScene): {
+	jPre: number;
+	lPost: number;
+} {
+	const mood = scene?.mood;
+	const pacing = scene?.pacing;
+	if (pacing === "fast") return { jPre: 2, lPost: 3 };
+	if (pacing === "slow") return { jPre: 5, lPost: 9 };
+	if (mood === "news") return { jPre: 2, lPost: 4 };
+	if (mood === "horror" || mood === "mystery") return { jPre: 5, lPost: 10 };
+	if (mood === "warm") return { jPre: 4, lPost: 8 };
+	return { jPre: J_CUT_PRE_FRAMES, lPost: L_CUT_POST_FRAMES };
+}
+
 /** 씬별 트랜지션 프레임 수 계산 */
 export function getOverlapFrames(scene: RemotionScene): number {
 	const t = scene.transition ?? "crossfade";
@@ -27,16 +45,18 @@ export function getSceneAudioWindow(
 	const seamPrev = prevHasAudio ? from + Math.ceil(prevOverlap / 2) : 0;
 
 	const nextHasAudio =
-		sceneIndex < scenes.length - 1 &&
-		Boolean(scenes[sceneIndex + 1]?.audioUrl);
+		sceneIndex < scenes.length - 1 && Boolean(scenes[sceneIndex + 1]?.audioUrl);
 	const nextOverlap =
 		sceneIndex < scenes.length - 1
 			? getOverlapFrames(scenes[sceneIndex + 1])
 			: 0;
-	const seamNext = nextHasAudio ? to - Math.floor(nextOverlap / 2) : totalFrames;
+	const seamNext = nextHasAudio
+		? to - Math.floor(nextOverlap / 2)
+		: totalFrames;
 
-	const audioFrom = Math.max(seamPrev, from - J_CUT_PRE_FRAMES);
-	const audioEnd = Math.min(seamNext, to + L_CUT_POST_FRAMES);
+	const { jPre, lPost } = getMoodCutFrames(scenes[sceneIndex]);
+	const audioFrom = Math.max(seamPrev, from - jPre);
+	const audioEnd = Math.min(seamNext, to + lPost);
 
 	return {
 		from: audioFrom,

@@ -11,9 +11,9 @@
 import { Diamond, RotateCcw, Trash2 } from "lucide-react";
 import { useMemo } from "react";
 import {
+	evaluateTransform,
 	type TimelineClip,
 	type TransformProp,
-	evaluateTransform,
 } from "../../lib/timeline-model";
 import { useTimelineStore } from "../../lib/timeline-store";
 

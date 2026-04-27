@@ -3,8 +3,8 @@
  */
 
 import { beforeEach, describe, expect, it } from "vitest";
-import { useEditorStore } from "./editor-store";
 import type { TimelineScene } from "./editor-store";
+import { useEditorStore } from "./editor-store";
 
 function makeScene(
 	overrides: Partial<TimelineScene> = {},

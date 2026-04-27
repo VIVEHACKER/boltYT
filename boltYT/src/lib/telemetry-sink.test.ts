@@ -181,7 +181,7 @@ describe("installTelemetryFlushers 이벤트 핸들러", () => {
 		// installed 상태 리셋 위해 새 모듈 import 불가 → 직접 이벤트 핸들러 호출
 		queueTelemetry({ message: "pagehide-test" });
 		// pagehide 핸들러 수동 호출
-		for (const fn of (eventListeners.pagehide ?? [])) {
+		for (const fn of eventListeners.pagehide ?? []) {
 			fn();
 		}
 		await Promise.resolve();
@@ -205,7 +205,7 @@ describe("installTelemetryFlushers 이벤트 핸들러", () => {
 		vi.stubGlobal("fetch", fetchMock);
 
 		queueTelemetry({ message: "visibility-test" });
-		for (const fn of (eventListeners.visibilitychange ?? [])) {
+		for (const fn of eventListeners.visibilitychange ?? []) {
 			fn();
 		}
 		await Promise.resolve();

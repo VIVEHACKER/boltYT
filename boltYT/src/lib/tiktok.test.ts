@@ -14,9 +14,15 @@ import {
 const _ls: Record<string, string> = {};
 const mockStorage = {
 	getItem: (k: string) => _ls[k] ?? null,
-	setItem: (k: string, v: string) => { _ls[k] = v; },
-	removeItem: (k: string) => { delete _ls[k]; },
-	clear: () => { for (const k of Object.keys(_ls)) delete _ls[k]; },
+	setItem: (k: string, v: string) => {
+		_ls[k] = v;
+	},
+	removeItem: (k: string) => {
+		delete _ls[k];
+	},
+	clear: () => {
+		for (const k of Object.keys(_ls)) delete _ls[k];
+	},
 };
 beforeAll(() => vi.stubGlobal("localStorage", mockStorage));
 afterEach(() => {
@@ -25,20 +31,27 @@ afterEach(() => {
 });
 
 function okFetch(body: unknown) {
-	vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-		ok: true,
-		status: 200,
-		json: () => Promise.resolve(body),
-	}));
+	vi.stubGlobal(
+		"fetch",
+		vi.fn().mockResolvedValue({
+			ok: true,
+			status: 200,
+			json: () => Promise.resolve(body),
+		}),
+	);
 	return fetch as unknown as ReturnType<typeof vi.fn>;
 }
 
 function failFetch(status: number, body?: unknown) {
-	vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-		ok: false,
-		status,
-		json: () => Promise.resolve(body ?? { error: { message: `HTTP ${status}` } }),
-	}));
+	vi.stubGlobal(
+		"fetch",
+		vi.fn().mockResolvedValue({
+			ok: false,
+			status,
+			json: () =>
+				Promise.resolve(body ?? { error: { message: `HTTP ${status}` } }),
+		}),
+	);
 }
 
 // ─── checkTikTokServer ────────────────────────────────────────────────────────
@@ -65,7 +78,8 @@ describe("checkTikTokServer", () => {
 		mockStorage.setItem("tiktok_server_url", "http://custom:9998");
 		const fetchMock = vi.fn().mockResolvedValue({
 			ok: true,
-			json: () => Promise.resolve({ ok: true, configured: false, authenticated: false }),
+			json: () =>
+				Promise.resolve({ ok: true, configured: false, authenticated: false }),
 		});
 		vi.stubGlobal("fetch", fetchMock);
 		await checkTikTokServer();
@@ -76,11 +90,14 @@ describe("checkTikTokServer", () => {
 		vi.stubGlobal("localStorage", undefined);
 		const fetchMock = vi.fn().mockResolvedValue({
 			ok: true,
-			json: () => Promise.resolve({ ok: true, configured: false, authenticated: false }),
+			json: () =>
+				Promise.resolve({ ok: true, configured: false, authenticated: false }),
 		});
 		vi.stubGlobal("fetch", fetchMock);
 		await checkTikTokServer();
-		expect((fetchMock.mock.calls[0] as unknown[])[0]).toContain("localhost:3461");
+		expect((fetchMock.mock.calls[0] as unknown[])[0]).toContain(
+			"localhost:3461",
+		);
 		vi.stubGlobal("localStorage", mockStorage);
 	});
 });
@@ -88,7 +105,10 @@ describe("checkTikTokServer", () => {
 // ─── getTikTokAuthStatus ──────────────────────────────────────────────────────
 describe("getTikTokAuthStatus", () => {
 	it("인증됨 → authenticated: true", async () => {
-		okFetch({ authenticated: true, user: { openId: "tt-123", displayName: "유저", avatarUrl: "" } });
+		okFetch({
+			authenticated: true,
+			user: { openId: "tt-123", displayName: "유저", avatarUrl: "" },
+		});
 		const status = await getTikTokAuthStatus();
 		expect(status.authenticated).toBe(true);
 	});
@@ -104,7 +124,9 @@ describe("revokeTikTokAuth", () => {
 	it("POST /auth/revoke 호출", async () => {
 		const fetchMock = okFetch({});
 		await revokeTikTokAuth();
-		expect((fetchMock.mock.calls[0] as [string, RequestInit])[1].method).toBe("POST");
+		expect((fetchMock.mock.calls[0] as [string, RequestInit])[1].method).toBe(
+			"POST",
+		);
 	});
 });
 
@@ -121,18 +143,22 @@ describe("uploadToTikTok", () => {
 
 	it("실패 → error.message throw", async () => {
 		failFetch(400, { error: { message: "TikTok 업로드 실패" } });
-		await expect(uploadToTikTok({
-			filePath: "/tmp/v.mp4",
-			title: "테스트",
-		})).rejects.toThrow("TikTok 업로드 실패");
+		await expect(
+			uploadToTikTok({
+				filePath: "/tmp/v.mp4",
+				title: "테스트",
+			}),
+		).rejects.toThrow("TikTok 업로드 실패");
 	});
 
 	it("error.message 없으면 기본 메시지 throw", async () => {
 		failFetch(500, { error: {} });
-		await expect(uploadToTikTok({
-			filePath: "/tmp/v.mp4",
-			title: "테스트",
-		})).rejects.toThrow("TikTok 업로드 실패");
+		await expect(
+			uploadToTikTok({
+				filePath: "/tmp/v.mp4",
+				title: "테스트",
+			}),
+		).rejects.toThrow("TikTok 업로드 실패");
 	});
 
 	it("privacyLevel 지정 가능", async () => {
@@ -142,7 +168,9 @@ describe("uploadToTikTok", () => {
 			title: "테스트",
 			privacyLevel: "SELF_ONLY",
 		});
-		const body = JSON.parse((fetchMock.mock.calls[0] as [string, RequestInit])[1].body as string) as Record<string, unknown>;
+		const body = JSON.parse(
+			(fetchMock.mock.calls[0] as [string, RequestInit])[1].body as string,
+		) as Record<string, unknown>;
 		expect(body.privacyLevel).toBe("SELF_ONLY");
 	});
 });

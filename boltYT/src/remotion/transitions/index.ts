@@ -146,6 +146,97 @@ function none(): TransitionStyles {
 }
 
 /**
+ * Zoom punch — 펀치감 있는 확대 컷. 짧은 트랜지션에 강한 임팩트.
+ * exiting: 1 → 1.4 빠르게, entering: 1.15 → 1 + 짧은 모션 블러
+ */
+function zoomPunch(
+	frame: number,
+	fps: number,
+	transitionFrames: number,
+): TransitionStyles {
+	const progress = spring({
+		frame,
+		fps,
+		config: { damping: 14, stiffness: 200, mass: 0.4 },
+		durationInFrames: transitionFrames,
+	});
+	const blur = Math.sin(progress * Math.PI) * 6;
+	return {
+		entering: {
+			opacity: progress,
+			transform: `scale(${interpolate(progress, [0, 1], [1.15, 1])})`,
+			filter: `blur(${blur}px)`,
+		},
+		exiting: {
+			opacity: 1 - progress,
+			transform: `scale(${interpolate(progress, [0, 1], [1, 1.4])})`,
+			filter: `blur(${blur}px)`,
+		},
+	};
+}
+
+/**
+ * Light leak — 따뜻한 화이트→오렌지 플레어가 가운데에서 화면을 휩쓸고 사라짐.
+ * 영화/감성 다큐 느낌. 두 씬 모두 보이지만 mid-progress 에서 플레어 오버레이가 가림.
+ */
+function lightLeak(
+	frame: number,
+	_fps: number,
+	transitionFrames: number,
+): TransitionStyles {
+	const progress = interpolate(frame, [0, transitionFrames], [0, 1], {
+		extrapolateLeft: "clamp",
+		extrapolateRight: "clamp",
+	});
+	// 0.5 지점에서 플레어 최대치
+	const flare = Math.sin(progress * Math.PI);
+	const enterOpacity = interpolate(progress, [0.3, 0.7], [0, 1], {
+		extrapolateLeft: "clamp",
+		extrapolateRight: "clamp",
+	});
+	const flareFilter = `brightness(${1 + flare * 0.6}) contrast(${1 - flare * 0.2}) saturate(${1 + flare * 0.4})`;
+	return {
+		entering: {
+			opacity: enterOpacity,
+			filter: flareFilter,
+		},
+		exiting: {
+			opacity: 1 - enterOpacity,
+			filter: flareFilter,
+		},
+	};
+}
+
+/**
+ * Push — 다음 씬이 이전 씬을 밀어내듯 함께 이동.
+ * direction: 1 = 새 씬이 오른쪽→왼쪽, -1 = 왼쪽→오른쪽.
+ */
+function pushPan(direction: 1 | -1) {
+	return (
+		frame: number,
+		fps: number,
+		transitionFrames: number,
+	): TransitionStyles => {
+		const progress = spring({
+			frame,
+			fps,
+			config: { damping: 26, stiffness: 120, mass: 0.6 },
+			durationInFrames: transitionFrames,
+		});
+		const enterFrom = 100 * direction;
+		const exitTo = -100 * direction;
+		return {
+			entering: {
+				transform: `translateX(${interpolate(progress, [0, 1], [enterFrom, 0])}%)`,
+			},
+			exiting: {
+				transform: `translateX(${interpolate(progress, [0, 1], [0, exitTo])}%)`,
+			},
+		};
+	};
+}
+
+/**
  * Whip pan — 프로 쇼츠의 빠른 가로 "휙!" 전환.
  * 전체 5프레임 내에 모션 블러 + 고속 translateX.
  * direction: 1 = right (현재 씬이 왼쪽으로 빠짐), -1 = left (오른쪽으로 빠짐)
@@ -185,8 +276,12 @@ function whipPan(direction: 1 | -1) {
 const TRANSITION_MAP: Record<TransitionType, TransitionFn> = {
 	crossfade,
 	zoom,
+	zoom_punch: zoomPunch,
+	light_leak: lightLeak,
 	slide_left: slideLeft,
 	slide_right: slideRight,
+	push_left: pushPan(-1),
+	push_right: pushPan(1),
 	glitch,
 	whip_left: whipPan(-1),
 	whip_right: whipPan(1),

@@ -5,6 +5,7 @@
 
 import { RotateCcw, Upload } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useShallow } from "zustand/react/shallow";
 import {
 	COLOR_GRADE_LABELS,
 	COLOR_MATRICES,
@@ -14,7 +15,6 @@ import { applyGraphToImage } from "../../lib/color-graph-canvas";
 import { parseCubeLut, specToSvgMatrix } from "../../lib/color-pipeline";
 import type { ColorGradeSpec } from "../../lib/timeline-model";
 import { useTimelineStore } from "../../lib/timeline-store";
-import { useShallow } from "zustand/react/shallow";
 import { ColorWheel } from "./ColorWheel";
 
 /** LUT 캐시 — 클립 spec 에는 lutId 만 저장, 실체는 이 맵에 */

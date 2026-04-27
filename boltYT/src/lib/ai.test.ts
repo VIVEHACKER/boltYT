@@ -299,7 +299,8 @@ describe("generateResearchScript", () => {
 		// 첫 번째 fetch: extractResearchBrief, 두 번째 fetch: generateResearchScript
 		vi.stubGlobal(
 			"fetch",
-			vi.fn()
+			vi
+				.fn()
 				.mockResolvedValueOnce({
 					ok: true,
 					json: () =>
@@ -396,7 +397,8 @@ describe("generateResearchScript", () => {
 		// 첫 번째 AI 호출 실패 (extractResearchBrief), 두 번째 성공
 		vi.stubGlobal(
 			"fetch",
-			vi.fn()
+			vi
+				.fn()
 				.mockResolvedValueOnce({
 					ok: false,
 					status: 500,
@@ -486,7 +488,9 @@ describe("generateResearchScript", () => {
 // ─── generateImage / generateImageToPath ─────────────────────────────────────
 describe("generateImage", () => {
 	it("image-gen.generateImage 위임 → URL 반환", async () => {
-		const mockGen = vi.fn().mockResolvedValue({ url: "http://generated.com/img.jpg" });
+		const mockGen = vi
+			.fn()
+			.mockResolvedValue({ url: "http://generated.com/img.jpg" });
 		vi.doMock("./image-gen", () => ({
 			generateImage: mockGen,
 			generateImageToPath: mockGen,

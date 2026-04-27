@@ -8,6 +8,7 @@ import { getNarrationCaptionMotionTheme } from "../lib/narration-caption-motion"
 import {
 	getNarrationCaptionContainerToneStyle,
 	getNarrationCaptionWordToneStyle,
+	isEmphasisWord,
 } from "../lib/narration-caption-theme";
 import type { NewsSurfaceTone } from "../lib/news-surface-theme";
 import type { RemotionScene, SubtitleStyle, WordTiming } from "./types";
@@ -38,27 +39,35 @@ interface Chunk {
 	endFrame: number;
 }
 
-/** 단어들을 2~4개씩 청크로 분할 */
+// 한국어 절 경계 기호 (구두점 + 어미)
+const CLAUSE_BREAK_RE = /[.!?,;。！？，、…]$|[은는이가을를도만에서로]$/;
+const STRONG_BREAK_RE = /[.!?。！？…]$/;
+
+/** 단어들을 2~4개씩 청크로 분할 — 절 경계 우선, orphan tail 흡수 */
 function buildChunks(words: WordTiming[]): Chunk[] {
 	if (words.length === 0) return [];
 
 	const chunks: Chunk[] = [];
 	let i = 0;
+	const maxChars = 14; // 한국어 기준 (영어는 token 수로 자연 제한됨)
+	const minWords = 2;
+	const maxWords = 4;
 
 	while (i < words.length) {
-		// 한 청크당 글자수 기준 (한국어: 6~12자, 영어: 12~25자)
 		let charCount = 0;
 		const chunkWords: WordTiming[] = [];
-		const maxChars = 14; // 한국어 기준
-		const minWords = 2;
-		const maxWords = 4;
 
 		while (i < words.length && chunkWords.length < maxWords) {
 			const w = words[i];
-			charCount += w.word.length;
+			charCount += w.word.length + 1; // 공백 포함 추정
 			chunkWords.push(w);
 			i++;
-			if (charCount >= maxChars && chunkWords.length >= minWords) break;
+			// 강한 종결(.?!) → 즉시 끊기
+			if (STRONG_BREAK_RE.test(w.word) && chunkWords.length >= minWords) break;
+			// 글자수 + 절 경계 선호
+			if (charCount >= maxChars && chunkWords.length >= minWords) {
+				if (CLAUSE_BREAK_RE.test(w.word) || charCount >= maxChars + 4) break;
+			}
 		}
 
 		if (chunkWords.length > 0) {
@@ -67,6 +76,17 @@ function buildChunks(words: WordTiming[]): Chunk[] {
 				startFrame: chunkWords[0].startFrame,
 				endFrame: chunkWords[chunkWords.length - 1].endFrame,
 			});
+		}
+	}
+
+	// Orphan tail 흡수: 마지막 청크가 1단어이고 직전 청크가 maxWords 미만이면 병합
+	if (chunks.length >= 2) {
+		const last = chunks[chunks.length - 1];
+		const prev = chunks[chunks.length - 2];
+		if (last.words.length === 1 && prev.words.length < maxWords) {
+			prev.words.push(...last.words);
+			prev.endFrame = last.endFrame;
+			chunks.pop();
 		}
 	}
 
@@ -275,18 +295,31 @@ export function ChunkedCaption({
 						state,
 						accentColor,
 					});
+					// 자동 emphasis: 숫자/강조부사/감탄사는 항상 accent 컬러 + heavier weight
+					const emphasized = isEmphasisWord(w.word);
+					const baseColor = isActive
+						? activeColor
+						: isPast
+							? "rgba(255,255,255,0.9)"
+							: "rgba(255,255,255,0.72)";
+					const finalColor = emphasized && !isActive ? accentColor : baseColor;
+					const finalWeight = emphasized
+						? isActive
+							? 800
+							: 720
+						: isActive
+							? 750
+							: emphasis
+								? 680
+								: 580;
 					return (
 						<span
 							key={`${w.word}-${w.startFrame}`}
 							style={{
 								fontSize,
-								fontWeight: isActive ? 750 : emphasis ? 680 : 580,
+								fontWeight: finalWeight,
 								fontFamily: sub.fontFamily,
-								color: isActive
-									? activeColor
-									: isPast
-										? "rgba(255,255,255,0.9)"
-										: "rgba(255,255,255,0.72)",
+								color: finalColor,
 								transform: `scale(${wordScale})`,
 								display: "inline-block",
 								transition: "color 0.08s",

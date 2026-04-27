@@ -7,6 +7,7 @@
  */
 
 import { useRef, useState } from "react";
+import { useShallow } from "zustand/react/shallow";
 import {
 	type AutomationCurve,
 	type AutomationKeyframe,
@@ -14,7 +15,6 @@ import {
 	evaluateCurve,
 	type TransformProp,
 } from "../../lib/timeline-model";
-import { useShallow } from "zustand/react/shallow";
 import { useTimelineStore } from "../../lib/timeline-store";
 
 const EASE_CYCLE: Record<

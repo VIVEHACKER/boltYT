@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 import { useMemo, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useShallow } from "zustand/react/shallow";
 import { AudioEffectsPanel } from "../../components/timeline/AudioEffectsPanel";
 import { ColorPanel } from "../../components/timeline/ColorPanel";
 import { CurveEditor } from "../../components/timeline/CurveEditor";
@@ -44,7 +45,6 @@ import { TransformPanel } from "../../components/timeline/TransformPanel";
 import { useEditorPanels } from "../../hooks/useEditorPanels";
 import { useTimelineLoad } from "../../hooks/useTimelineLoad";
 import { useTimelineSave } from "../../hooks/useTimelineSave";
-import { useShallow } from "zustand/react/shallow";
 import { useTimelineStore } from "../../lib/timeline-store";
 import { useMulticamShortcuts } from "../../lib/use-multicam-shortcuts";
 import {

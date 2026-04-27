@@ -58,7 +58,10 @@ describe("shot-overlay-theme", () => {
 describe("shot-overlay-theme 추가 분기", () => {
 	// ─── headline: tone 분기 ─────────────────────────────────────────────
 	it("headline + timeline → TIMELINE 라벨", () => {
-		const theme = getShotOverlayTheme({ overlay: "headline", tone: "timeline" });
+		const theme = getShotOverlayTheme({
+			overlay: "headline",
+			tone: "timeline",
+		});
 		expect(theme.label?.text).toBe("TIMELINE");
 	});
 
@@ -84,7 +87,10 @@ describe("shot-overlay-theme 추가 분기", () => {
 
 	// ─── evidence: tone 분기 ─────────────────────────────────────────────
 	it("evidence + evidence tone → EVIDENCE FILE 라벨", () => {
-		const theme = getShotOverlayTheme({ overlay: "evidence", tone: "evidence" });
+		const theme = getShotOverlayTheme({
+			overlay: "evidence",
+			tone: "evidence",
+		});
 		expect(theme.label?.text).toBe("EVIDENCE FILE");
 	});
 

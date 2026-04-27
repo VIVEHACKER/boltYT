@@ -4,8 +4,12 @@ import type { SceneShot } from "../lib/scene-shot-types";
 export type TransitionType =
 	| "crossfade"
 	| "zoom"
+	| "zoom_punch"
+	| "light_leak"
 	| "slide_left"
 	| "slide_right"
+	| "push_left"
+	| "push_right"
 	| "glitch"
 	| "whip_left"
 	| "whip_right"
@@ -15,8 +19,12 @@ export type TransitionType =
 export const TRANSITION_FRAMES: Record<TransitionType, number> = {
 	crossfade: 22,
 	zoom: 20,
+	zoom_punch: 10,
+	light_leak: 16,
 	slide_left: 18,
 	slide_right: 18,
+	push_left: 16,
+	push_right: 16,
 	glitch: 8,
 	whip_left: 12,
 	whip_right: 12,

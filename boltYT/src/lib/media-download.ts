@@ -193,7 +193,10 @@ export async function searchAndDownloadImageToPath(
 ): Promise<{ url: string; storagePath: string } | null> {
 	const ko = queryKo || queryEn;
 
-	async function tryPexels(): Promise<{ url: string; storagePath: string } | null> {
+	async function tryPexels(): Promise<{
+		url: string;
+		storagePath: string;
+	} | null> {
 		const pexels = await searchPexelsImages(queryEn, 3);
 		if (pexels.length > 0 && pexels[0].downloadUrl) {
 			return await downloadImageToPath(storagePath, pexels[0].downloadUrl);
@@ -201,7 +204,10 @@ export async function searchAndDownloadImageToPath(
 		return null;
 	}
 
-	async function tryNaver(): Promise<{ url: string; storagePath: string } | null> {
+	async function tryNaver(): Promise<{
+		url: string;
+		storagePath: string;
+	} | null> {
 		const results = await searchNaverImages(ko, 3);
 		if (results.length === 0) return null;
 		const sorted = [...results].sort(
@@ -303,14 +309,17 @@ export async function searchAndDownloadVideoToPath(
 	queryKo?: string,
 	maxDuration = 20,
 	locale: "ko" | "en" = "ko",
-): Promise<
-	| { videoUrl: string; storagePath: string; thumbnailUrl: string }
-	| null
-> {
+): Promise<{
+	videoUrl: string;
+	storagePath: string;
+	thumbnailUrl: string;
+} | null> {
 	const ko = queryKo || queryEn;
-	type VResult =
-		| { videoUrl: string; storagePath: string; thumbnailUrl: string }
-		| null;
+	type VResult = {
+		videoUrl: string;
+		storagePath: string;
+		thumbnailUrl: string;
+	} | null;
 
 	async function tryPexels(): Promise<VResult> {
 		const pexels = await searchPexelsVideos(queryEn, 5);

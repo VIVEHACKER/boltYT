@@ -291,11 +291,14 @@ describe("openAuthPopup", () => {
 		vi.stubGlobal("localStorage", undefined);
 		const fetchMock = vi.fn().mockResolvedValue({
 			ok: true,
-			json: () => Promise.resolve({ ok: true, configured: true, authenticated: false }),
+			json: () =>
+				Promise.resolve({ ok: true, configured: true, authenticated: false }),
 		});
 		vi.stubGlobal("fetch", fetchMock);
 		await checkYouTubeServer();
-		expect((fetchMock.mock.calls[0] as unknown[])[0]).toContain("localhost:3457");
+		expect((fetchMock.mock.calls[0] as unknown[])[0]).toContain(
+			"localhost:3457",
+		);
 		vi.stubGlobal("localStorage", mockStorage);
 	});
 
@@ -305,7 +308,8 @@ describe("openAuthPopup", () => {
 			"fetch",
 			vi.fn().mockResolvedValue({
 				ok: true,
-				json: () => Promise.resolve({ url: "https://accounts.google.com/auth" }),
+				json: () =>
+					Promise.resolve({ url: "https://accounts.google.com/auth" }),
 			}),
 		);
 
@@ -332,10 +336,12 @@ describe("openAuthPopup", () => {
 		await new Promise((r) => setTimeout(r, 0));
 		const handlers = eventHandlers["message"] ?? [];
 		for (const h of handlers) {
-			h(new MessageEvent("message", {
-				origin: "http://localhost:5173",
-				data: { type: "youtube-auth-success" },
-			}));
+			h(
+				new MessageEvent("message", {
+					origin: "http://localhost:5173",
+					data: { type: "youtube-auth-success" },
+				}),
+			);
 		}
 
 		const result = await popupPromise;
@@ -397,7 +403,7 @@ describe("openAuthPopup", () => {
 				ok: false,
 				status: 403,
 				statusText: "Forbidden",
-				json: () => Promise.resolve({}),  // error 필드 없음
+				json: () => Promise.resolve({}), // error 필드 없음
 			}),
 		);
 		await expect(getAuthUrl()).rejects.toThrow("HTTP 403");

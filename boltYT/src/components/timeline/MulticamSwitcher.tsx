@@ -9,9 +9,9 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { angleAtFrame } from "../../lib/multicam";
 import { findGroup } from "../../lib/multicam-timeline";
-import { useShallow } from "zustand/react/shallow";
 import { useTimelineStore } from "../../lib/timeline-store";
 import { useMulticamShortcuts } from "../../lib/use-multicam-shortcuts";
 

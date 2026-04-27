@@ -232,7 +232,9 @@ export function inferNarrationTtsOptions(
 	).length;
 	const warmMoodCount = moods.filter((mood) => mood === "warm").length;
 	const newsMoodCount = moods.filter((mood) => mood === "news").length;
-	const videoSceneCount = scenes.filter((scene) => scene.type === "video").length;
+	const videoSceneCount = scenes.filter(
+		(scene) => scene.type === "video",
+	).length;
 
 	const suspenseScore =
 		mysteryMoodCount +
@@ -405,11 +407,18 @@ function concatNarrationBuffers(
 	);
 	const sampleRate = segments[0].buffer.sampleRate;
 	const totalFrames = segments.reduce((sum, segment) => {
-		const pauseFrames = Math.max(0, Math.round(segment.pauseSeconds * sampleRate));
+		const pauseFrames = Math.max(
+			0,
+			Math.round(segment.pauseSeconds * sampleRate),
+		);
 		return sum + segment.buffer.length + pauseFrames;
 	}, 0);
 
-	const merged = audioContext.createBuffer(channelCount, totalFrames, sampleRate);
+	const merged = audioContext.createBuffer(
+		channelCount,
+		totalFrames,
+		sampleRate,
+	);
 	let offset = 0;
 
 	for (const segment of segments) {
@@ -603,7 +612,9 @@ export async function generateContinuousNarration(
 		return { url: "", totalDuration: 0, sceneDurations: [] };
 	}
 
-	const { encodeWav, getAudioContext, processVoice } = await import("./voice-dsp");
+	const { encodeWav, getAudioContext, processVoice } = await import(
+		"./voice-dsp"
+	);
 	const audioContext = getAudioContext();
 	const preparedSegments: Array<{
 		sceneId: string;
@@ -622,9 +633,14 @@ export async function generateContinuousNarration(
 			scene.narration_text,
 			index === scenes.length - 1,
 		);
-		const sceneDuration = durationToSceneSeconds(decoded.duration + pauseSeconds);
+		const sceneDuration = durationToSceneSeconds(
+			decoded.duration + pauseSeconds,
+		);
 		const durationFrames = Math.max(1, Math.round(decoded.duration * 30));
-		const wordTimings = await transcribeToWordTimings(rawBuffer, durationFrames);
+		const wordTimings = await transcribeToWordTimings(
+			rawBuffer,
+			durationFrames,
+		);
 
 		preparedSegments.push({
 			sceneId: scene.id,
@@ -650,7 +666,9 @@ export async function generateContinuousNarration(
 		"audio/wav",
 	);
 	const totalDuration = Number(merged.duration.toFixed(2));
-	const sceneDurations = preparedSegments.map((segment) => segment.sceneDuration);
+	const sceneDurations = preparedSegments.map(
+		(segment) => segment.sceneDuration,
+	);
 
 	await Promise.all(
 		preparedSegments.map((segment, index) =>

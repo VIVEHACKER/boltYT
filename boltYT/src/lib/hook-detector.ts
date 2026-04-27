@@ -35,6 +35,21 @@ const SHOCK_PATTERNS = [
 	/이런\s*일이/,
 	/상상도\s*못/,
 	/충격\s*실화/,
+	/폭로/,
+	/숨겨진/,
+	/감춰진/,
+	/은폐/,
+	/실화/,
+	/믿을\s*수\s*없/,
+	/놀랍게도/,
+	/놀랍지만/,
+	/세상에/,
+	/대박/,
+	/소름/,
+	/끔찍/,
+	/경이로운/,
+	/단\s*하나/,
+	/(처음|최초)\s*공개/,
 ];
 
 const CLAIM_PATTERNS = [
@@ -46,6 +61,13 @@ const CLAIM_PATTERNS = [
 	/이것이\s*(바로|진짜)/,
 	/핵심은/,
 	/알아야\s*(할|하는)/,
+	/^(\d+\s*가지|\d+\s*개|\d+\s*명)/,
+	/단\s*(\d+\s*초|\d+\s*분)/,
+	/(\d+\s*%|\d+\s*억|\d+\s*만\s*명)/,
+	/유일하게/,
+	/오직/,
+	/전\s*세계/,
+	/(역대\s*최|사상\s*최)/,
 ];
 
 const STORY_PATTERNS = [
@@ -86,7 +108,9 @@ export function detectHookPattern(narration: string): HookResult {
 		(a, b) => (b[1] > a[1] ? b : a),
 	);
 
-	const confidence = Math.min(1, winner[1] / 3);
+	// 첫 신호 1개=0.4, 2개=0.7, 3개+=1.0 (calibration 강화)
+	const raw = winner[1];
+	const confidence = raw >= 3 ? 1 : raw === 2 ? 0.7 : 0.4;
 	return { pattern: winner[0], confidence };
 }
 

@@ -256,7 +256,9 @@ describe("generateImage", () => {
 				json: () => Promise.resolve({ images: [] }),
 			}),
 		);
-		await expect(generateImage("scene-a1111-noimg", "prompt")).rejects.toThrow();
+		await expect(
+			generateImage("scene-a1111-noimg", "prompt"),
+		).rejects.toThrow();
 	});
 
 	it("sceneIdForAsset 지정 → supabase insert 호출", async () => {

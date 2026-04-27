@@ -9,8 +9,8 @@
 import {
 	type AudioEffect,
 	type DelayEffect,
-	type Eq3Effect,
 	dbToGain,
+	type Eq3Effect,
 	orderChain,
 	type ReverbEffect,
 	synthReverbIR,

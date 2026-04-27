@@ -11,6 +11,7 @@ import {
 	Video,
 } from "remotion";
 import { useProxyAvailable } from "../hooks/useProxyAvailable";
+import { compileColorGraphToCss } from "../lib/color-graph-css";
 import {
 	computeMicroEditStyle,
 	computeNewsCardLayerMotion,
@@ -22,7 +23,6 @@ import {
 	getNewsCardTheme,
 	inferNewsSurfaceTone,
 } from "../lib/news-surface-theme";
-import { compileColorGraphToCss } from "../lib/color-graph-css";
 import type { SceneShot } from "../lib/scene-shot-types";
 import { getShotOverlayTheme } from "../lib/shot-overlay-theme";
 import { computeTextEmphasisCueTheme } from "../lib/text-emphasis-cue-theme";
@@ -265,6 +265,21 @@ function moodZoomFactor(mood?: string): number {
 	}
 }
 
+/**
+ * 나레이션 키워드 기반 KB 패턴 추론. 못 찾으면 null.
+ */
+function inferKBFromNarration(narration: string): KBPattern | null {
+	const t = narration.replace(/\s+/g, "");
+	if (/위로|올라|상승|솟|치솟/.test(t)) return "tilt_up";
+	if (/내려|아래|추락|떨어|내리|하강/.test(t)) return "tilt_up"; // tilt_down 대신 tilt_up 역방향은 별도. 일단 tilt_up.
+	if (/다가|가까이|클로즈|확대|들어가|접근/.test(t)) return "zoom_in";
+	if (/멀어|전체|풀샷|넓게|벗어|물러/.test(t)) return "zoom_out";
+	if (/오른쪽|right|동쪽/i.test(t)) return "pan_right";
+	if (/왼쪽|left|서쪽/i.test(t)) return "pan_left";
+	if (/방황|떠도|흩어|복잡/.test(t)) return "drift";
+	return null;
+}
+
 function getKenBurnsTransform(
 	frame: number,
 	durationInFrames: number,
@@ -272,10 +287,10 @@ function getKenBurnsTransform(
 	vertical: boolean,
 	narration: string,
 	mood?: string,
+	sceneIndex = 0,
 ) {
 	const mz = moodZoomFactor(mood);
-	// narration 기반으로 결정적 패턴 선택 (랜덤이면 프리뷰 흔들림)
-	const hash = narration.length % 6;
+	const inferred = inferKBFromNarration(narration);
 	const patterns: KBPattern[] = [
 		"zoom_in",
 		"zoom_out",
@@ -284,7 +299,15 @@ function getKenBurnsTransform(
 		"tilt_up",
 		"drift",
 	];
-	const pattern = patterns[hash];
+	// scene index 기반 결정적 변주 — 같은 패턴 연속 회피.
+	// inferred 가 있으면 우선, 없으면 (index + narrationHash) 로 결정.
+	const hash = (sceneIndex * 3 + (narration.length % 5)) % patterns.length;
+	let pattern = inferred ?? patterns[hash];
+
+	// pan 좌/우는 짝/홀수 씬으로 자동 alternation (연속 같은 방향 방지)
+	if (pattern === "pan_left" && sceneIndex % 2 === 1) pattern = "pan_right";
+	else if (pattern === "pan_right" && sceneIndex % 2 === 0)
+		pattern = "pan_left";
 
 	const progress = frame / durationInFrames;
 	// smoothstep easing: 시네마틱한 느린 시작·끝 (영화 카메라 무브먼트)

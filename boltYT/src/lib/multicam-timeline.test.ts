@@ -112,7 +112,10 @@ describe("multicam-timeline", () => {
 
 	it("groupedMulticamClips — multicam.angle undefined 클립 포함 시 0으로 정렬", () => {
 		const p = setup();
-		const noAngleClip = { ...mkClip("noangle", 0), multicam: { groupId: "g1" } } as TimelineClip;
+		const noAngleClip = {
+			...mkClip("noangle", 0),
+			multicam: { groupId: "g1" },
+		} as TimelineClip;
 		p.clips = [mkClip("c2", 2), noAngleClip, mkClip("c1", 1)];
 		const grouped = groupedMulticamClips(p, "g1");
 		expect(grouped[0].multicam?.angle ?? 0).toBe(0);

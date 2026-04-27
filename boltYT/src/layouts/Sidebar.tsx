@@ -7,9 +7,9 @@ import {
 import {
 	Activity,
 	ChartBar as BarChart3,
-	Film,
 	FilePlus,
 	FileText,
+	Film,
 	LayoutDashboard,
 	Palette,
 	Settings,

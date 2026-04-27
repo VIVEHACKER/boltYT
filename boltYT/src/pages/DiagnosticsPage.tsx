@@ -13,9 +13,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useApiKeys } from "../lib/api-keys-context";
 import {
 	type AgentResult,
+	type CommandResult,
 	clearErrors,
 	clearServerErrors,
-	type CommandResult,
 	type DiagError,
 	type DiagHealthReport,
 	dispatchOrder,

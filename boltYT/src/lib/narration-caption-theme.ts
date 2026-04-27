@@ -20,6 +20,31 @@ export function isNarrationTimelineCueWord(word: string) {
 	);
 }
 
+/**
+ * 자동 강조 단어 감지 — 숫자, 감탄사, 강조 부사, 고유명사 패턴.
+ * 자막에서 highlight 컬러로 표시.
+ */
+export function isEmphasisWord(word: string): boolean {
+	if (!word) return false;
+	const w = word.trim().replace(/[!?.,。！？，、…]+$/, "");
+	if (w.length === 0) return false;
+	// 숫자 (백분율, 만/억/천/명 단위)
+	if (/^\d+([.,]\d+)?(%|배|개|명|만|억|천|회|초|분|시간|일|년)?$/.test(w))
+		return true;
+	// 강조 부사
+	if (
+		/^(절대|반드시|무조건|꼭|결국|마침내|진짜|정말|완전|엄청|역대|사상|단|오직|유일)$/.test(
+			w,
+		)
+	)
+		return true;
+	// 감탄형 어미
+	if (/[!！]+$/.test(word)) return true;
+	// 고유명사 추정 (대문자 시작 영단어 2글자+)
+	if (/^[A-Z][a-zA-Z]{2,}$/.test(w)) return true;
+	return false;
+}
+
 export function getNarrationCaptionContainerToneStyle(params: {
 	tone?: NewsSurfaceTone;
 	accentColor: string;

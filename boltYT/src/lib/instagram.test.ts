@@ -14,9 +14,15 @@ import {
 const _ls: Record<string, string> = {};
 const mockStorage = {
 	getItem: (k: string) => _ls[k] ?? null,
-	setItem: (k: string, v: string) => { _ls[k] = v; },
-	removeItem: (k: string) => { delete _ls[k]; },
-	clear: () => { for (const k of Object.keys(_ls)) delete _ls[k]; },
+	setItem: (k: string, v: string) => {
+		_ls[k] = v;
+	},
+	removeItem: (k: string) => {
+		delete _ls[k];
+	},
+	clear: () => {
+		for (const k of Object.keys(_ls)) delete _ls[k];
+	},
 };
 beforeAll(() => vi.stubGlobal("localStorage", mockStorage));
 afterEach(() => {
@@ -25,20 +31,27 @@ afterEach(() => {
 });
 
 function okFetch(body: unknown) {
-	vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-		ok: true,
-		status: 200,
-		json: () => Promise.resolve(body),
-	}));
+	vi.stubGlobal(
+		"fetch",
+		vi.fn().mockResolvedValue({
+			ok: true,
+			status: 200,
+			json: () => Promise.resolve(body),
+		}),
+	);
 	return fetch as unknown as ReturnType<typeof vi.fn>;
 }
 
 function failFetch(status: number, body?: unknown) {
-	vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-		ok: false,
-		status,
-		json: () => Promise.resolve(body ?? { error: { message: `HTTP ${status}` } }),
-	}));
+	vi.stubGlobal(
+		"fetch",
+		vi.fn().mockResolvedValue({
+			ok: false,
+			status,
+			json: () =>
+				Promise.resolve(body ?? { error: { message: `HTTP ${status}` } }),
+		}),
+	);
 }
 
 // ─── checkInstagramServer ────────────────────────────────────────────────────
@@ -65,7 +78,8 @@ describe("checkInstagramServer", () => {
 		mockStorage.setItem("instagram_server_url", "http://custom:9999");
 		const fetchMock = vi.fn().mockResolvedValue({
 			ok: true,
-			json: () => Promise.resolve({ ok: true, configured: false, authenticated: false }),
+			json: () =>
+				Promise.resolve({ ok: true, configured: false, authenticated: false }),
 		});
 		vi.stubGlobal("fetch", fetchMock);
 		await checkInstagramServer();
@@ -76,11 +90,14 @@ describe("checkInstagramServer", () => {
 		vi.stubGlobal("localStorage", undefined);
 		const fetchMock = vi.fn().mockResolvedValue({
 			ok: true,
-			json: () => Promise.resolve({ ok: true, configured: false, authenticated: false }),
+			json: () =>
+				Promise.resolve({ ok: true, configured: false, authenticated: false }),
 		});
 		vi.stubGlobal("fetch", fetchMock);
 		await checkInstagramServer();
-		expect((fetchMock.mock.calls[0] as unknown[])[0]).toContain("localhost:3462");
+		expect((fetchMock.mock.calls[0] as unknown[])[0]).toContain(
+			"localhost:3462",
+		);
 		vi.stubGlobal("localStorage", mockStorage);
 	});
 });
@@ -88,7 +105,10 @@ describe("checkInstagramServer", () => {
 // ─── getIgAuthStatus ──────────────────────────────────────────────────────────
 describe("getIgAuthStatus", () => {
 	it("인증됨 → authenticated: true", async () => {
-		okFetch({ authenticated: true, user: { igUserId: "123", username: "testuser" } });
+		okFetch({
+			authenticated: true,
+			user: { igUserId: "123", username: "testuser" },
+		});
 		const status = await getIgAuthStatus();
 		expect(status.authenticated).toBe(true);
 	});
@@ -105,7 +125,9 @@ describe("revokeIgAuth", () => {
 	it("POST /auth/revoke 호출", async () => {
 		const fetchMock = okFetch({});
 		await revokeIgAuth();
-		expect((fetchMock.mock.calls[0] as [string, RequestInit])[1].method).toBe("POST");
+		expect((fetchMock.mock.calls[0] as [string, RequestInit])[1].method).toBe(
+			"POST",
+		);
 	});
 });
 
@@ -122,17 +144,21 @@ describe("uploadToInstagram", () => {
 
 	it("실패 → error.message throw", async () => {
 		failFetch(400, { error: { message: "업로드 실패" } });
-		await expect(uploadToInstagram({
-			videoUrl: "https://example.com/video.mp4",
-			caption: "테스트",
-		})).rejects.toThrow("업로드 실패");
+		await expect(
+			uploadToInstagram({
+				videoUrl: "https://example.com/video.mp4",
+				caption: "테스트",
+			}),
+		).rejects.toThrow("업로드 실패");
 	});
 
 	it("error.message 없으면 기본 메시지 throw", async () => {
 		failFetch(500, { error: {} });
-		await expect(uploadToInstagram({
-			videoUrl: "https://example.com/v.mp4",
-			caption: "테스트",
-		})).rejects.toThrow("Instagram 업로드 실패");
+		await expect(
+			uploadToInstagram({
+				videoUrl: "https://example.com/v.mp4",
+				caption: "테스트",
+			}),
+		).rejects.toThrow("Instagram 업로드 실패");
 	});
 });

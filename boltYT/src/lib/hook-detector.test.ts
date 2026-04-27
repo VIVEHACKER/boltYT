@@ -107,10 +107,10 @@ describe("detectHookPattern — story 패턴", () => {
 });
 
 describe("detectHookPattern — confidence", () => {
-	it("패턴 1개 → confidence ≤ 1/3", () => {
-		// "경악"만 shock 패턴에 해당 → score=1, confidence=1/3
+	it("패턴 1개 → confidence 0.4 (calibration 강화)", () => {
+		// "경악"만 shock 패턴에 해당 → score=1, confidence=0.4
 		const r = detectHookPattern("경악할 만한 일이 벌어졌어요");
-		expect(r.confidence).toBeLessThanOrEqual(1 / 3 + 0.01);
+		expect(r.confidence).toBeCloseTo(0.4, 1);
 	});
 
 	it("패턴 3개 이상 → confidence 1", () => {

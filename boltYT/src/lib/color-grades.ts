@@ -17,7 +17,13 @@ export type ColorGradePreset =
 	| "cold-noir"
 	| "vibrant-pop"
 	| "muted-doc"
-	| "retro-vhs";
+	| "retro-vhs"
+	| "cinematic-bleach"
+	| "sunset-glow"
+	| "arctic"
+	| "k-drama-soft"
+	| "true-crime-noir"
+	| "nature-doc";
 
 /** 4x5 행렬 (20개 값) */
 export type ColorMatrix = readonly [
@@ -82,6 +88,42 @@ const RETRO_VHS: ColorMatrix = [
 	0, 0, 0, 1, 0,
 ];
 
+/** Cinematic Bleach — 채도 -25% + 살짝 따뜻한 하이라이트. 미니멀 시네마. */
+const CINEMATIC_BLEACH: ColorMatrix = [
+	0.95, 0.04, 0.04, 0, 0.02, 0.04, 0.92, 0.04, 0, 0.01, 0.04, 0.04, 0.85, 0,
+	-0.01, 0, 0, 0, 1, 0,
+];
+
+/** Sunset Glow — 강한 오렌지/핑크 하이라이트, 따뜻한 골든 아워. */
+const SUNSET_GLOW: ColorMatrix = [
+	1.18, 0.05, 0.0, 0, 0.06, 0.05, 1.0, 0.0, 0, 0.02, -0.05, 0.0, 0.85, 0, 0.0,
+	0, 0, 0, 1, 0,
+];
+
+/** Arctic — 차가운 화이트 + 시안. 추운 분위기, 미니멀 다큐. */
+const ARCTIC: ColorMatrix = [
+	0.92, 0.05, 0.08, 0, 0.04, 0.05, 1.02, 0.05, 0, 0.04, 0.08, 0.08, 1.12, 0,
+	0.05, 0, 0, 0, 1, 0,
+];
+
+/** K-Drama Soft — 부드러운 톤, 살짝 핑크, 채도 +5%. 로맨스/감성. */
+const K_DRAMA_SOFT: ColorMatrix = [
+	1.08, 0.05, 0.05, 0, 0.04, 0.0, 1.02, 0.05, 0, 0.02, 0.0, 0.05, 1.0, 0, 0.03,
+	0, 0, 0, 1, 0,
+];
+
+/** True Crime Noir — 어둡고 콘트라스트 강한 모노톤 + 살짝 황색. 범죄/탐사. */
+const TRUE_CRIME_NOIR: ColorMatrix = [
+	0.78, 0.18, 0.04, 0, -0.05, 0.18, 0.74, 0.04, 0, -0.05, 0.04, 0.04, 0.62, 0,
+	-0.04, 0, 0, 0, 1, 0,
+];
+
+/** Nature Doc — 녹색/청색 강조, 채도 +15%. 자연 다큐. */
+const NATURE_DOC: ColorMatrix = [
+	1.0, -0.02, -0.02, 0, 0.0, -0.05, 1.18, -0.05, 0, 0.02, -0.02, 0.0, 1.1, 0,
+	0.0, 0, 0, 0, 1, 0,
+];
+
 export const COLOR_MATRICES: Record<
 	Exclude<ColorGradePreset, "none">,
 	ColorMatrix
@@ -92,6 +134,12 @@ export const COLOR_MATRICES: Record<
 	"vibrant-pop": VIBRANT_POP,
 	"muted-doc": MUTED_DOC,
 	"retro-vhs": RETRO_VHS,
+	"cinematic-bleach": CINEMATIC_BLEACH,
+	"sunset-glow": SUNSET_GLOW,
+	arctic: ARCTIC,
+	"k-drama-soft": K_DRAMA_SOFT,
+	"true-crime-noir": TRUE_CRIME_NOIR,
+	"nature-doc": NATURE_DOC,
 };
 
 export const COLOR_GRADE_LABELS: Record<ColorGradePreset, string> = {
@@ -102,6 +150,12 @@ export const COLOR_GRADE_LABELS: Record<ColorGradePreset, string> = {
 	"vibrant-pop": "선명한 팝",
 	"muted-doc": "다큐 중립",
 	"retro-vhs": "복고 VHS",
+	"cinematic-bleach": "시네마틱 블리치",
+	"sunset-glow": "선셋 글로우",
+	arctic: "아크틱",
+	"k-drama-soft": "K-드라마 소프트",
+	"true-crime-noir": "트루 크라임 느와르",
+	"nature-doc": "자연 다큐",
 };
 
 /** 매트릭스를 SVG feColorMatrix values 속성 형식 문자열로 */
@@ -118,12 +172,16 @@ export function suggestColorGrade(
 ): ColorGradePreset {
 	const key = `${mood}:${lighting ?? ""}`;
 	// 우선 조합 기반
-	if (mood === "horror" && lighting === "dark") return "cold-noir";
-	if (mood === "horror") return "teal-orange";
+	if (mood === "horror" && lighting === "dark") return "true-crime-noir";
+	if (mood === "horror") return "cold-noir";
 	if (mood === "mystery") return "teal-orange";
+	if (mood === "warm" && lighting === "golden") return "sunset-glow";
 	if (mood === "warm") return "warm-film";
 	if (mood === "news") return "muted-doc";
 	if (mood === "neutral" && lighting === "bright") return "vibrant-pop";
+	if (mood === "neutral" && lighting === "cold") return "arctic";
+	if (mood === "soft") return "k-drama-soft";
+	if (mood === "nature") return "nature-doc";
 	void key;
 	return "none";
 }

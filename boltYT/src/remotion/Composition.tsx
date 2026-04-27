@@ -94,7 +94,9 @@ function useDuckEnvelope(
 				distFromStart = Math.min(distFromStart, frame - seg.audioFrom);
 			}
 		}
-		const t = Math.min(distFromStart / ATTACK_FRAMES, 1);
+		// cubic ease-in: t³ → 빠르게 밀어내리는 자연스러운 덕킹
+		const tLin = Math.min(distFromStart / ATTACK_FRAMES, 1);
+		const t = tLin * tLin * tLin;
 		baseVol = interpolate(t, [0, 1], [FULL_VOL, DUCK_VOL]);
 	} else {
 		let distFromEnd = Number.MAX_SAFE_INTEGER;
@@ -104,7 +106,10 @@ function useDuckEnvelope(
 			}
 		}
 		if (distFromEnd < RELEASE_FRAMES) {
-			const t = distFromEnd / RELEASE_FRAMES;
+			// cubic ease-out: 1 - (1-t)³ → 부드럽게 회복
+			const tLin = distFromEnd / RELEASE_FRAMES;
+			const inv = 1 - tLin;
+			const t = 1 - inv * inv * inv;
 			baseVol = interpolate(t, [0, 1], [DUCK_VOL, FULL_VOL]);
 		} else {
 			baseVol = FULL_VOL;

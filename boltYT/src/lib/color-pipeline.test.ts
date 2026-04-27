@@ -3,6 +3,7 @@
  */
 
 import { beforeAll, describe, expect, it, vi } from "vitest";
+import type { ScopeFrame } from "./color-pipeline";
 import {
 	applyCubeLutToImageData,
 	composeMatrices,
@@ -14,7 +15,6 @@ import {
 	specToSvgMatrix,
 	temperatureTintMatrix,
 } from "./color-pipeline";
-import type { ScopeFrame } from "./color-pipeline";
 
 // ImageData polyfill (Node 환경)
 class ImageDataMock {

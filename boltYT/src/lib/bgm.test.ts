@@ -15,9 +15,10 @@ vi.mock("./bgm-library", () => ({
 	checkLocalPresetExists: vi.fn(async () => false),
 }));
 
+import type { AutoBgmSceneHint, BgmTrack } from "./bgm";
 import {
-	BGM_MOODS,
 	autoPickBgm,
+	BGM_MOODS,
 	downloadBgm,
 	inferAutoBgmPreset,
 	searchBgm,
@@ -25,7 +26,6 @@ import {
 	setBgmFromFile,
 	setBgmFromUrl,
 } from "./bgm";
-import type { AutoBgmSceneHint, BgmTrack } from "./bgm";
 import { checkLocalPresetExists, getUserDefaultBgm } from "./bgm-library";
 
 // ─── localStorage stub ────────────────────────────────────────────────────────

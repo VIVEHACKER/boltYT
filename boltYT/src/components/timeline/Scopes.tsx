@@ -7,6 +7,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useShallow } from "zustand/react/shallow";
 import type { ColorGraph } from "../../lib/color-graph";
 import { applyColorGradeToCanvas } from "../../lib/color-graph-webgl";
 import {
@@ -21,7 +22,6 @@ import {
 } from "../../lib/histogram";
 import type { TimelineClip } from "../../lib/timeline-model";
 import { useTimelineStore } from "../../lib/timeline-store";
-import { useShallow } from "zustand/react/shallow";
 
 const SAMPLE_WIDTH = 256;
 const SAMPLE_HEIGHT = 144;

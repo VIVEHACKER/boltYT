@@ -17,23 +17,23 @@ import {
 	estimatedBpmFromTempo,
 	retimeScenesToBeatGrid,
 } from "../../lib/beat-sync";
-import { buildHookFlags } from "../../lib/hook-detector";
 import { autoPickBgm, inferAutoBgmPreset } from "../../lib/bgm";
-import { isBpmReliable, type BgmAnalysis } from "../../lib/bgm-analyze";
-import type { SceneShot } from "../../lib/scene-shot-types";
+import { type BgmAnalysis, isBpmReliable } from "../../lib/bgm-analyze";
+import { buildHookFlags } from "../../lib/hook-detector";
 import { ensureBlobUrls } from "../../lib/local-db";
 import { referenceToPreset } from "../../lib/reference-bridge";
 import { prepareRenderPayload } from "../../lib/render-assets";
 import {
 	DEFAULT_PRESET,
-	type HardwareAccel,
 	HARDWARE_LABELS,
+	type HardwareAccel,
 	QUALITY_DESCRIPTIONS,
 	QUALITY_LABELS,
 	type RenderQualityPreset,
 	resolveRenderOptions,
 } from "../../lib/render-options";
 import { pollRenderProgress, submitRender } from "../../lib/render-queue";
+import type { SceneShot } from "../../lib/scene-shot-types";
 import { assignSfxToScenes } from "../../lib/sfx";
 import { supabase } from "../../lib/supabase";
 import {

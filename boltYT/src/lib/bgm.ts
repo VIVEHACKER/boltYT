@@ -292,18 +292,13 @@ export interface AutoBgmSceneHint {
 	sceneType?: "image" | "video" | "text_emphasis" | "news_overlay";
 }
 
-export function inferAutoBgmPreset(
-	scenes: AutoBgmSceneHint[],
-): {
+export function inferAutoBgmPreset(scenes: AutoBgmSceneHint[]): {
 	mood: BgmMood | "";
 	keywords: string[];
 	tempo: "slow" | "mid" | "fast";
 } {
 	const moodCounts = new Map<BgmMood, number>();
-	const moodMap: Record<
-		NonNullable<AutoBgmSceneHint["mood"]>,
-		BgmMood
-	> = {
+	const moodMap: Record<NonNullable<AutoBgmSceneHint["mood"]>, BgmMood> = {
 		horror: "dark",
 		mystery: "mysterious",
 		news: "dramatic",

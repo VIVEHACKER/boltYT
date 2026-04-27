@@ -42,6 +42,12 @@ const SHOCK_WORDS = [
 	"놀랍게도",
 	"어이없",
 	"결정적",
+	"폭로",
+	"세상에",
+	"대박",
+	"소름",
+	"끔찍",
+	"믿기 어려",
 ];
 
 const ARROW_CUES = [
@@ -52,6 +58,10 @@ const ARROW_CUES = [
 	"바로",
 	"바로 이",
 	"눈여겨",
+	"보시다시피",
+	"확인",
+	"보면",
+	"이것이",
 ];
 
 /** 퍼센트 추출 */
@@ -177,15 +187,20 @@ export function assignMotionGraphicsForScene(
 	}
 
 	// 4. 이모지 버스트 — 충격/반전 키워드 (text_emphasis만)
+	//    SHOCK_WORDS 가 2개 이상이면 더 강한 burst (count↑/radius↑)
 	if (scene.scene_type === "text_emphasis" && hasShockWord(text)) {
+		const shockMatches = SHOCK_WORDS.filter((w) => text.includes(w)).length;
+		const strong = shockMatches >= 2;
 		graphics.push({
 			type: "emoji_burst",
 			startFrame: Math.round(totalFrames * 0.1),
-			duration: Math.min(totalFrames - 6, 36), // 1.2초
+			duration: Math.min(totalFrames - 6, strong ? 48 : 36),
 			params: {
-				emojis: ["💥", "⚡", "❗", "🔥"],
-				count: 16,
-				radius: 38,
+				emojis: strong
+					? ["💥", "⚡", "❗", "🔥", "💢", "✨"]
+					: ["💥", "⚡", "❗", "🔥"],
+				count: strong ? 24 : 16,
+				radius: strong ? 50 : 38,
 			},
 		});
 	}

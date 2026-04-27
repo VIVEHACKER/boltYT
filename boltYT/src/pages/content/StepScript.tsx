@@ -17,6 +17,10 @@ import { snapDurationToBeat } from "../../lib/beat-sync";
 import { suggestColorGrade } from "../../lib/color-grades";
 import { assignMotionGraphicsForScene } from "../../lib/motion-graphics";
 import { referenceToPreset } from "../../lib/reference-bridge";
+import {
+	applySceneSourcePlan,
+	buildFallbackSceneSourcePlan,
+} from "../../lib/scene-sequence";
 import type { SceneShot } from "../../lib/scene-shot-types";
 import {
 	applyShortsVideoRules,
@@ -25,13 +29,9 @@ import {
 	intensifyHookScenes,
 	isSourceCompatible,
 	rebalanceScenesForMotion,
-	syncSceneMetadataFromSource,
 	type ShotSource,
+	syncSceneMetadataFromSource,
 } from "../../lib/scene-shots";
-import {
-	applySceneSourcePlan,
-	buildFallbackSceneSourcePlan,
-} from "../../lib/scene-sequence";
 import { supabase } from "../../lib/supabase";
 import type { ReferenceTemplate } from "../../types/database";
 import type { CollectedSource, ContentMode } from "./ContentWizardPage";
@@ -150,7 +150,10 @@ export default function StepScript({
 
 			const finalizeScenes = (scenesToFinalize: SceneData[]) => {
 				const shotSources = toShotSources(sources);
-				const motionScenes = rebalanceScenesForMotion(scenesToFinalize, shotSources);
+				const motionScenes = rebalanceScenesForMotion(
+					scenesToFinalize,
+					shotSources,
+				);
 				const shortsAdjusted =
 					format === "longform"
 						? motionScenes
@@ -371,7 +374,8 @@ export default function StepScript({
 						? {
 								...shot,
 								[field]:
-									field === "duration_seconds" && !Number.isFinite(Number(value))
+									field === "duration_seconds" &&
+									!Number.isFinite(Number(value))
 										? shot.duration_seconds
 										: value,
 							}

@@ -178,7 +178,9 @@ describe("dispatchOrder", () => {
 
 	it("client:clear-localstorage → localStorage.clear 실패 시 ok:false", async () => {
 		vi.stubGlobal("localStorage", {
-			clear: () => { throw new Error("storage locked"); },
+			clear: () => {
+				throw new Error("storage locked");
+			},
 			getItem: () => null,
 			setItem: () => {},
 			removeItem: () => {},

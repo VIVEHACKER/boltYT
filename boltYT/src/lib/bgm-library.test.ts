@@ -7,11 +7,11 @@
 
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import {
-	LOCAL_PRESETS,
-	PIXABAY_QUERIES,
 	checkLocalPresetExists,
 	clearUserDefaultBgm,
 	getUserDefaultBgm,
+	LOCAL_PRESETS,
+	PIXABAY_QUERIES,
 	setUserDefaultBgm,
 } from "./bgm-library";
 

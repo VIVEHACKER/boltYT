@@ -5,13 +5,13 @@
  * 프리셋 객체로 변환.
  */
 
-import type { ReferenceTemplate } from "../types/database";
 import type {
 	CaptionStyle,
 	SceneMood,
 	SubtitleStyle,
 	TransitionType,
 } from "../remotion/types";
+import type { ReferenceTemplate } from "../types/database";
 import type { BgmMood } from "./bgm";
 import type { TtsOptions } from "./tts";
 

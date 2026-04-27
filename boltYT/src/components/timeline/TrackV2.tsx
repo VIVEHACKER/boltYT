@@ -2,12 +2,12 @@
  * TrackV2 — 단일 트랙 렌더 + 클립 배치 + 트랙 레벨 컨트롤.
  */
 
-import type React from "react";
 import { Lock, Unlock, Volume2, VolumeX } from "lucide-react";
+import type React from "react";
 import { useCallback, useRef, useState } from "react";
+import { useShallow } from "zustand/react/shallow";
 import type { TimelineClip, TimelineTrack } from "../../lib/timeline-model";
 import { clipsOnTrack } from "../../lib/timeline-model";
-import { useShallow } from "zustand/react/shallow";
 import { useTimelineStore } from "../../lib/timeline-store";
 import { ClipV2 } from "./ClipV2";
 import { VolumeEnvelope } from "./VolumeEnvelope";

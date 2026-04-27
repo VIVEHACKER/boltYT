@@ -17,12 +17,12 @@ import {
 	selectComposition,
 } from "@remotion/renderer";
 import { createClient } from "@supabase/supabase-js";
-import type { SceneShot } from "../lib/scene-shot-types";
 import {
 	type RenderQualityPreset,
 	resolveRenderOptions,
 	toRenderMediaOptions,
 } from "../lib/render-options";
+import type { SceneShot } from "../lib/scene-shot-types";
 
 const VIDEO_FPS = 30;
 const BUNDLE_TIMEOUT_MS = 5 * 60 * 1000;

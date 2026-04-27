@@ -3,8 +3,8 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { TimelineClip } from "../../lib/timeline-model";
 import { useShallow } from "zustand/react/shallow";
+import type { TimelineClip } from "../../lib/timeline-model";
 import { useTimelineStore } from "../../lib/timeline-store";
 import { BeatGrid } from "./BeatGrid";
 import { KeyboardShortcutsModal } from "./KeyboardShortcutsModal";

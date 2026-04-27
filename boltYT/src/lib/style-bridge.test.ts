@@ -21,8 +21,8 @@ vi.mock("./tts", () => ({
 	findVoice: vi.fn(() => null),
 }));
 
-import { applyStyleToComposition, getStyleConfig } from "./style-bridge";
 import type { StyleConfig } from "./style-bridge";
+import { applyStyleToComposition, getStyleConfig } from "./style-bridge";
 
 // ─── applyStyleToComposition ──────────────────────────────────────────────────
 describe("applyStyleToComposition", () => {
@@ -194,7 +194,9 @@ describe("getStyleConfig", () => {
 					outro_template: "",
 				},
 			})
-			.mockResolvedValueOnce({ data: { name: "채널E", default_cta: "좋아요 구독" } });
+			.mockResolvedValueOnce({
+				data: { name: "채널E", default_cta: "좋아요 구독" },
+			});
 		const result = await getStyleConfig("ch-7");
 		expect(result.outro?.ctaText).toBe("좋아요 구독");
 	});

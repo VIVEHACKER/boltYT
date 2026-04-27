@@ -3,6 +3,8 @@
  *
  * Web Audio OfflineAudioContext 체인:
  *   HP Filter (80Hz)         — 저역 rumble 제거
+ *   De-mud (-2dB @ 250Hz)    — 머디한 답답함 제거
+ *   Vowel Boost (+1.5dB@1.2k) — 모음 명료도
  *   Peaking EQ (+3dB @ 2.5k) — presence (또렷함)
  *   Notch (-4dB @ 6.5k)      — de-esser (치찰음 감소)
  *   Compressor               — 다이나믹 레인지 압축
@@ -107,6 +109,20 @@ async function applyDspChain(input: AudioBuffer): Promise<AudioBuffer> {
 	hp.frequency.value = 80;
 	hp.Q.value = 0.7;
 
+	// 1.5 De-mud (-2dB @ 250Hz) — 머디한 저중역 제거 (남자 발성에서 답답함 ↓)
+	const demud = offline.createBiquadFilter();
+	demud.type = "peaking";
+	demud.frequency.value = 250;
+	demud.Q.value = 1.0;
+	demud.gain.value = -2;
+
+	// 1.7 Vowel boost (+1.5dB @ 1.2kHz) — 모음 명료도 ↑
+	const vowel = offline.createBiquadFilter();
+	vowel.type = "peaking";
+	vowel.frequency.value = 1200;
+	vowel.Q.value = 1.0;
+	vowel.gain.value = 1.5;
+
 	// 2. Presence EQ (+3dB @ 2.5kHz)
 	const presence = offline.createBiquadFilter();
 	presence.type = "peaking";
@@ -135,7 +151,9 @@ async function applyDspChain(input: AudioBuffer): Promise<AudioBuffer> {
 
 	// Connect
 	source.connect(hp);
-	hp.connect(presence);
+	hp.connect(demud);
+	demud.connect(vowel);
+	vowel.connect(presence);
 	presence.connect(deesser);
 	deesser.connect(comp);
 	comp.connect(gain);

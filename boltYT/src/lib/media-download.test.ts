@@ -4,7 +4,15 @@
  * 외부 의존성(fetch, supabase, storeLocalFile, search)은 vi.mock으로 처리
  */
 
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+	afterEach,
+	beforeAll,
+	beforeEach,
+	describe,
+	expect,
+	it,
+	vi,
+} from "vitest";
 
 // ─── Mock: local-db ───────────────────────────────────────────────────────────
 vi.mock("./local-db", () => ({
@@ -39,9 +47,15 @@ const _ls: Record<string, string> = {};
 beforeAll(() =>
 	vi.stubGlobal("localStorage", {
 		getItem: (k: string) => _ls[k] ?? null,
-		setItem: (k: string, v: string) => { _ls[k] = v; },
-		removeItem: (k: string) => { delete _ls[k]; },
-		clear: () => { for (const k of Object.keys(_ls)) delete _ls[k]; },
+		setItem: (k: string, v: string) => {
+			_ls[k] = v;
+		},
+		removeItem: (k: string) => {
+			delete _ls[k];
+		},
+		clear: () => {
+			for (const k of Object.keys(_ls)) delete _ls[k];
+		},
 	}),
 );
 
@@ -50,6 +64,7 @@ afterEach(() => {
 	mockInsert.mockResolvedValue({ data: null, error: null });
 });
 
+import { storeLocalFile } from "./local-db";
 import {
 	downloadImageToLocal,
 	downloadImageToPath,
@@ -64,7 +79,6 @@ import {
 	searchAndDownloadVideo,
 	searchAndDownloadVideoToPath,
 } from "./media-download";
-import { storeLocalFile } from "./local-db";
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 function mockFetchOk(contentType = "image/jpeg", body?: ArrayBuffer) {
@@ -81,7 +95,11 @@ function mockFetchOk(contentType = "image/jpeg", body?: ArrayBuffer) {
 function mockFetchFail(status = 404) {
 	vi.stubGlobal(
 		"fetch",
-		vi.fn().mockResolvedValue({ ok: false, status, text: () => Promise.resolve("error") }),
+		vi.fn().mockResolvedValue({
+			ok: false,
+			status,
+			text: () => Promise.resolve("error"),
+		}),
 	);
 }
 
@@ -89,20 +107,29 @@ function mockFetchFail(status = 404) {
 describe("downloadImageToPath", () => {
 	it("jpg 이미지 다운로드 성공 → url + storagePath 반환", async () => {
 		mockFetchOk("image/jpeg");
-		const result = await downloadImageToPath("scenes/s1/img.jpg", "http://img.com/photo.jpg");
+		const result = await downloadImageToPath(
+			"scenes/s1/img.jpg",
+			"http://img.com/photo.jpg",
+		);
 		expect(result.url).toContain("scenes/s1");
 		expect(result.storagePath).toContain(".jpg");
 	});
 
 	it("png URL → ext를 png로 정규화", async () => {
 		mockFetchOk("image/png");
-		const result = await downloadImageToPath("scenes/s1/img.jpg", "http://img.com/photo.png");
+		const result = await downloadImageToPath(
+			"scenes/s1/img.jpg",
+			"http://img.com/photo.png",
+		);
 		expect(result.storagePath).toContain(".png");
 	});
 
 	it("webp URL → ext를 webp로 정규화", async () => {
 		mockFetchOk("image/webp");
-		const result = await downloadImageToPath("scenes/s1/img.jpg", "http://img.com/photo.webp");
+		const result = await downloadImageToPath(
+			"scenes/s1/img.jpg",
+			"http://img.com/photo.webp",
+		);
 		expect(result.storagePath).toContain(".webp");
 	});
 
@@ -129,7 +156,10 @@ describe("downloadImageToPath", () => {
 
 	it("URL에 확장자 없을 때 → jpg 기본값 사용", async () => {
 		mockFetchOk("image/jpeg");
-		const result = await downloadImageToPath("scenes/s1/img.jpg", "http://img.com/photo");
+		const result = await downloadImageToPath(
+			"scenes/s1/img.jpg",
+			"http://img.com/photo",
+		);
 		expect(result.storagePath).toContain(".jpg");
 	});
 });
@@ -138,7 +168,10 @@ describe("downloadImageToPath", () => {
 describe("downloadImageToLocal", () => {
 	it("이미지 다운로드 + supabase insert → url 반환", async () => {
 		mockFetchOk("image/jpeg");
-		const url = await downloadImageToLocal("scene-1", "http://img.com/photo.jpg");
+		const url = await downloadImageToLocal(
+			"scene-1",
+			"http://img.com/photo.jpg",
+		);
 		expect(typeof url).toBe("string");
 		expect(mockInsert).toHaveBeenCalledWith(
 			expect.objectContaining({ scene_id: "scene-1", type: "image" }),
@@ -154,7 +187,10 @@ describe("downloadYouTubeVideoToPath", () => {
 			vi.fn().mockResolvedValue({ ok: false, status: 503 }),
 		);
 		await expect(
-			downloadYouTubeVideoToPath("scenes/s1/video.mp4", "https://youtube.com/watch?v=abc"),
+			downloadYouTubeVideoToPath(
+				"scenes/s1/video.mp4",
+				"https://youtube.com/watch?v=abc",
+			),
 		).rejects.toThrow("비디오 프록시가 실행되고 있지 않습니다");
 	});
 
@@ -164,14 +200,18 @@ describe("downloadYouTubeVideoToPath", () => {
 			vi.fn().mockRejectedValue(new Error("ECONNREFUSED")),
 		);
 		await expect(
-			downloadYouTubeVideoToPath("scenes/s1/video.mp4", "https://youtube.com/watch?v=abc"),
+			downloadYouTubeVideoToPath(
+				"scenes/s1/video.mp4",
+				"https://youtube.com/watch?v=abc",
+			),
 		).rejects.toThrow("비디오 프록시가 실행되고 있지 않습니다");
 	});
 
 	it("헬스체크 성공 + 다운로드 성공 → url + storagePath 반환", async () => {
 		vi.stubGlobal(
 			"fetch",
-			vi.fn()
+			vi
+				.fn()
 				.mockResolvedValueOnce({ ok: true }) // health check
 				.mockResolvedValueOnce({
 					ok: true,
@@ -190,7 +230,8 @@ describe("downloadYouTubeVideoToPath", () => {
 	it("헬스체크 성공 + 다운로드 실패 → throw", async () => {
 		vi.stubGlobal(
 			"fetch",
-			vi.fn()
+			vi
+				.fn()
 				.mockResolvedValueOnce({ ok: true }) // health check
 				.mockResolvedValueOnce({
 					ok: false,
@@ -199,7 +240,10 @@ describe("downloadYouTubeVideoToPath", () => {
 				}),
 		);
 		await expect(
-			downloadYouTubeVideoToPath("scenes/s1/video.mp4", "https://youtube.com/watch?v=abc"),
+			downloadYouTubeVideoToPath(
+				"scenes/s1/video.mp4",
+				"https://youtube.com/watch?v=abc",
+			),
 		).rejects.toThrow("영상 다운로드 실패");
 	});
 
@@ -207,7 +251,8 @@ describe("downloadYouTubeVideoToPath", () => {
 		_ls["video_proxy_url"] = "http://localhost:9999";
 		vi.stubGlobal(
 			"fetch",
-			vi.fn()
+			vi
+				.fn()
 				.mockResolvedValueOnce({ ok: true })
 				.mockResolvedValueOnce({
 					ok: true,
@@ -228,14 +273,18 @@ describe("downloadYouTubeVideo", () => {
 	it("다운로드 성공 + supabase insert → url 반환", async () => {
 		vi.stubGlobal(
 			"fetch",
-			vi.fn()
+			vi
+				.fn()
 				.mockResolvedValueOnce({ ok: true })
 				.mockResolvedValueOnce({
 					ok: true,
 					arrayBuffer: () => Promise.resolve(new ArrayBuffer(16)),
 				}),
 		);
-		const url = await downloadYouTubeVideo("scene-yt", "https://youtube.com/watch?v=abc");
+		const url = await downloadYouTubeVideo(
+			"scene-yt",
+			"https://youtube.com/watch?v=abc",
+		);
 		expect(typeof url).toBe("string");
 		expect(mockInsert).toHaveBeenCalledWith(
 			expect.objectContaining({ scene_id: "scene-yt", type: "video" }),
@@ -253,7 +302,10 @@ describe("downloadVideoToPath", () => {
 				arrayBuffer: () => Promise.resolve(new ArrayBuffer(32)),
 			}),
 		);
-		const result = await downloadVideoToPath("scenes/s1/video.webm", "http://cdn.com/clip.mp4");
+		const result = await downloadVideoToPath(
+			"scenes/s1/video.webm",
+			"http://cdn.com/clip.mp4",
+		);
 		expect(result.storagePath).toContain(".mp4");
 	});
 
@@ -275,7 +327,10 @@ describe("downloadVideoToLocal", () => {
 				arrayBuffer: () => Promise.resolve(new ArrayBuffer(16)),
 			}),
 		);
-		const url = await downloadVideoToLocal("scene-v", "http://cdn.com/clip.mp4");
+		const url = await downloadVideoToLocal(
+			"scene-v",
+			"http://cdn.com/clip.mp4",
+		);
 		expect(typeof url).toBe("string");
 		expect(mockInsert).toHaveBeenCalledWith(
 			expect.objectContaining({ scene_id: "scene-v", type: "video" }),
@@ -293,20 +348,32 @@ describe("downloadThumbnailToLocal", () => {
 				arrayBuffer: () => Promise.resolve(new ArrayBuffer(16)),
 			}),
 		);
-		const url = await downloadThumbnailToLocal("scene-t", "http://img.com/thumb.jpg");
+		const url = await downloadThumbnailToLocal(
+			"scene-t",
+			"http://img.com/thumb.jpg",
+		);
 		expect(typeof url).toBe("string");
 		expect(mockInsert).toHaveBeenCalled();
 	});
 
 	it("썸네일 다운로드 실패 → 빈 문자열 반환 (catch 분기)", async () => {
 		mockFetchFail(403);
-		const url = await downloadThumbnailToLocal("scene-t2", "http://img.com/fail.jpg");
+		const url = await downloadThumbnailToLocal(
+			"scene-t2",
+			"http://img.com/fail.jpg",
+		);
 		expect(url).toBe("");
 	});
 
 	it("fetch 자체 오류 → 빈 문자열 반환", async () => {
-		vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("Network Error")));
-		const url = await downloadThumbnailToLocal("scene-t3", "http://img.com/err.jpg");
+		vi.stubGlobal(
+			"fetch",
+			vi.fn().mockRejectedValue(new Error("Network Error")),
+		);
+		const url = await downloadThumbnailToLocal(
+			"scene-t3",
+			"http://img.com/err.jpg",
+		);
 		expect(url).toBe("");
 	});
 });
@@ -428,7 +495,11 @@ describe("searchAndDownloadImageToPath", () => {
 
 	it("네이버 결과 여러 개 → 큰 이미지 선택", async () => {
 		mockSearchNaverImages.mockResolvedValue([
-			{ link: "http://naver.com/small.jpg", sizewidth: "100", sizeheight: "100" },
+			{
+				link: "http://naver.com/small.jpg",
+				sizewidth: "100",
+				sizeheight: "100",
+			},
 			{ link: "http://naver.com/big.jpg", sizewidth: "800", sizeheight: "600" },
 		]);
 		mockFetchOk("image/jpeg");
@@ -483,7 +554,8 @@ describe("searchAndDownloadVideoToPath", () => {
 		]);
 		vi.stubGlobal(
 			"fetch",
-			vi.fn()
+			vi
+				.fn()
 				.mockResolvedValueOnce({ ok: true }) // proxy health
 				.mockResolvedValueOnce({
 					ok: true,
@@ -603,7 +675,8 @@ describe("searchAndDownloadVideoToPath", () => {
 		]);
 		vi.stubGlobal(
 			"fetch",
-			vi.fn()
+			vi
+				.fn()
 				.mockResolvedValue({ ok: true })
 				.mockResolvedValue({
 					ok: true,
@@ -618,7 +691,8 @@ describe("searchAndDownloadVideoToPath", () => {
 		// 첫 번째 성공
 		vi.stubGlobal(
 			"fetch",
-			vi.fn()
+			vi
+				.fn()
 				.mockResolvedValueOnce({ ok: true }) // health
 				.mockResolvedValueOnce({
 					ok: true,
@@ -633,7 +707,13 @@ describe("searchAndDownloadVideoToPath", () => {
 		]);
 		mockSearchPexelsVideos.mockRejectedValue(new Error("fail"));
 		mockSearchPixabayVideos.mockRejectedValue(new Error("fail"));
-		const result = await searchAndDownloadVideoToPath("s2/v.mp4", "forest", "숲", 20, "ko");
+		const result = await searchAndDownloadVideoToPath(
+			"s2/v.mp4",
+			"forest",
+			"숲",
+			20,
+			"ko",
+		);
 		expect(result).toBeNull();
 	});
 
@@ -662,7 +742,13 @@ describe("searchAndDownloadVideoToPath", () => {
 		mockSearchYouTubeVideos.mockResolvedValue([]);
 		mockSearchPexelsVideos.mockResolvedValue([]);
 		mockSearchPixabayVideos.mockResolvedValue([]);
-		const result = await searchAndDownloadVideoToPath("s/v.mp4", "forest", undefined, 20, "ko");
+		const result = await searchAndDownloadVideoToPath(
+			"s/v.mp4",
+			"forest",
+			undefined,
+			20,
+			"ko",
+		);
 		expect(mockSearchYouTubeVideos).toHaveBeenCalledWith("forest", 5);
 		expect(result).toBeNull();
 	});
@@ -678,14 +764,21 @@ describe("searchAndDownloadVideo", () => {
 		]);
 		vi.stubGlobal(
 			"fetch",
-			vi.fn()
+			vi
+				.fn()
 				.mockResolvedValueOnce({ ok: true }) // health
 				.mockResolvedValueOnce({
 					ok: true,
 					arrayBuffer: () => Promise.resolve(new ArrayBuffer(16)),
 				}),
 		);
-		const result = await searchAndDownloadVideo("scene-sv", "forest", "숲", 20, "ko");
+		const result = await searchAndDownloadVideo(
+			"scene-sv",
+			"forest",
+			"숲",
+			20,
+			"ko",
+		);
 		expect(result.videoUrl).not.toBe("");
 		expect(result.thumbnailUrl).toBe("http://thumb.com/t.jpg");
 		expect(mockInsert).toHaveBeenCalledWith(
@@ -711,7 +804,8 @@ describe("resetUsedVideoIds", () => {
 		]);
 		vi.stubGlobal(
 			"fetch",
-			vi.fn()
+			vi
+				.fn()
 				.mockResolvedValueOnce({ ok: true })
 				.mockResolvedValueOnce({
 					ok: true,
@@ -724,14 +818,21 @@ describe("resetUsedVideoIds", () => {
 		resetUsedVideoIds();
 		vi.stubGlobal(
 			"fetch",
-			vi.fn()
+			vi
+				.fn()
 				.mockResolvedValueOnce({ ok: true })
 				.mockResolvedValueOnce({
 					ok: true,
 					arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)),
 				}),
 		);
-		const result = await searchAndDownloadVideoToPath("s2/v.mp4", "forest", "숲", 20, "ko");
+		const result = await searchAndDownloadVideoToPath(
+			"s2/v.mp4",
+			"forest",
+			"숲",
+			20,
+			"ko",
+		);
 		expect(result).not.toBeNull();
 	});
 });

@@ -12,8 +12,8 @@ import {
 
 // ─── COLOR_MATRICES 구조 검증 ─────────────────────────────────────────────────
 describe("COLOR_MATRICES", () => {
-	it("6개 프리셋 정의", () => {
-		expect(Object.keys(COLOR_MATRICES)).toHaveLength(6);
+	it("12개 프리셋 정의 (6 베이스 + 6 확장)", () => {
+		expect(Object.keys(COLOR_MATRICES)).toHaveLength(12);
 	});
 
 	it("각 행렬은 정확히 20개 값", () => {
@@ -31,8 +31,8 @@ describe("COLOR_MATRICES", () => {
 
 // ─── COLOR_GRADE_LABELS 구조 검증 ─────────────────────────────────────────────
 describe("COLOR_GRADE_LABELS", () => {
-	it("'none' 포함 7개 레이블", () => {
-		expect(Object.keys(COLOR_GRADE_LABELS)).toHaveLength(7);
+	it("'none' 포함 13개 레이블", () => {
+		expect(Object.keys(COLOR_GRADE_LABELS)).toHaveLength(13);
 		expect(COLOR_GRADE_LABELS.none).toBe("원본");
 	});
 
@@ -70,12 +70,12 @@ describe("matrixToSvgValues", () => {
 
 // ─── suggestColorGrade ────────────────────────────────────────────────────────
 describe("suggestColorGrade", () => {
-	it("horror + dark → cold-noir", () => {
-		expect(suggestColorGrade("horror", "dark")).toBe("cold-noir");
+	it("horror + dark → true-crime-noir (확장)", () => {
+		expect(suggestColorGrade("horror", "dark")).toBe("true-crime-noir");
 	});
 
-	it("horror (lighting 없음) → teal-orange", () => {
-		expect(suggestColorGrade("horror")).toBe("teal-orange");
+	it("horror (lighting 없음) → cold-noir", () => {
+		expect(suggestColorGrade("horror")).toBe("cold-noir");
 	});
 
 	it("mystery → teal-orange", () => {
@@ -100,5 +100,21 @@ describe("suggestColorGrade", () => {
 
 	it("neutral + dark → none (bright 아닌 경우)", () => {
 		expect(suggestColorGrade("neutral", "dark")).toBe("none");
+	});
+
+	it("warm + golden → sunset-glow", () => {
+		expect(suggestColorGrade("warm", "golden")).toBe("sunset-glow");
+	});
+
+	it("neutral + cold → arctic", () => {
+		expect(suggestColorGrade("neutral", "cold")).toBe("arctic");
+	});
+
+	it("soft → k-drama-soft", () => {
+		expect(suggestColorGrade("soft")).toBe("k-drama-soft");
+	});
+
+	it("nature → nature-doc", () => {
+		expect(suggestColorGrade("nature")).toBe("nature-doc");
 	});
 });

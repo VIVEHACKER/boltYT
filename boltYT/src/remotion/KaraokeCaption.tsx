@@ -4,12 +4,12 @@
  */
 
 import { interpolate, useCurrentFrame } from "remotion";
-import type { NewsSurfaceTone } from "../lib/news-surface-theme";
 import { getNarrationCaptionMotionTheme } from "../lib/narration-caption-motion";
 import {
 	getNarrationCaptionContainerToneStyle,
 	getNarrationCaptionWordToneStyle,
 } from "../lib/narration-caption-theme";
+import type { NewsSurfaceTone } from "../lib/news-surface-theme";
 import type { RemotionScene, SubtitleStyle, WordTiming } from "./types";
 
 interface KaraokeCaptionProps {
@@ -52,7 +52,10 @@ export function KaraokeCaption({
 	);
 	const exitProgress = interpolate(
 		frame,
-		[lastEnd - motionTheme.exitLeadFrames, lastEnd + motionTheme.exitDurationFrames],
+		[
+			lastEnd - motionTheme.exitLeadFrames,
+			lastEnd + motionTheme.exitDurationFrames,
+		],
 		[1, 0],
 		{ extrapolateLeft: "clamp", extrapolateRight: "clamp" },
 	);
@@ -71,9 +74,21 @@ export function KaraokeCaption({
 		[0, 1],
 		[motionTheme.enterFromScale, 1],
 	);
-	const exitTranslateX = interpolate(exitProgress, [0, 1], [motionTheme.exitToX, 0]);
-	const exitTranslateY = interpolate(exitProgress, [0, 1], [motionTheme.exitToY, 0]);
-	const exitScale = interpolate(exitProgress, [0, 1], [motionTheme.exitToScale, 1]);
+	const exitTranslateX = interpolate(
+		exitProgress,
+		[0, 1],
+		[motionTheme.exitToX, 0],
+	);
+	const exitTranslateY = interpolate(
+		exitProgress,
+		[0, 1],
+		[motionTheme.exitToY, 0],
+	);
+	const exitScale = interpolate(
+		exitProgress,
+		[0, 1],
+		[motionTheme.exitToScale, 1],
+	);
 
 	return (
 		<p

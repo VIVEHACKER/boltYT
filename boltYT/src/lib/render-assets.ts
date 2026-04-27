@@ -30,7 +30,11 @@ function getExtensionFromUrl(url: string, fallback: string): string {
 
 function shouldMirrorToRenderServer(url: string): boolean {
 	if (!url) return false;
-	if (url.startsWith("blob:") || url.startsWith("data:") || url.startsWith("/")) {
+	if (
+		url.startsWith("blob:") ||
+		url.startsWith("data:") ||
+		url.startsWith("/")
+	) {
 		return true;
 	}
 	if (!url.startsWith("http://") && !url.startsWith("https://")) return true;
@@ -59,7 +63,9 @@ async function uploadAssetToRenderServer(
 		sourceUrl,
 		getExtensionFromContentType(contentType),
 	);
-	const finalPath = logicalPath.includes(".") ? logicalPath : `${logicalPath}.${ext}`;
+	const finalPath = logicalPath.includes(".")
+		? logicalPath
+		: `${logicalPath}.${ext}`;
 
 	const uploadRes = await fetch(
 		`${renderServer}/asset?path=${encodeURIComponent(finalPath)}`,
@@ -70,7 +76,9 @@ async function uploadAssetToRenderServer(
 		},
 	);
 	if (!uploadRes.ok) {
-		const err = await uploadRes.json().catch(() => ({ error: uploadRes.statusText }));
+		const err = await uploadRes
+			.json()
+			.catch(() => ({ error: uploadRes.statusText }));
 		throw new Error(
 			(err as { error?: string }).error ??
 				`렌더 자산 업로드 실패: ${uploadRes.status}`,
