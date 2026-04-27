@@ -20,6 +20,10 @@ const QUESTION_PATTERNS = [
 	/^(왜|어떻게|무엇|언제|누가|어디서|얼마나)/,
 	/알고\s*(계|있)셨/,
 	/혹시/,
+	// English
+	/^(why|how|what|when|who|where|did|does|do|is|are|can|could|would|will)\s/i,
+	/\bever wonder\b/i,
+	/\bguess what\b/i,
 ];
 
 const SHOCK_PATTERNS = [
@@ -50,6 +54,15 @@ const SHOCK_PATTERNS = [
 	/경이로운/,
 	/단\s*하나/,
 	/(처음|최초)\s*공개/,
+	// English shock
+	/\bshocking\b/i,
+	/\bunbelievable\b/i,
+	/\binsane\b/i,
+	/\byou won't believe\b/i,
+	/\bturn(ed|s)? out\b/i,
+	/\bplot twist\b/i,
+	/\brevealed?\b/i,
+	/\bexposed?\b/i,
 ];
 
 const CLAIM_PATTERNS = [

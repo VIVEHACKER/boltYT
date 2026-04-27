@@ -26,6 +26,9 @@ export type SfxCategory =
 	| "dark_ambient"
 	| "notification"
 	| "suspense_hit"
+	| "bell"
+	| "drone"
+	| "woosh_tail"
 	| "none";
 
 export interface SfxEntry {
@@ -177,6 +180,48 @@ export const SFX_CATALOG: SfxEntry[] = [
 		file: "notification.mp3",
 		duration: 0.6,
 		volume: 0.3,
+	},
+	{
+		id: "bell-soft",
+		category: "bell",
+		file: "bell-soft.mp3",
+		duration: 1.4,
+		volume: 0.32,
+	},
+	{
+		id: "bell-deep",
+		category: "bell",
+		file: "bell-deep.mp3",
+		duration: 2.5,
+		volume: 0.4,
+	},
+	{
+		id: "drone-low",
+		category: "drone",
+		file: "drone-low.mp3",
+		duration: 6.0,
+		volume: 0.18,
+	},
+	{
+		id: "drone-mystic",
+		category: "drone",
+		file: "drone-mystic.mp3",
+		duration: 5.5,
+		volume: 0.22,
+	},
+	{
+		id: "woosh-tail-1",
+		category: "woosh_tail",
+		file: "woosh-tail-1.mp3",
+		duration: 1.6,
+		volume: 0.3,
+	},
+	{
+		id: "woosh-tail-2",
+		category: "woosh_tail",
+		file: "woosh-tail-2.mp3",
+		duration: 1.2,
+		volume: 0.28,
 	},
 ];
 

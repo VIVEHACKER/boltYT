@@ -212,6 +212,15 @@ async function applyDspChain(rawInput: AudioBuffer): Promise<AudioBuffer> {
 	const gain = offline.createGain();
 	gain.gain.value = makeupGain;
 
+	// 6. Soft limiter (peak ceiling -1dBFS)
+	//    DynamicsCompressor 를 매우 빠른 attack + 높은 ratio 로 사용 → brick-wall 근사
+	const limiter = offline.createDynamicsCompressor();
+	limiter.threshold.value = -1.5; // 살짝 위에서부터 잡기
+	limiter.ratio.value = 20; // brick-wall
+	limiter.attack.value = 0.0005;
+	limiter.release.value = 0.05;
+	limiter.knee.value = 0.5;
+
 	// Connect — series chain 분기 → parallel mix
 	source.connect(hp);
 	hp.connect(demud);
@@ -228,7 +237,8 @@ async function applyDspChain(rawInput: AudioBuffer): Promise<AudioBuffer> {
 	wetGain.connect(mixGain);
 	// final
 	mixGain.connect(gain);
-	gain.connect(offline.destination);
+	gain.connect(limiter);
+	limiter.connect(offline.destination);
 
 	source.start(0);
 	return offline.startRendering();

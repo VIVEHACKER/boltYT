@@ -419,12 +419,20 @@ interface SceneProps {
 	usage?: "preview" | "render";
 }
 
-/** subtitlePosition → flex 배치 변환 */
+/** subtitlePosition → flex 배치 변환. shot_type 이 close/extreme close 면 dynamic 일 때 top 으로. */
 function positionToFlex(
 	pos: SubtitlePosition,
 	isEmphasis: boolean,
+	shotType?: string,
 ): "flex-start" | "center" | "flex-end" {
-	if (pos === "dynamic") return isEmphasis ? "center" : "flex-end";
+	if (pos === "dynamic") {
+		if (isEmphasis) return "center";
+		// 클로즈업 → 자막 위쪽 (얼굴 가리지 않게)
+		if (shotType === "close_up" || shotType === "extreme_close")
+			return "flex-start";
+		// 와이드 → 자막 아래
+		return "flex-end";
+	}
 	if (pos === "top") return "flex-start";
 	if (pos === "center") return "center";
 	return "flex-end";
@@ -907,7 +915,11 @@ function NewsOverlayView({
 			{/* 하단 나레이션 자막 */}
 			<AbsoluteFill
 				style={{
-					justifyContent: positionToFlex(subtitlePosition, false),
+					justifyContent: positionToFlex(
+						subtitlePosition,
+						false,
+						scene.shot_type,
+					),
 					alignItems: "center",
 					padding: `${layout.topPad}px ${layout.sidePad}px ${layout.bottomPad}px`,
 				}}
@@ -1187,7 +1199,11 @@ function DefaultSceneView({
 			{/* 자막 */}
 			<AbsoluteFill
 				style={{
-					justifyContent: positionToFlex(subtitlePosition, isEmphasis),
+					justifyContent: positionToFlex(
+						subtitlePosition,
+						isEmphasis,
+						scene.shot_type,
+					),
 					alignItems: "center",
 					padding: `${layout.topPad}px ${layout.sidePad}px ${layout.bottomPad}px`,
 				}}
@@ -1597,7 +1613,11 @@ function VideoSceneView({
 			{/* 자막 */}
 			<AbsoluteFill
 				style={{
-					justifyContent: positionToFlex(subtitlePosition, false),
+					justifyContent: positionToFlex(
+						subtitlePosition,
+						false,
+						scene.shot_type,
+					),
 					alignItems: "center",
 					padding: `${layout.topPad}px ${layout.sidePad}px ${layout.bottomPad}px`,
 				}}

@@ -12,6 +12,8 @@ import type { RenderOptionsInput } from "../../src/lib/render-options.js";
 
 // ─── 타입 ────────────────────────────────────────────────────────────────────
 
+export type RenderJobPriority = "high" | "normal" | "low";
+
 export interface RenderJob {
 	id: string;
 	scriptId: string;
@@ -29,6 +31,29 @@ export interface RenderJob {
 	renderOptions?: RenderOptionsInput;
 	timeoutMs?: number;
 	lastFrame?: number;
+	/** high → 큐 head 로 점프, low → tail 로. 기본 normal (FIFO). */
+	priority?: RenderJobPriority;
+}
+
+/** 우선순위 weight (정렬용) */
+export function priorityWeight(p?: RenderJobPriority): number {
+	if (p === "high") return 0;
+	if (p === "low") return 2;
+	return 1;
+}
+
+/**
+ * 큐를 priority 기반으로 안정 정렬 — high 먼저, normal 다음, low 마지막.
+ * 같은 priority 안에서는 createdAt 순서 유지 (stable).
+ */
+export function sortByPriority(jobs: RenderJob[]): RenderJob[] {
+	return [...jobs].sort((a, b) => {
+		const pa = priorityWeight(a.priority);
+		const pb = priorityWeight(b.priority);
+		if (pa !== pb) return pa - pb;
+		// stable: createdAt asc
+		return (a.createdAt || "").localeCompare(b.createdAt || "");
+	});
 }
 
 export const VALID_FORMATS = new Set(["shorts", "longform"]);

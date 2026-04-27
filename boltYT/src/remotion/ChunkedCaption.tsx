@@ -366,6 +366,10 @@ export function ChunkedCaption({
 							: emphasis
 								? 680
 								: 580;
+					// emoji 포함된 단어는 line-height 보정 (이모지가 위/아래로 잘리는 문제 방지)
+					const hasEmoji = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(
+						w.word,
+					);
 					return (
 						<span
 							key={`${w.word}-${w.startFrame}`}
@@ -380,6 +384,8 @@ export function ChunkedCaption({
 								...wordEffect,
 								...toneWordStyle,
 								letterSpacing: 0,
+								lineHeight: hasEmoji ? 1.4 : undefined,
+								padding: hasEmoji ? "0 4px" : undefined,
 							}}
 						>
 							{w.word}

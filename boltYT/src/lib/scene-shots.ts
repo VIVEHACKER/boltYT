@@ -1124,31 +1124,42 @@ function isHardTransition(transition?: string) {
 	);
 }
 
+/**
+ * 이전 transition 의 방향(left/right)을 추적해 같은 방향이 연속되지 않도록 결정.
+ * (index % 2 만 쓰면 시청자가 패턴 인지 → 위화감)
+ */
 function preferredShortsTransition(
 	index: number,
 	sceneType: SceneType,
 	prevType?: SceneType,
+	prevTransition?: string,
 ): string {
 	if (index <= 1) return "none";
 	if (sceneType === "text_emphasis") return "glitch";
 	// text_emphasis 이후: hard cut으로 바로 돌아옴
 	if (prevType === "text_emphasis") return "none";
-	// image → video 전환: whip으로 긴장감 유지
-	if (prevType === "image" && sceneType === "video") {
+
+	// 이전이 whip_right 였으면 이번엔 whip_left (반대 방향)
+	const oppositeWhip = (prev?: string) => {
+		if (prev === "whip_right" || prev === "push_right") return "whip_left";
+		if (prev === "whip_left" || prev === "push_left") return "whip_right";
 		return index % 2 === 0 ? "whip_right" : "whip_left";
+	};
+
+	// image → video 전환: whip으로 긴장감 유지 (반대 방향)
+	if (prevType === "image" && sceneType === "video") {
+		return oppositeWhip(prevTransition);
 	}
-	// video → image 전환: whip 또는 드물게 zoom
+	// video → image 전환: whip 또는 드물게 zoom_punch
 	if (prevType === "video" && sceneType === "image") {
-		return index % 5 === 0
-			? "zoom"
-			: index % 2 === 0
-				? "whip_left"
-				: "whip_right";
+		if (index % 5 === 0) return "zoom_punch";
+		return oppositeWhip(prevTransition);
 	}
-	// 일반: crossfade 남용 제거, hard 위주
-	if (index % 7 === 0) return "zoom"; // 드물게 zoom
+	// 일반: hard cut 위주, 가끔 zoom_punch / light_leak
+	if (index % 11 === 0) return "light_leak";
+	if (index % 7 === 0) return "zoom_punch";
 	if (index % 3 === 0) return "none";
-	return index % 2 === 0 ? "whip_right" : "whip_left";
+	return oppositeWhip(prevTransition);
 }
 
 export function rebalanceScenesForMotion<T extends ShotSceneInput>(
