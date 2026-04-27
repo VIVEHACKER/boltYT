@@ -32,6 +32,27 @@ export type BgmMood =
 	| "epic"
 	| "sad";
 
+/**
+ * 외부 mood 키워드 → BgmMood 정규화.
+ * 레퍼런스 템플릿이나 Scene.bgm_mood 가 다양한 표현을 사용해도 일관된 매칭.
+ */
+export function normalizeMood(input?: string): BgmMood {
+	if (!input) return "calm";
+	const m = input.toLowerCase().trim();
+	if (/horror|scary|creepy|haunt/.test(m)) return "dark";
+	if (/tense|tension|thriller|suspense|pulse/.test(m)) return "tense";
+	if (/mystery|mysterious|detective|investigat/.test(m)) return "mysterious";
+	if (/drama|emotional|powerful|grand/.test(m)) return "dramatic";
+	if (/calm|peace|relax|chill|quiet|ambient/.test(m)) return "calm";
+	if (/upbeat|happy|cheerful|positive|fun|energy|energetic/.test(m))
+		return "upbeat";
+	if (/epic|cinematic|trailer|hero|battle/.test(m)) return "epic";
+	if (/sad|melancholy|lonely|sorrow/.test(m)) return "sad";
+	if (/hopeful/.test(m)) return "calm";
+	if (/neutral/.test(m)) return "calm";
+	return "calm";
+}
+
 /** 장르/분위기별 검색 키워드 매핑 */
 const MOOD_QUERIES: Record<BgmMood, string> = {
 	dark: "dark ambient horror",
