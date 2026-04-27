@@ -195,6 +195,38 @@ export function matrixToSvgValues(m: ColorMatrix): string {
 	return m.join(" ");
 }
 
+/** 표준 photo 필터 — invert / sepia / grayscale */
+export const PHOTO_INVERT: ColorMatrix = [
+	-1, 0, 0, 0, 1, 0, -1, 0, 0, 1, 0, 0, -1, 0, 1, 0, 0, 0, 1, 0,
+];
+
+export const PHOTO_SEPIA: ColorMatrix = [
+	0.393, 0.769, 0.189, 0, 0, 0.349, 0.686, 0.168, 0, 0, 0.272, 0.534, 0.131, 0,
+	0, 0, 0, 0, 1, 0,
+];
+
+export const PHOTO_GRAYSCALE: ColorMatrix = [
+	0.299, 0.587, 0.114, 0, 0, 0.299, 0.587, 0.114, 0, 0, 0.299, 0.587, 0.114, 0,
+	0, 0, 0, 0, 1, 0,
+];
+
+/** 두 매트릭스를 행렬 곱 (4x5 합성). 색보정 누적 적용 시 1회 컴파일로 처리. */
+export function multiplyMatrices(a: ColorMatrix, b: ColorMatrix): ColorMatrix {
+	const out = new Array(20).fill(0) as number[];
+	for (let row = 0; row < 4; row++) {
+		for (let col = 0; col < 5; col++) {
+			let sum = 0;
+			for (let k = 0; k < 4; k++) {
+				sum += a[row * 5 + k] * b[k * 5 + col];
+			}
+			// offset column accumulates extra constant
+			if (col === 4) sum += a[row * 5 + 4];
+			out[row * 5 + col] = sum;
+		}
+	}
+	return out as unknown as ColorMatrix;
+}
+
 /** Identity matrix — 색 변화 없음 */
 const IDENTITY: ColorMatrix = [
 	1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0,

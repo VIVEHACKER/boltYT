@@ -249,12 +249,15 @@ export function ChunkedCaption({
 	if (!activeChunk) return null;
 
 	// 청크 글자수에 따른 어댑티브 폰트 — 길면 작게 (단일행 유지 시도)
-	const chunkChars = activeChunk.words.reduce(
-		(s, w) => s + w.word.length,
-		0,
-	);
+	const chunkChars = activeChunk.words.reduce((s, w) => s + w.word.length, 0);
 	const fontScale =
-		chunkChars > 22 ? 0.85 : chunkChars > 18 ? 0.92 : chunkChars > 14 ? 0.96 : 1;
+		chunkChars > 22
+			? 0.85
+			: chunkChars > 18
+				? 0.92
+				: chunkChars > 14
+					? 0.96
+					: 1;
 	const fontSize = Math.round(baseFontSize * fontScale);
 
 	// 청크 등장 애니메이션
@@ -379,6 +382,8 @@ export function ChunkedCaption({
 					const hasEmoji = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(
 						w.word,
 					);
+					// 따옴표로 감싼 단어는 italic
+					const isQuoted = /["「『'""].+["」』'""]/.test(w.word);
 					return (
 						<span
 							key={`${w.word}-${w.startFrame}`}
@@ -395,6 +400,7 @@ export function ChunkedCaption({
 								letterSpacing: 0,
 								lineHeight: hasEmoji ? 1.4 : undefined,
 								padding: hasEmoji ? "0 4px" : undefined,
+								fontStyle: isQuoted ? "italic" : undefined,
 							}}
 						>
 							{w.word}
