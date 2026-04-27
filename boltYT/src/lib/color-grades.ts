@@ -168,6 +168,26 @@ const IDENTITY: ColorMatrix = [
 	1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0,
 ];
 
+export type EaseCurve = "linear" | "ease_in" | "ease_out" | "ease_in_out";
+
+/** 표준 cubic ease 함수들 (color grade 트랜지션용) */
+export function applyEase(t: number, curve: EaseCurve): number {
+	const x = Math.max(0, Math.min(1, t));
+	switch (curve) {
+		case "ease_in":
+			return x * x * x;
+		case "ease_out": {
+			const inv = 1 - x;
+			return 1 - inv * inv * inv;
+		}
+		case "ease_in_out":
+			// smoothstep cubic
+			return x * x * (3 - 2 * x);
+		default:
+			return x;
+	}
+}
+
 /**
  * 두 프리셋 사이 t∈[0,1] 보간된 행렬 반환.
  * 씬 시작 시 from → 끝에 to 로 변환되는 시네마틱 그레이딩 트랜지션에 사용.
@@ -177,12 +197,13 @@ export function interpolateColorMatrices(
 	from: ColorGradePreset,
 	to: ColorGradePreset,
 	t: number,
+	curve: EaseCurve = "ease_in_out",
 ): ColorMatrix {
 	const a = from === "none" ? IDENTITY : COLOR_MATRICES[from];
 	const b = to === "none" ? IDENTITY : COLOR_MATRICES[to];
-	const clamped = Math.max(0, Math.min(1, t));
+	const eased = applyEase(t, curve);
 	const out = new Array(20) as number[];
-	for (let i = 0; i < 20; i++) out[i] = a[i] * (1 - clamped) + b[i] * clamped;
+	for (let i = 0; i < 20; i++) out[i] = a[i] * (1 - eased) + b[i] * eased;
 	return out as unknown as ColorMatrix;
 }
 

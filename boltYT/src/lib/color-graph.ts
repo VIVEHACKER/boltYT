@@ -31,7 +31,9 @@ export type ColorNode =
 			saturationDelta?: number;
 			lightnessDelta?: number;
 			hueDelta?: number;
-	  };
+	  }
+	| { kind: "sharpen"; amount: number }
+	| { kind: "bloom"; threshold: number; intensity: number };
 
 export type ColorGraph = ColorNode[];
 
@@ -145,6 +147,22 @@ export function applyNode(px: ColorPixel, node: ColorNode): ColorPixel {
 				clamp01(hsl.l + (node.lightnessDelta ?? 0) * mask),
 			);
 			return out;
+		}
+		case "sharpen": {
+			// 픽셀 단위 sharpen 는 의미 없음 — 컴파일 시 CSS contrast 로 근사 (CSS 경로)
+			// 또는 WebGL 샤더에서 unsharp mask. 평가 단계에서는 패스스루.
+			return px;
+		}
+		case "bloom": {
+			// Bloom 도 인접 픽셀 정보 필요 → 픽셀 단위 평가에서는 brightness boost 로만 근사
+			const luma = 0.299 * px.r + 0.587 * px.g + 0.114 * px.b;
+			if (luma < node.threshold) return px;
+			const k = 1 + node.intensity * (luma - node.threshold);
+			return {
+				r: clamp01(px.r * k),
+				g: clamp01(px.g * k),
+				b: clamp01(px.b * k),
+			};
 		}
 	}
 }

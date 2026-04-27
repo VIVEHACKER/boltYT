@@ -232,7 +232,7 @@ export function ChunkedCaption({
 	sceneType = "image",
 }: Props) {
 	const frame = useCurrentFrame();
-	const fontSize = emphasis ? sub.emphasisFontSize : sub.fontSize;
+	const baseFontSize = emphasis ? sub.emphasisFontSize : sub.fontSize;
 	const chunks = buildChunks(words);
 	const motionTheme = getNarrationCaptionMotionTheme({
 		sceneType,
@@ -247,6 +247,15 @@ export function ChunkedCaption({
 	);
 
 	if (!activeChunk) return null;
+
+	// 청크 글자수에 따른 어댑티브 폰트 — 길면 작게 (단일행 유지 시도)
+	const chunkChars = activeChunk.words.reduce(
+		(s, w) => s + w.word.length,
+		0,
+	);
+	const fontScale =
+		chunkChars > 22 ? 0.85 : chunkChars > 18 ? 0.92 : chunkChars > 14 ? 0.96 : 1;
+	const fontSize = Math.round(baseFontSize * fontScale);
 
 	// 청크 등장 애니메이션
 	const enterProgress = interpolate(

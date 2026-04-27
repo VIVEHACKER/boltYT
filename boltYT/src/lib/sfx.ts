@@ -257,6 +257,29 @@ function pickVariant(category: SfxCategory, seed = 0): SfxEntry | undefined {
 	return matches[Math.abs(seed) % matches.length];
 }
 
+/** Mood 별 SFX 볼륨 스케일 (1.0 = 원본). horror 는 강조, news 는 절제. */
+export function moodVolumeScale(mood?: SceneMood): number {
+	if (mood === "horror") return 1.25;
+	if (mood === "mystery") return 1.1;
+	if (mood === "news") return 0.75;
+	if (mood === "warm") return 0.9;
+	return 1;
+}
+
+/** SfxEntry 의 volume 을 mood 에 맞게 적용한 새 entry 반환. */
+export function withMoodVolume(
+	entry: SfxEntry | undefined,
+	mood?: SceneMood,
+): SfxEntry | undefined {
+	if (!entry) return undefined;
+	const scale = moodVolumeScale(mood);
+	if (scale === 1) return entry;
+	return {
+		...entry,
+		volume: Math.max(0, Math.min(1, entry.volume * scale)),
+	};
+}
+
 function clampFrame(value: number, min: number, max: number): number {
 	return Math.max(min, Math.min(max, value));
 }

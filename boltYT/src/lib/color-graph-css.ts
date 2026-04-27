@@ -33,6 +33,15 @@ function cssFilterOf(node: ColorNode): string | null {
 		case "hsl-qualifier":
 			// CSS filter 로 마스크 기반 부분 수정 불가 — WebGL shader 경로 필요
 			return null;
+		case "sharpen": {
+			// CSS 에 sharpen 직접 없음 — contrast(1+a*0.5) 로 근사
+			return `contrast(${(1 + node.amount * 0.5).toFixed(4)})`;
+		}
+		case "bloom": {
+			// CSS 에 bloom 직접 없음 — brightness 살짝 + drop-shadow 글로우로 근사
+			const b = (1 + node.intensity * 0.2).toFixed(4);
+			return `brightness(${b})`;
+		}
 	}
 }
 
