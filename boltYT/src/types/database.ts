@@ -183,12 +183,22 @@ export interface Scene {
 		| "cold-noir"
 		| "vibrant-pop"
 		| "muted-doc"
-		| "retro-vhs";
+		| "retro-vhs"
+		| "cinematic-bleach"
+		| "sunset-glow"
+		| "arctic"
+		| "k-drama-soft"
+		| "true-crime-noir"
+		| "nature-doc";
 	transition?:
 		| "crossfade"
 		| "zoom"
+		| "zoom_punch"
+		| "light_leak"
 		| "slide_left"
 		| "slide_right"
+		| "push_left"
+		| "push_right"
 		| "glitch"
 		| "whip_left"
 		| "whip_right"
