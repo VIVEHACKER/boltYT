@@ -24,6 +24,59 @@ export function setVoiceDspEnabled(enabled: boolean): void {
 	localStorage.setItem("voice_dsp_enabled", String(enabled));
 }
 
+/** Voice DSP 프로파일 — 음성 특성별 EQ 곡선 차별화 */
+export type VoiceProfile = "neutral" | "male" | "female";
+
+export interface VoiceProfileParams {
+	hpFreq: number; // High-pass cutoff (Hz)
+	demudFreq: number; // De-mud center
+	demudGain: number;
+	vowelFreq: number; // Vowel boost center
+	presenceFreq: number;
+	deesserFreq: number; // De-esser center
+}
+
+export const VOICE_PROFILES: Record<VoiceProfile, VoiceProfileParams> = {
+	neutral: {
+		hpFreq: 80,
+		demudFreq: 250,
+		demudGain: -2,
+		vowelFreq: 1200,
+		presenceFreq: 2500,
+		deesserFreq: 6500,
+	},
+	// 남성: 저역 더 컷 (60Hz 까지 살림), de-mud 320Hz, presence 2.2k
+	male: {
+		hpFreq: 60,
+		demudFreq: 320,
+		demudGain: -2.5,
+		vowelFreq: 1100,
+		presenceFreq: 2200,
+		deesserFreq: 6000,
+	},
+	// 여성: 저역 보호 100Hz, de-mud 200Hz, presence 3k, deesser 7k
+	female: {
+		hpFreq: 100,
+		demudFreq: 200,
+		demudGain: -1.5,
+		vowelFreq: 1400,
+		presenceFreq: 3000,
+		deesserFreq: 7000,
+	},
+};
+
+export function getVoiceProfile(): VoiceProfile {
+	if (typeof localStorage === "undefined") return "neutral";
+	const v = localStorage.getItem("voice_dsp_profile");
+	if (v === "male" || v === "female") return v;
+	return "neutral";
+}
+
+export function setVoiceProfile(profile: VoiceProfile): void {
+	if (typeof localStorage === "undefined") return;
+	localStorage.setItem("voice_dsp_profile", profile);
+}
+
 let _sharedCtx: AudioContext | null = null;
 
 /**

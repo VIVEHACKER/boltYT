@@ -210,6 +210,57 @@ export const PHOTO_GRAYSCALE: ColorMatrix = [
 	0, 0, 0, 0, 1, 0,
 ];
 
+/**
+ * Luminance-preserving saturation matrix.
+ * 일반 saturation 은 채도 ↑ 시 luma 도 살짝 변하지만, 이 행렬은 ITU-R BT.709
+ * 가중치(0.213/0.715/0.072) 를 써서 luma 를 보존.
+ *   amount: 0 = 원본, 1 = +100% 채도, -1 = grayscale
+ */
+export function luminancePreservingSaturation(amount: number): ColorMatrix {
+	const s = 1 + amount;
+	const lr = 0.213;
+	const lg = 0.715;
+	const lb = 0.072;
+	return [
+		lr + (1 - lr) * s,
+		lg - lg * s,
+		lb - lb * s,
+		0,
+		0,
+		lr - lr * s,
+		lg + (1 - lg) * s,
+		lb - lb * s,
+		0,
+		0,
+		lr - lr * s,
+		lg - lg * s,
+		lb + (1 - lb) * s,
+		0,
+		0,
+		0,
+		0,
+		0,
+		1,
+		0,
+	];
+}
+
+/**
+ * 여러 preset 을 순차 합성한 단일 매트릭스 반환.
+ * 예: combinePresets(["teal-orange", "cinematic-bleach"]) → 두 룩이 누적 적용된 행렬.
+ * 순서가 결과에 영향 (matrix multiplication 비가환).
+ */
+export function combinePresets(
+	presets: Exclude<ColorGradePreset, "none">[],
+): ColorMatrix {
+	if (presets.length === 0) return IDENTITY;
+	let result = COLOR_MATRICES[presets[0]];
+	for (let i = 1; i < presets.length; i++) {
+		result = multiplyMatrices(result, COLOR_MATRICES[presets[i]]);
+	}
+	return result;
+}
+
 /** 두 매트릭스를 행렬 곱 (4x5 합성). 색보정 누적 적용 시 1회 컴파일로 처리. */
 export function multiplyMatrices(a: ColorMatrix, b: ColorMatrix): ColorMatrix {
 	const out = new Array(20).fill(0) as number[];
