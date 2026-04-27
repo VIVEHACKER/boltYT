@@ -12,7 +12,12 @@
 
 export type RenderCodec = "h264" | "h265" | "vp9";
 
-export type RenderQualityPreset = "draft" | "balanced" | "high" | "archive";
+export type RenderQualityPreset =
+	| "draft"
+	| "balanced"
+	| "high"
+	| "archive"
+	| "shorts_60";
 
 /**
  * Remotion hardware acceleration 옵션.
@@ -116,6 +121,19 @@ const PRESETS: Record<
 		hardwareAccel: "disable",
 		useCrf: true,
 	},
+	// 60fps 쇼츠 — 부드러운 모션, YouTube Shorts/TikTok 권장
+	// 1080x1920 60fps + h264 High@4.2 호환, HW 가속으로 빠른 인코딩
+	shorts_60: {
+		codec: "h264",
+		crf: 19,
+		videoBitrate: "16M",
+		audioBitrate: "256k",
+		x264Preset: "medium",
+		jpegQuality: 95,
+		pixelFormat: "yuv420p",
+		hardwareAccel: "if-possible",
+		useCrf: true,
+	},
 };
 
 export const DEFAULT_PRESET: RenderQualityPreset = "high";
@@ -126,6 +144,7 @@ export const QUALITY_LABELS: Record<RenderQualityPreset, string> = {
 	balanced: "표준",
 	high: "고화질",
 	archive: "아카이브 (최고)",
+	shorts_60: "쇼츠 60fps",
 };
 
 export const QUALITY_DESCRIPTIONS: Record<RenderQualityPreset, string> = {
@@ -133,6 +152,7 @@ export const QUALITY_DESCRIPTIONS: Record<RenderQualityPreset, string> = {
 	balanced: "기본 · 8Mbps · HW 가속 · SNS 업로드",
 	high: "12Mbps · SW 인코딩 · YouTube 권장",
 	archive: "20Mbps · SW 인코딩 · 원본 보관용",
+	shorts_60: "60fps · 16Mbps · HW 가속 · TikTok/Shorts",
 };
 
 export const HARDWARE_LABELS: Record<HardwareAccel, string> = {

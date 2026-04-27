@@ -23,10 +23,16 @@ function getMoodCutFrames(scene?: RemotionScene): {
 	return { jPre: J_CUT_PRE_FRAMES, lPost: L_CUT_POST_FRAMES };
 }
 
-/** 씬별 트랜지션 프레임 수 계산 */
+/** 씬별 트랜지션 프레임 수 계산 — pacing 별 boost (slow ↑ / fast ↓) */
 export function getOverlapFrames(scene: RemotionScene): number {
 	const t = scene.transition ?? "crossfade";
-	return TRANSITION_FRAMES[t];
+	const base = TRANSITION_FRAMES[t];
+	// crossfade 만 pacing 영향 — 다른 트랜지션은 효과 자체가 길이 의존적
+	if (t !== "crossfade") return base;
+	const pacing = scene.pacing;
+	if (pacing === "fast") return Math.max(8, Math.round(base * 0.55));
+	if (pacing === "slow") return Math.round(base * 1.6);
+	return base;
 }
 
 export function getSceneAudioWindow(

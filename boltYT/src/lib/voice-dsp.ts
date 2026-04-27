@@ -185,7 +185,7 @@ async function applyDspChain(rawInput: AudioBuffer): Promise<AudioBuffer> {
 	deesser.Q.value = 3;
 	deesser.gain.value = -4;
 
-	// 4. Compressor
+	// 4a. Series compressor — 일반적인 다이나믹 압축 (3:1)
 	const comp = offline.createDynamicsCompressor();
 	comp.threshold.value = -18;
 	comp.ratio.value = 3;
@@ -193,18 +193,41 @@ async function applyDspChain(rawInput: AudioBuffer): Promise<AudioBuffer> {
 	comp.release.value = 0.05;
 	comp.knee.value = 6;
 
+	// 4b. Parallel "NY-style" heavy compressor — 평행 체인으로 살짝 섞어 punch 보강
+	//     dry 80% + wet 20% 비율 (-1.94 dB 다운, perceived punch ↑)
+	const parallelComp = offline.createDynamicsCompressor();
+	parallelComp.threshold.value = -32;
+	parallelComp.ratio.value = 8;
+	parallelComp.attack.value = 0.001;
+	parallelComp.release.value = 0.12;
+	parallelComp.knee.value = 3;
+	const dryGain = offline.createGain();
+	dryGain.gain.value = 0.8;
+	const wetGain = offline.createGain();
+	wetGain.gain.value = 0.2;
+	const mixGain = offline.createGain();
+	mixGain.gain.value = 1;
+
 	// 5. Makeup Gain (Loudness normalize)
 	const gain = offline.createGain();
 	gain.gain.value = makeupGain;
 
-	// Connect
+	// Connect — series chain 분기 → parallel mix
 	source.connect(hp);
 	hp.connect(demud);
 	demud.connect(vowel);
 	vowel.connect(presence);
 	presence.connect(deesser);
 	deesser.connect(comp);
-	comp.connect(gain);
+	// dry path
+	comp.connect(dryGain);
+	dryGain.connect(mixGain);
+	// wet path (parallel heavy comp)
+	comp.connect(parallelComp);
+	parallelComp.connect(wetGain);
+	wetGain.connect(mixGain);
+	// final
+	mixGain.connect(gain);
 	gain.connect(offline.destination);
 
 	source.start(0);

@@ -150,12 +150,34 @@ export function referenceToPreset(
 }
 
 /**
+ * Mood → cinematic descriptor 매핑 (이미지 prompt 인텐시티 부스트).
+ */
+export function moodVisualIntensity(mood?: string): string {
+	switch (mood) {
+		case "horror":
+			return "high contrast, deep shadows, cold blue accents, ominous atmosphere";
+		case "mystery":
+			return "moody chiaroscuro, amber backlighting, fog particles, shallow depth of field";
+		case "warm":
+			return "soft golden hour, warm saturated tones, gentle bokeh";
+		case "news":
+			return "neutral journalistic lighting, sharp focus, documentary realism";
+		case "neutral":
+			return "balanced cinematic exposure, natural color grading";
+		default:
+			return "";
+	}
+}
+
+/**
  * 씬별 visual_prompt에 템플릿의 시각 스타일 DNA를 주입.
  * 원본 prompt는 WHAT(내용), 템플릿은 HOW(스타일).
+ * mood 가 주어지면 mood 기반 cinematic descriptor 도 추가.
  */
 export function enrichVisualPrompt(
 	sceneVisualPrompt: string,
 	preset: ReferencePreset,
+	mood?: string,
 ): string {
 	const style = preset.image.promptTemplate.trim();
 	const colorHint =
@@ -170,10 +192,15 @@ export function enrichVisualPrompt(
 				: preset.image.lighting === "mixed"
 					? "dynamic contrast lighting"
 					: "natural cinematic lighting";
+	const moodHint = moodVisualIntensity(mood);
 
-	const parts = [sceneVisualPrompt, style, colorHint, lightingHint].filter(
-		Boolean,
-	);
+	const parts = [
+		sceneVisualPrompt,
+		style,
+		colorHint,
+		lightingHint,
+		moodHint,
+	].filter(Boolean);
 	return parts.join(", ");
 }
 

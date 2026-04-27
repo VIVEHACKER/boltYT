@@ -184,7 +184,7 @@ function getBgContainerStyle(
 	};
 }
 
-// bgStyle별 단어 shadow/stroke
+// bgStyle별 단어 shadow/stroke (multi-layer 깊이감)
 function getWordEffect(
 	bgStyle: ChunkedCaptionBgStyle,
 	isActive: boolean,
@@ -193,22 +193,31 @@ function getWordEffect(
 	if (bgStyle === "stroke") {
 		return {
 			WebkitTextStroke: "2px rgba(0,0,0,0.92)",
+			// 멀티 레이어: 가까운 그림자 + 먼 부드러운 그림자
 			textShadow: isActive
-				? "0 2px 10px rgba(0,0,0,0.7)"
-				: "0 2px 4px rgba(0,0,0,0.7)",
+				? "0 1px 0 rgba(0,0,0,0.8), 0 3px 8px rgba(0,0,0,0.7), 0 6px 18px rgba(0,0,0,0.4)"
+				: "0 1px 0 rgba(0,0,0,0.7), 0 2px 5px rgba(0,0,0,0.6)",
 		};
 	}
 	if (bgStyle === "glow") {
 		return {
 			WebkitTextStroke: "1.5px rgba(0,0,0,0.9)",
-			textShadow: `0 0 12px ${accentColor}88, 0 0 24px ${accentColor}55, 0 2px 6px rgba(0,0,0,0.8)`,
+			// 글로우 + 깊이 그림자
+			textShadow: `0 0 8px ${accentColor}aa, 0 0 18px ${accentColor}66, 0 0 32px ${accentColor}33, 0 2px 6px rgba(0,0,0,0.8)`,
+		};
+	}
+	if (bgStyle === "ticker" || bgStyle === "spotlight") {
+		return {
+			WebkitTextStroke: "1px rgba(0,0,0,0.9)",
+			textShadow:
+				"0 1px 0 rgba(0,0,0,0.6), 0 2px 4px rgba(0,0,0,0.45), 0 4px 12px rgba(0,0,0,0.3)",
 		};
 	}
 	return {
 		WebkitTextStroke: "1.5px rgba(0,0,0,0.85)",
 		textShadow: isActive
-			? "0 2px 8px rgba(0,0,0,0.7)"
-			: "0 1px 4px rgba(0,0,0,0.6)",
+			? "0 1px 0 rgba(0,0,0,0.7), 0 2px 6px rgba(0,0,0,0.6), 0 5px 14px rgba(0,0,0,0.35)"
+			: "0 1px 0 rgba(0,0,0,0.55), 0 2px 4px rgba(0,0,0,0.5)",
 	};
 }
 
