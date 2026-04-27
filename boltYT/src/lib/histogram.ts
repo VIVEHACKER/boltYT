@@ -35,6 +35,30 @@ export function computeHistogram(
 	return { r, g, b, bins, samples };
 }
 
+/**
+ * 히스토그램 → 자동 노출 보정값 추정 (EV stops).
+ * - 평균 밝기 계산
+ * - 너무 어두움 (mean < 80) → +0.3 ~ +0.6 EV
+ * - 너무 밝음 (mean > 175) → -0.3 ~ -0.5 EV
+ * - 중심 (110-145) → 0 (보정 불필요)
+ */
+export function suggestExposureFromHistogram(h: RgbHistogram): number {
+	if (h.samples === 0) return 0;
+	let sum = 0;
+	for (let i = 0; i < h.bins; i++) {
+		const center = ((i + 0.5) / h.bins) * 256;
+		sum += (h.r[i] + h.g[i] + h.b[i]) * center;
+	}
+	const mean = sum / (3 * h.samples);
+	if (mean < 60) return 0.6;
+	if (mean < 80) return 0.4;
+	if (mean < 100) return 0.2;
+	if (mean > 200) return -0.5;
+	if (mean > 175) return -0.3;
+	if (mean > 150) return -0.15;
+	return 0;
+}
+
 /** 히스토그램 정규화 — 채널별 최대값 기준 0-1. */
 export function normalizeHistogram(h: RgbHistogram): {
 	r: Float32Array;

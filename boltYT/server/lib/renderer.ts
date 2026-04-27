@@ -203,6 +203,17 @@ export function createRenderer(opts: RendererOptions): Renderer {
 				job.retryCount = retries + 1;
 				job.progress = 0;
 				job.error = undefined;
+				// timeout 카테고리는 다음 시도에서 timeoutMs 1.5x 늘림 (점진적 여유)
+				if (errorCategory === "timeout" && job.timeoutMs) {
+					job.timeoutMs = Math.min(
+						3 * 60 * 60 * 1000, // 3시간 cap
+						Math.round(job.timeoutMs * 1.5),
+					);
+					log.info("Extended timeout for retry", {
+						jobId: job.id,
+						newTimeoutMs: job.timeoutMs,
+					});
+				}
 				job.errorCategory = undefined;
 				const delay = RETRY_DELAYS_MS[retries] ?? 10_000;
 				log.warn("Render failed, retrying", {
