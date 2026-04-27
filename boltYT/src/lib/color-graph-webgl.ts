@@ -111,6 +111,22 @@ function nodeToGLSL(node: ColorNode): string {
 				`}`,
 			].join("\n  ");
 		}
+		case "sharpen": {
+			// 픽셀 단위 sharpen 는 인접 sample 필요 → contrast 부스트로 근사
+			const a = (node.amount * 0.5).toFixed(6);
+			return `color.rgb = (color.rgb - 0.5) * (1.0 + ${a}) + 0.5;`;
+		}
+		case "bloom": {
+			const th = node.threshold.toFixed(6);
+			const it = node.intensity.toFixed(6);
+			return [
+				`{ float _luma = dot(color.rgb, vec3(0.299, 0.587, 0.114));`,
+				`  if (_luma >= ${th}) {`,
+				`    float _k = 1.0 + ${it} * (_luma - ${th});`,
+				`    color.rgb = clamp(color.rgb * _k, 0.0, 1.0);`,
+				`  } }`,
+			].join("\n  ");
+		}
 	}
 }
 

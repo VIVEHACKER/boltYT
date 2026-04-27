@@ -35,6 +35,7 @@ export const PIXABAY_QUERIES: Record<BgmMood, string[]> = {
 		"creepy suspense",
 		"scary atmospheric",
 		"haunted dark",
+		"ambient dark drone",
 	],
 	tense: [
 		"tension suspense thriller",
@@ -59,6 +60,8 @@ export const PIXABAY_QUERIES: Record<BgmMood, string[]> = {
 		"relaxing meditation",
 		"soft piano calm",
 		"peaceful acoustic",
+		"lo-fi chill study",
+		"warm acoustic guitar calm",
 	],
 	upbeat: [
 		"upbeat energetic pop",
@@ -83,21 +86,6 @@ export const PIXABAY_QUERIES: Record<BgmMood, string[]> = {
 		"lonely",
 		"lo-fi chill emotional",
 		"introspective ambient",
-	],
-	calm: [
-		"calm peaceful ambient",
-		"relaxing meditation",
-		"soft piano calm",
-		"peaceful acoustic",
-		"lo-fi chill study",
-		"warm acoustic guitar calm",
-	],
-	dark: [
-		"dark horror ambient",
-		"creepy suspense",
-		"scary atmospheric",
-		"haunted dark",
-		"ambient dark drone",
 	],
 };
 

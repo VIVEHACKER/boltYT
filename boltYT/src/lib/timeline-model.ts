@@ -31,7 +31,13 @@ export type ColorGradePreset =
 	| "cold-noir"
 	| "vibrant-pop"
 	| "muted-doc"
-	| "retro-vhs";
+	| "retro-vhs"
+	| "cinematic-bleach"
+	| "sunset-glow"
+	| "arctic"
+	| "k-drama-soft"
+	| "true-crime-noir"
+	| "nature-doc";
 
 /**
  * Bezier tangent handle (AutomationKeyframe 전용).
