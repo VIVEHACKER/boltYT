@@ -72,7 +72,8 @@ export function defaultTierForPath(pathname: string): LimiterTier | "bypass" {
 	}
 	if (
 		pathname.startsWith("/api/openai/") ||
-		pathname.startsWith("/api/elevenlabs/")
+		pathname.startsWith("/api/elevenlabs/") ||
+		pathname.startsWith("/api/fal/")
 	) {
 		return "costly";
 	}

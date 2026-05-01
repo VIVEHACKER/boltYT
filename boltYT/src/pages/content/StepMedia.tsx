@@ -53,6 +53,19 @@ import {
 	inferNarrationTtsOptions,
 	type TtsOptions,
 } from "../../lib/tts";
+import {
+	detectVideoGen,
+	generateSceneVideo,
+	getActiveVideoProvider,
+	setActiveVideoProvider,
+	VIDEO_COST_PER_SCENE,
+	type VideoGenProvider,
+} from "../../lib/video-gen";
+import {
+	deriveLockedSeed,
+	enrichVideoPrompt,
+	type ScriptFormat,
+} from "../../lib/video-prompt-enrich";
 import type { ReferenceTemplate, Scene } from "../../types/database";
 import type { CollectedSource, ContentMode } from "./ContentWizardPage";
 
@@ -179,6 +192,35 @@ export default function StepMedia({
 		"idle" | "generating" | "complete" | "error"
 	>("idle");
 	const [narrationError, setNarrationError] = useState("");
+	const [aiVideoAvailable, setAiVideoAvailable] = useState(false);
+	const [aiVideoProvider, setAiVideoProvider] = useState<VideoGenProvider>(
+		getActiveVideoProvider(),
+	);
+	const [scriptFormat, setScriptFormat] = useState<ScriptFormat>("shorts");
+	const [aiVideoBatch, setAiVideoBatch] = useState<{
+		current: number;
+		total: number;
+	} | null>(null);
+	useEffect(() => {
+		detectVideoGen()
+			.then((s) => setAiVideoAvailable(s.available))
+			.catch(() => setAiVideoAvailable(false));
+	}, []);
+	useEffect(() => {
+		(async () => {
+			try {
+				const { data } = await supabase
+					.from("scripts")
+					.select("format")
+					.eq("id", scriptId)
+					.maybeSingle();
+				const fmt = (data as { format?: string } | null)?.format;
+				if (fmt === "longform" || fmt === "shorts") setScriptFormat(fmt);
+			} catch {
+				// ignore — 기본 shorts 유지
+			}
+		})();
+	}, [scriptId]);
 
 	const loadScenes = useCallback(async () => {
 		resetUsedVideoIds();
@@ -812,6 +854,199 @@ export default function StepMedia({
 		}
 	}
 
+	/** scenes 테이블에 directives 일괄 update — 페이지 리로드 후에도 재사용 */
+	async function persistDirectivesToDb(
+		currentScenes: SceneWithMedia[],
+		directiveMap: Map<number, SceneDirective>,
+	) {
+		const updates: Array<PromiseLike<unknown>> = [];
+		for (let i = 0; i < currentScenes.length; i++) {
+			const directive = directiveMap.get(i);
+			if (!directive) continue;
+			updates.push(
+				supabase
+					.from("scenes")
+					.update({
+						shot_type: directive.shot_type,
+						camera_motion: directive.camera_motion,
+						scene_bgm_mood: directive.bgm_mood,
+						pacing: directive.pacing,
+					})
+					.eq("id", currentScenes[i].id),
+			);
+		}
+		try {
+			await Promise.all(updates);
+		} catch (err) {
+			// 컬럼 없거나 RLS 차단 시 — 비치명. 다음 세션 재계산.
+			console.warn(
+				"[directives persist] supabase update 실패:",
+				(err as Error).message,
+			);
+		}
+	}
+
+	async function generateAiVideo(
+		sceneIndex: number,
+		options: { chainFromVideoUrl?: string } = {},
+		retryCount = 0,
+	) {
+		const scene = scenesRef.current[sceneIndex];
+		updateScene(sceneIndex, { videoStatus: "generating", errorMsg: undefined });
+
+		try {
+			// 이미지가 없으면 먼저 생성
+			let imageUrl = scene.imageUrl;
+			if (!imageUrl) {
+				const imagePrompt = buildSceneImagePrompt(scene);
+				imageUrl = await aiGenerateImage(
+					scene.id,
+					imagePrompt,
+					referencePreset,
+				);
+				updateScene(sceneIndex, {
+					imageStatus: "complete",
+					imageUrl,
+				});
+			}
+
+			const rawPrompt = buildSceneImagePrompt(scene);
+			const duration = Math.min(
+				10,
+				Math.max(3, Math.ceil(Number(scene.duration_seconds) || 5)),
+			);
+
+			// referencePreset.image: { mood, lighting, dominantColors, promptTemplate }
+			// 우선순위: scene 고유값 > ref. directives 는 [key:string]:unknown 으로 저장됨.
+			const refImage = referencePreset?.image;
+			const sceneShotType = scene.shot_type as
+				| SceneDirective["shot_type"]
+				| undefined;
+			const sceneCameraMotion = scene.camera_motion as
+				| SceneDirective["camera_motion"]
+				| undefined;
+			const sceneLighting = scene.lighting_style as
+				| "dark"
+				| "natural"
+				| "bright"
+				| "mixed"
+				| undefined;
+			const enriched = enrichVideoPrompt({
+				rawPrompt,
+				mood: scene.mood ?? refImage?.mood,
+				lighting: sceneLighting ?? refImage?.lighting,
+				shotType: sceneShotType,
+				cameraMotion: sceneCameraMotion,
+				dominantColors: refImage?.dominantColors,
+				stylePromptTemplate: refImage?.promptTemplate,
+				format: scriptFormat,
+			});
+
+			const { url } = await generateSceneVideo(scene.id, {
+				provider: aiVideoProvider,
+				prompt: enriched.prompt,
+				imageUrl,
+				duration,
+				aspectRatio: enriched.aspectRatio,
+				cameraCommands: enriched.cameraCommands,
+				seed: deriveLockedSeed(scriptId),
+				chainFromVideoUrl: options.chainFromVideoUrl,
+			});
+
+			updateScene(sceneIndex, { videoStatus: "complete", videoUrl: url });
+			return url;
+		} catch (err) {
+			const msg = err instanceof Error ? err.message : "Unknown error";
+			if (retryCount < 1) {
+				updateScene(sceneIndex, {
+					errorMsg: `AI 영상 자동 복구 중 (${retryCount + 1}/1)...`,
+				});
+				await new Promise((r) => setTimeout(r, 5000));
+				return generateAiVideo(sceneIndex, options, retryCount + 1);
+			}
+			updateScene(sceneIndex, { videoStatus: "error", errorMsg: msg });
+			return undefined;
+		}
+	}
+
+	/**
+	 * 모든 씬 AI 영상 일괄 생성 — 순차 처리 + last-frame chaining.
+	 * 이전 씬의 결과 비디오 마지막 프레임이 다음 씬의 init_image 가 되어
+	 * 시각 연속성 확보 (스톱 모션 같은 끊김 방지).
+	 */
+	async function handleGenerateAllAiVideos() {
+		setGenerating(true);
+		const eligible = scenesRef.current.filter(
+			(s) => s.scene_type !== "text_emphasis",
+		).length;
+		setAiVideoBatch({ current: 0, total: eligible });
+		try {
+			// directives 누락 시 lazy 계산 (촬영지시 → enrichVideoPrompt 활용 극대화)
+			const hasAnyDirective = scenesRef.current.some(
+				(s) => s.camera_motion || s.shot_type,
+			);
+			if (!hasAnyDirective) {
+				try {
+					const briefStub = {
+						summary: "",
+						timeline: [],
+						key_figures: [],
+						facts: [],
+						misconceptions: [],
+						search_keywords: [],
+					};
+					const directives = await planSceneDirectives(
+						scenesRef.current.map((s, i) => ({
+							narration: s.narration_text,
+							type: s.scene_type,
+							index: i,
+						})),
+						briefStub,
+						"",
+					);
+					const dirMap = new Map(directives.map((d) => [d.index, d]));
+					setScenes((prev) => {
+						const next = prev.map((s, i) => {
+							const d = dirMap.get(i);
+							if (!d) return s;
+							return {
+								...s,
+								shot_type: d.shot_type,
+								camera_motion: d.camera_motion,
+								scene_bgm_mood: d.bgm_mood,
+								pacing: d.pacing,
+							};
+						});
+						scenesRef.current = next;
+						return next;
+					});
+					await persistDirectivesToDb(scenesRef.current, dirMap);
+				} catch (err) {
+					console.warn(
+						"[ai-video] directives lazy 계산 실패 — mood만 사용:",
+						(err as Error).message,
+					);
+				}
+			}
+
+			let prevVideoUrl: string | undefined;
+			let processed = 0;
+			for (let i = 0; i < scenesRef.current.length; i++) {
+				const scene = scenesRef.current[i];
+				if (scene.scene_type === "text_emphasis") continue;
+				processed++;
+				setAiVideoBatch({ current: processed, total: eligible });
+				const url = await generateAiVideo(i, {
+					chainFromVideoUrl: prevVideoUrl,
+				});
+				if (url) prevVideoUrl = url;
+			}
+		} finally {
+			setAiVideoBatch(null);
+			setGenerating(false);
+		}
+	}
+
 	async function generateTts(sceneIndex: number, retryCount = 0) {
 		const scene = scenesRef.current[sceneIndex];
 		updateScene(sceneIndex, { ttsStatus: "generating", errorMsg: undefined });
@@ -993,6 +1228,9 @@ export default function StepMedia({
 			return next;
 		});
 
+		// directives DB 영속화 (페이지 리로드 후 재계산 비용 절약)
+		await persistDirectivesToDb(scenesRef.current, directiveMap);
+
 		const existingBgm =
 			localStorage.getItem(`bgm_path_${scriptId}`) ??
 			localStorage.getItem(`bgm_url_${scriptId}`);
@@ -1125,6 +1363,50 @@ export default function StepMedia({
 				)}
 			</div>
 
+			{aiVideoAvailable && (
+				<div className="flex items-center gap-static-sm mb-static-md flex-wrap p-static-sm bg-canvas rounded-[4px]">
+					<PText size="small" color="contrast-high">
+						🎬 AI 영상 생성
+					</PText>
+					<select
+						className="bg-surface text-[12px] rounded-[4px] px-static-xs py-[4px] border border-[var(--p-color-state-base)]"
+						value={aiVideoProvider}
+						onChange={(e) => {
+							const next = e.target.value as VideoGenProvider;
+							setAiVideoProvider(next);
+							setActiveVideoProvider(next);
+						}}
+					>
+						<option value="wan26">Wan 2.6 (가성비)</option>
+						<option value="kling3">Kling 3.0 (고품질)</option>
+						<option value="ltx2">LTX-2 (빠름)</option>
+						<option value="hailuo">Hailuo (T2V + 카메라)</option>
+						<option value="klingO1">Kling O1 (보간)</option>
+					</select>
+					<PText size="x-small" color="contrast-medium">
+						씬당 약 ${VIDEO_COST_PER_SCENE[aiVideoProvider].toFixed(2)} · 총 ~$
+						{(VIDEO_COST_PER_SCENE[aiVideoProvider] * scenes.length).toFixed(2)}
+					</PText>
+					{!generating && (
+						<PButton
+							compact
+							variant="primary"
+							onClick={handleGenerateAllAiVideos}
+						>
+							🎬 모든 씬 일괄 (체이닝)
+						</PButton>
+					)}
+					{aiVideoBatch && (
+						<PTag color="notification-info-soft">
+							일괄 생성중 {aiVideoBatch.current}/{aiVideoBatch.total}
+						</PTag>
+					)}
+					<PText size="x-small" color="contrast-low">
+						{scriptFormat === "shorts" ? "9:16 세로" : "16:9 가로"} · 시드 잠금
+					</PText>
+				</div>
+			)}
+
 			{narrationError && (
 				<PInlineNotification
 					state="error"
@@ -1231,6 +1513,18 @@ export default function StepMedia({
 							</div>
 
 							<div className="shrink-0 flex items-center gap-static-xs">
+								{aiVideoAvailable &&
+									!generating &&
+									scene.scene_type !== "text_emphasis" &&
+									scene.videoStatus !== "generating" && (
+										<PButton
+											compact
+											variant="tertiary"
+											onClick={() => generateAiVideo(i)}
+										>
+											🎬 AI 영상
+										</PButton>
+									)}
 								{(scene.imageStatus === "pending" ||
 									scene.videoStatus === "pending" ||
 									scene.ttsStatus === "pending") &&

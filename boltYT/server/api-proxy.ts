@@ -6,6 +6,7 @@
 
 import { createServer } from "node:http";
 import { Readable } from "node:stream";
+import { actorFromReq, recordAudit } from "./lib/audit.ts";
 import { createTtlCache } from "./lib/cache.ts";
 import {
 	checkServer,
@@ -15,13 +16,17 @@ import {
 } from "./lib/diag.ts";
 import { runAgent } from "./lib/diag-agent.ts";
 import { loadEnv, validateEnv, watchEnv } from "./lib/env.ts";
-import { fetchWithRetry } from "./lib/fetch-retry.ts";
 import {
 	clearErrors as clearErrorsBuffer,
 	listErrors as listErrorsBuffer,
 	recordError,
 } from "./lib/errors-buffer.ts";
-import { actorFromReq, recordAudit } from "./lib/audit.ts";
+import {
+	FAL_ENDPOINTS,
+	type FalProvider,
+	submitFalVideo,
+} from "./lib/fal-client.ts";
+import { fetchWithRetry } from "./lib/fetch-retry.ts";
 import { createLogger } from "./lib/logger.ts";
 import { maskSecrets } from "./lib/mask.ts";
 import {
@@ -57,6 +62,7 @@ const KEYS = {
 	youtube: "",
 	naverClientId: "",
 	naverClientSecret: "",
+	fal: "",
 };
 
 function reloadKeys() {
@@ -67,6 +73,7 @@ function reloadKeys() {
 	KEYS.youtube = process.env.YOUTUBE_API_KEY ?? "";
 	KEYS.naverClientId = process.env.NAVER_CLIENT_ID ?? "";
 	KEYS.naverClientSecret = process.env.NAVER_CLIENT_SECRET ?? "";
+	KEYS.fal = process.env.FAL_KEY ?? "";
 }
 
 reloadKeys();
@@ -376,6 +383,7 @@ const server = createServer(async (req, res) => {
 			pixabay: Boolean(KEYS.pixabay),
 			youtube: Boolean(KEYS.youtube),
 			naver: Boolean(KEYS.naverClientId && KEYS.naverClientSecret),
+			fal: Boolean(KEYS.fal),
 		});
 		return;
 	}
@@ -607,6 +615,71 @@ const server = createServer(async (req, res) => {
 			json(req, res, 500, {
 				error: e instanceof Error ? e.message : "ElevenLabs proxy error",
 			});
+		}
+		return;
+	}
+
+	// ─── fal.ai 영상 생성 (T2V / I2V) ───
+	if (url.pathname === "/api/fal/video-gen" && req.method === "POST") {
+		if (!requireKey(req, res, KEYS.fal, "fal.ai")) return;
+		const body = await parseBody(req);
+		if (body === null) {
+			json(req, res, 413, { error: "요청 본문이 너무 큽니다 (최대 1MB)" });
+			return;
+		}
+
+		const providerStr = sanitizeString(body.provider, 32);
+		if (!providerStr || !(providerStr in FAL_ENDPOINTS)) {
+			json(req, res, 400, {
+				error: `provider 누락 또는 잘못됨. 허용: ${Object.keys(FAL_ENDPOINTS).join(", ")}`,
+			});
+			return;
+		}
+		const provider = providerStr as FalProvider;
+
+		const input = (body.input ?? {}) as Record<string, unknown>;
+		if (!input || typeof input !== "object") {
+			json(req, res, 400, { error: "input 객체가 필요합니다" });
+			return;
+		}
+
+		const timeoutMs = sanitizeInt(body.timeout_ms, 10_000, 600_000, 300_000);
+
+		try {
+			recordAudit({
+				actor: actorFromReq(req),
+				action: "fal.video-gen.submit",
+				resource: provider,
+				outcome: "ok",
+				service: SERVICE,
+				details: { promptLen: String(input.prompt ?? "").length },
+			});
+			const result = await submitFalVideo({
+				apiKey: KEYS.fal,
+				provider,
+				input,
+				timeoutMs,
+				onLog: (m) => log.info("fal status", { provider, m }),
+			});
+			metricCounter("fal_video_gen_total", { provider, outcome: "ok" });
+			json(req, res, 200, {
+				video_url: result.video_url,
+				request_id: result.request_id,
+				provider: result.provider,
+				endpoint: result.endpoint,
+			});
+		} catch (e) {
+			metricCounter("fal_video_gen_total", { provider, outcome: "error" });
+			const msg = e instanceof Error ? e.message : "fal proxy error";
+			recordError({
+				service: SERVICE,
+				source: "server",
+				level: "error",
+				message: maskSecrets(msg),
+				context: { route: "/api/fal/video-gen", provider },
+			});
+			log.error("fal video-gen exception", { provider, error: msg });
+			json(req, res, 500, { error: maskSecrets(msg) });
 		}
 		return;
 	}
