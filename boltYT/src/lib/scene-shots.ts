@@ -2,6 +2,7 @@ import type {
 	SceneShot,
 	SceneShotCrop,
 	SceneShotMotion,
+	SceneShotVisualRole,
 } from "./scene-shot-types";
 
 type SceneType = "image" | "video" | "text_emphasis" | "news_overlay";
@@ -58,6 +59,10 @@ function truncate(value: string, max = 80): string {
 	return value.length <= max ? value : `${value.slice(0, max).trim()}...`;
 }
 
+function uniqueNonEmpty(values: string[]): string[] {
+	return [...new Set(values.map(normalizeText).filter(Boolean))];
+}
+
 function looksEnglish(value: string): boolean {
 	return Array.from(value).every((char) => char.charCodeAt(0) <= 0x7f);
 }
@@ -101,13 +106,19 @@ function splitDuration(totalSeconds: number, shotCount: number): number[] {
 	return durations;
 }
 
-function shotCountForScene(scene: ShotSceneInput): number {
-	if (scene.type === "text_emphasis") return scene.duration <= 3.2 ? 2 : 3;
-	if (scene.duration <= 2.6) return 2;
-	if (scene.duration <= 4.5) return 3;
-	if (scene.duration <= 7) return 4;
-	if (scene.duration <= 10) return 5;
-	return 5;
+function shotCountForScene(
+	scene: ShotSceneInput,
+	sources: Array<{ source: ShotSource }> = [],
+): number {
+	const hasVideo = sources.some(({ source }) => source.type === "video");
+	const hasSupport = sources.some(({ source }) => source.type !== "video");
+	const sourceBonus = hasVideo && hasSupport ? 1 : 0;
+
+	if (scene.duration <= 2.6) return hasVideo && hasSupport ? 3 : 2;
+	if (scene.duration <= 4.5) return hasVideo ? 4 : 3;
+	if (scene.duration <= 7) return hasVideo || hasSupport ? 5 : 4;
+	if (scene.duration <= 10) return Math.min(6, 5 + sourceBonus);
+	return Math.min(7, 6 + sourceBonus);
 }
 
 function hasKeyword(text: string, keywords: string[]): boolean {
@@ -320,7 +331,11 @@ function kindsForScene(
 				? videoKindsByPattern[pattern]
 				: imageKindsByPattern[pattern];
 
-	return base.slice(0, shotCount);
+	if (shotCount <= base.length) return base.slice(0, shotCount);
+	return Array.from({ length: shotCount }, (_, index) => {
+		if (index < base.length) return base[index];
+		return base[((index - 1) % (base.length - 1)) + 1];
+	});
 }
 
 function cropForKind(
@@ -440,6 +455,114 @@ function promptSuffixForKind(kind: SceneShot["kind"]): string {
 		default:
 			return "documentary still frame";
 	}
+}
+
+function visualRoleForShot(
+	kind: SceneShot["kind"],
+	pattern: IncidentPattern,
+	source?: ShotSource,
+): SceneShotVisualRole {
+	if (kind === "evidence") return source?.type === "article" ? "document" : "evidence";
+	if (kind === "quote") {
+		return pattern === "profile" || source?.type === "image"
+			? "archive"
+			: "context";
+	}
+	if (kind === "context") {
+		if (pattern === "timeline") return "map";
+		if (source?.type === "article") return "document";
+		return "context";
+	}
+	if (source?.type === "video" || source?.type === "image") return "archive";
+	if (kind === "punch") return source ? "context" : "reconstruction";
+	if (kind === "establishing") return source ? "context" : "reconstruction";
+	return source ? "context" : "reconstruction";
+}
+
+function rejectTermsForShot(
+	role: SceneShotVisualRole,
+	pattern: IncidentPattern,
+): string[] {
+	const base = [
+		"logo",
+		"icon",
+		"template",
+		"poster",
+		"banner",
+		"meme",
+		"cartoon",
+		"illustration",
+		"clipart",
+		"로고",
+		"아이콘",
+		"템플릿",
+		"포스터",
+		"밈",
+		"일러스트",
+		"만화",
+	];
+	const evidence = role === "evidence" || role === "document"
+		? ["stock", "generic", "staged", "스톡", "연출", "자료화면"]
+		: [];
+	const profile = pattern === "profile"
+		? ["model", "actor", "cosplay", "모델", "배우", "코스프레"]
+		: [];
+	const crimeCliches =
+		pattern === "investigation" || pattern === "missing_person"
+			? ["luxury car", "money", "dark alley wallpaper", "현금", "고급차"]
+			: [];
+	return uniqueNonEmpty([...base, ...evidence, ...profile, ...crimeCliches]);
+}
+
+function searchTermsForShot(
+	scene: ShotSceneInput,
+	kind: SceneShot["kind"],
+	role: SceneShotVisualRole,
+	pattern: IncidentPattern,
+	source?: ShotSource,
+): string[] {
+	const roleTerm: Record<SceneShotVisualRole, string> = {
+		evidence: "evidence close up",
+		archive: "archive documentary",
+		reconstruction: "cinematic reconstruction",
+		map: "timeline map",
+		document: "document record",
+		data: "data visual",
+		context: "documentary context",
+		transition: "documentary transition",
+		ending: "final unresolved question",
+	};
+	const exactSource = [source?.eventDate, source?.eventTitle || source?.title]
+		.filter(Boolean)
+		.join(" ");
+	const sceneAnchor = [scene.newsDate, scene.newsTitle, sentenceLead(scene.narration)]
+		.filter(Boolean)
+		.join(" ");
+	return uniqueNonEmpty([
+		exactSource,
+		sceneAnchor,
+		scene.visualPrompt,
+		shotCaption(scene, source, kind, pattern),
+		roleTerm[role],
+		promptSuffixForPattern(pattern),
+	]).slice(0, 6);
+}
+
+function sourceConfidenceForShot(
+	scene: ShotSceneInput,
+	role: SceneShotVisualRole,
+	source?: ShotSource,
+): number {
+	let score = 34;
+	if (source?.type === "video") score = 82;
+	else if (source?.type === "image") score = 76;
+	else if (source?.type === "article") score = 70;
+	if (source?.url && isDirectImageUrl(source.url)) score += 8;
+	if (source?.thumbnail && isDirectImageUrl(source.thumbnail)) score += 4;
+	if (overlapsSceneMoment(scene, source)) score += 12;
+	if (role === "reconstruction") score = Math.min(score, 52);
+	if (role === "evidence" || role === "document") score += 5;
+	return clamp(Math.round(score), 20, 98);
 }
 
 function buildShotVisualPrompt(
@@ -594,11 +717,12 @@ function makeShot(
 	const mediaType =
 		scene.type === "video"
 			? "video"
-			: mediaTypeForImageLikeShot(kind, source?.source);
+			: mediaTypeForImageLikeShot(scene, kind, source?.source);
 	const sourceUrl =
 		mediaType === "image"
 			? resolveVisualUrl(source?.source)
 			: source?.source.url;
+	const visualRole = visualRoleForShot(kind, pattern, source?.source);
 	return {
 		id: toId(index, kind),
 		kind,
@@ -611,6 +735,20 @@ function makeShot(
 		caption: shotCaption(scene, source?.source, kind, pattern),
 		motion: motionForKind(kind, index, pattern),
 		crop: cropForKind(kind, pattern, index),
+		visual_role: visualRole,
+		search_terms: searchTermsForShot(
+			scene,
+			kind,
+			visualRole,
+			pattern,
+			source?.source,
+		),
+		reject_terms: rejectTermsForShot(visualRole, pattern),
+		source_confidence: sourceConfidenceForShot(
+			scene,
+			visualRole,
+			source?.source,
+		),
 		overlay:
 			kind === "evidence"
 				? "evidence"
@@ -642,9 +780,22 @@ function pickPrimarySource(
 		return compatible.find(({ source }) => source.type === "article");
 	}
 	if (scene.type === "image") {
+		const motionScore = sceneMotionScore(scene);
+		const exactVideo = compatible.find(
+			({ source }) =>
+				source.type === "video" && shouldPreferVideoSource(scene, "punch", source),
+		);
+		const video = compatible.find(({ source }) => source.type === "video");
+		const image = compatible.find(({ source }) => source.type === "image");
+		const article = compatible.find(({ source }) => source.type === "article");
+		if (motionScore >= 110 || (scene.duration <= 4.6 && exactVideo)) {
+			return exactVideo ?? video ?? image ?? article;
+		}
 		return (
-			compatible.find(({ source }) => source.type === "image") ??
-			compatible.find(({ source }) => source.type === "article")
+			image ??
+			article ??
+			exactVideo ??
+			video
 		);
 	}
 	return compatible[0];
@@ -653,6 +804,7 @@ function pickPrimarySource(
 function pickSourceForShot(
 	kind: SceneShot["kind"],
 	index: number,
+	scene: ShotSceneInput,
 	primary: { index: number; source: ShotSource } | undefined,
 	alternates: Array<{ index: number; source: ShotSource }>,
 ): { index: number; source: ShotSource } | undefined {
@@ -663,11 +815,16 @@ function pickSourceForShot(
 	const article = candidates.find(({ source }) => source.type === "article");
 	const image = candidates.find(({ source }) => source.type === "image");
 	const video = candidates.find(({ source }) => source.type === "video");
+	const prefersVideoForCoverage =
+		video && shouldPreferVideoSource(scene, kind, video.source);
 
 	if (kind === "evidence" || kind === "quote") {
 		return article ?? image ?? primary ?? video ?? alternates[index - 1];
 	}
 	if (kind === "context") {
+		if (prefersVideoForCoverage) {
+			return video ?? article ?? image ?? primary ?? alternates[index - 1];
+		}
 		return article ?? image ?? primary ?? video ?? alternates[index - 1];
 	}
 	if (kind === "establishing") return video ?? image ?? primary ?? article;
@@ -678,14 +835,40 @@ function pickSourceForShot(
 }
 
 function mediaTypeForImageLikeShot(
+	scene: ShotSceneInput,
 	kind: SceneShot["kind"],
 	source?: ShotSource,
 ): "image" | "video" {
 	if (source?.type !== "video") return "image";
-	if (kind === "context" || kind === "evidence" || kind === "quote") {
+	if (kind === "quote") {
+		return shouldPreferVideoSource(scene, kind, source) ? "video" : "image";
+	}
+	if (kind === "context" || kind === "evidence") {
+		return shouldPreferVideoSource(scene, kind, source) ? "video" : "image";
+	}
+	if (!shouldPreferVideoSource(scene, kind, source) && kind !== "detail") {
 		return "image";
 	}
 	return "video";
+}
+
+function shouldPreferVideoSource(
+	scene: ShotSceneInput,
+	kind: SceneShot["kind"],
+	source?: ShotSource,
+): boolean {
+	if (source?.type !== "video") return false;
+
+	const motionScore = sceneMotionScore(scene);
+	const exactMoment = overlapsSceneMoment(scene, source);
+	if (scene.type === "video") return true;
+	if (kind === "quote") {
+		return motionScore >= 185 && exactMoment;
+	}
+	if (kind === "context" || kind === "evidence") {
+		return exactMoment || motionScore >= 125 || scene.duration <= 4.4;
+	}
+	return exactMoment || motionScore >= 90 || scene.duration <= 4.8;
 }
 
 function pickSupportSourceForVideoShot(
@@ -732,7 +915,7 @@ function buildImageLikeShots(
 	const primary = pickPrimarySource(scene, compatible);
 	const alternates = compatible.filter(({ index }) => index !== primary?.index);
 	const pattern = inferIncidentPattern(scene, primary?.source);
-	const shotCount = shotCountForScene(scene);
+	const shotCount = shotCountForScene(scene, compatible);
 	const durations = splitDuration(scene.duration, shotCount);
 	const kinds = kindsForScene(scene, pattern, shotCount);
 	const trims = Array.from({ length: shotCount }, (_, index) => {
@@ -744,7 +927,13 @@ function buildImageLikeShots(
 	return normalizeShotDurations(
 		durations.map((duration, index) => {
 			const kind = kinds[index] ?? kinds[kinds.length - 1];
-			const source = pickSourceForShot(kind, index, primary, alternates);
+			const source = pickSourceForShot(
+				kind,
+				index,
+				scene,
+				primary,
+				alternates,
+			);
 			const shot = makeShot(index, kind, duration, scene, pattern, source);
 			if (shot.media_type !== "video") return shot;
 			return {
@@ -776,7 +965,10 @@ function buildVideoShots(
 				index !== primary?.index && source.type !== "video",
 		);
 	const pattern = inferIncidentPattern(scene, primary?.source);
-	const shotCount = shotCountForScene(scene);
+	const shotCount = shotCountForScene(
+		scene,
+		sources.map((source) => ({ source })),
+	);
 	const durations = splitDuration(scene.duration, shotCount);
 	const trims = Array.from({ length: shotCount }, (_, index) => {
 		const start = clamp(index * 0.18, 0, 0.78);
@@ -842,25 +1034,41 @@ export function ensureSceneShots(
 	const pattern = inferIncidentPattern(scene, primary?.source);
 
 	return normalizeShotDurations(
-		scene.shots.map((shot, index) => ({
-			...shot,
-			id: shot.id || toId(index, shot.kind || "detail"),
-			duration_seconds: Number(
-				Math.max(0.8, shot.duration_seconds || 0).toFixed(2),
-			),
-			visual_prompt:
-				shot.visual_prompt ||
-				buildShotVisualPrompt(
-					scene,
-					shot.kind || "detail",
-					pattern,
-					primary?.source,
+		scene.shots.map((shot, index) => {
+			const kind = shot.kind || "detail";
+			const source =
+				typeof shot.source_index === "number" && shot.source_index >= 0
+					? sources[shot.source_index]
+					: primary?.source;
+			const visualRole =
+				shot.visual_role ?? visualRoleForShot(kind, pattern, source);
+			return {
+				...shot,
+				id: shot.id || toId(index, kind),
+				duration_seconds: Number(
+					Math.max(0.8, shot.duration_seconds || 0).toFixed(2),
 				),
-			crop: shot.crop ?? cropForKind(shot.kind || "detail", pattern, index),
-			motion:
-				shot.motion ?? motionForKind(shot.kind || "detail", index, pattern),
-			overlay: shot.overlay ?? "none",
-		})),
+				visual_prompt:
+					shot.visual_prompt ||
+					buildShotVisualPrompt(scene, kind, pattern, source),
+				crop: shot.crop ?? cropForKind(kind, pattern, index),
+				motion: shot.motion ?? motionForKind(kind, index, pattern),
+				overlay: shot.overlay ?? "none",
+				visual_role: visualRole,
+				search_terms:
+					shot.search_terms?.length
+						? shot.search_terms
+						: searchTermsForShot(scene, kind, visualRole, pattern, source),
+				reject_terms:
+					shot.reject_terms?.length
+						? shot.reject_terms
+						: rejectTermsForShot(visualRole, pattern),
+				source_confidence:
+					typeof shot.source_confidence === "number"
+						? shot.source_confidence
+						: sourceConfidenceForShot(scene, visualRole, source),
+			};
+		}),
 		scene.duration,
 	);
 }
@@ -1044,13 +1252,86 @@ function buildSceneStartOffsets<T extends ShotSceneInput>(scenes: T[]) {
 	});
 }
 
+function pickEditFirstSourceIndex(
+	scene: ShotSceneInput,
+	sources: ShotSource[],
+): number {
+	if (
+		typeof scene.sourceIndex === "number" &&
+		scene.sourceIndex >= 0 &&
+		sources[scene.sourceIndex]
+	) {
+		return scene.sourceIndex;
+	}
+
+	const scored = sources
+		.map((source, index) => {
+			let score = 0;
+			if (overlapsSceneMoment(scene, source)) score += 80;
+			if (source.type === "image") score += 45;
+			if (source.type === "article") score += 38;
+			if (source.type === "video") score += sceneMotionScore(scene) >= 110 ? 52 : 18;
+			if (source.thumbnail || source.url) score += 8;
+			return { index, source, score };
+		})
+		.sort((a, b) => b.score - a.score);
+
+	return scored[0]?.index ?? -1;
+}
+
+function editFirstSceneType(
+	scene: ShotSceneInput,
+	source?: ShotSource,
+): SceneType {
+	if (source?.type === "video" && sceneMotionScore(scene) >= 110) return "video";
+	return "image";
+}
+
+function editFirstVisualPrompt(
+	scene: ShotSceneInput,
+	source?: ShotSource,
+): string {
+	return truncate(
+		[
+			scene.visualPrompt,
+			source?.type === "article"
+				? "source-led newspaper/document insert"
+				: source?.type === "video"
+					? "tight edited footage cutaway"
+					: source?.type === "image"
+						? "archival image detail cutaway"
+						: "documentary evidence cutaway",
+			"cinematic source footage background",
+			"subtitle-safe lower third area",
+		]
+			.filter(Boolean)
+			.join(", "),
+		220,
+	);
+}
+
+function normalizeTextEmphasisToEditFirst<T extends ShotSceneInput>(
+	scene: T,
+	sources: ShotSource[],
+): T {
+	if (scene.type !== "text_emphasis") return scene;
+	const sourceIndex = pickEditFirstSourceIndex(scene, sources);
+	const source = sourceIndex >= 0 ? sources[sourceIndex] : undefined;
+	return {
+		...scene,
+		type: editFirstSceneType(scene, source),
+		sourceIndex,
+		visualPrompt: editFirstVisualPrompt(scene, source),
+	} as T;
+}
+
 function injectShortsPatternInterrupts<
 	T extends ShotSceneInput & {
 		transition?: string;
 		mood?: string;
 		textEffect?: string;
 	},
->(scenes: T[]): T[] {
+>(scenes: T[], sources: ShotSource[] = []): T[] {
 	if (scenes.length < 4) return scenes;
 
 	const starts = buildSceneStartOffsets(scenes);
@@ -1060,7 +1341,10 @@ function injectShortsPatternInterrupts<
 	);
 	const desiredInterrupts = scenes.length >= 8 ? 2 : 1;
 	const existingInterrupts = scenes.filter(
-		(scene) => scene.type === "text_emphasis",
+		(scene) =>
+			scene.transition === "glitch" &&
+			scene.type !== "text_emphasis" &&
+			scene.type !== "news_overlay",
 	).length;
 	if (existingInterrupts >= desiredInterrupts) return scenes;
 
@@ -1100,18 +1384,18 @@ function injectShortsPatternInterrupts<
 
 	return scenes.map((scene, index) => {
 		if (!chosen.has(index)) return scene;
+		const sourceIndex = pickEditFirstSourceIndex(scene, sources);
+		const source = sourceIndex >= 0 ? sources[sourceIndex] : undefined;
 		return {
 			...scene,
-			type: "text_emphasis",
-			sourceIndex: -1,
+			type: editFirstSceneType(scene, source),
+			sourceIndex,
+			visualPrompt: editFirstVisualPrompt(scene, source),
 			duration: Number(Math.min(scene.duration, 2.2).toFixed(2)),
 			transition: "glitch",
-			textEffect:
-				scene.textEffect && scene.textEffect !== "none"
-					? scene.textEffect
-					: "glitch",
+			textEffect: undefined,
 			mood: scene.mood && scene.mood !== "neutral" ? scene.mood : "mystery",
-		};
+		} as T;
 	});
 }
 
@@ -1242,6 +1526,211 @@ export function rebalanceScenesForMotion<T extends ShotSceneInput>(
 	});
 }
 
+function preferredLongformTransition(
+	index: number,
+	sceneType: SceneType,
+	prevType?: SceneType,
+): string {
+	if (index === 0) return "none";
+	if (sceneType === "text_emphasis") return "zoom";
+	if (prevType === "text_emphasis") return "crossfade";
+	if (index % 6 === 0) return "slide_left";
+	if (index % 5 === 0) return "slide_right";
+	if (index % 4 === 0) return "zoom";
+	return "crossfade";
+}
+
+interface LongformVideoRuleOptions {
+	targetTotalSeconds?: number;
+}
+
+function stretchLongformDurations<T extends ShotSceneInput>(
+	scenes: T[],
+	options: LongformVideoRuleOptions = {},
+): T[] {
+	if (scenes.length < 6) return scenes;
+
+	const targetTotalSeconds = Math.max(360, options.targetTotalSeconds ?? 360);
+	const total = scenes.reduce((sum, scene) => sum + Math.max(0, scene.duration), 0);
+	if (total >= targetTotalSeconds) return scenes;
+	const targetAverage = targetTotalSeconds / scenes.length;
+	const maxSceneDuration =
+		targetTotalSeconds >= 1800
+			? Math.min(180, Math.max(45, targetAverage * 1.55))
+			: 45;
+
+	let remaining = targetTotalSeconds - total;
+	let adjustableRemaining = scenes.filter(
+		(scene) =>
+			scene.type !== "text_emphasis" &&
+			scene.type !== "news_overlay" &&
+			scene.duration < maxSceneDuration,
+	).length;
+	if (adjustableRemaining === 0) return scenes;
+
+	return scenes.map((scene) => {
+		if (
+			scene.type === "text_emphasis" ||
+			scene.type === "news_overlay" ||
+			scene.duration >= maxSceneDuration
+		) {
+			return scene;
+		}
+
+		const room = maxSceneDuration - scene.duration;
+		const add = Math.min(room, remaining / adjustableRemaining);
+		remaining -= add;
+		adjustableRemaining -= 1;
+		return {
+			...scene,
+			duration: Number((scene.duration + add).toFixed(2)),
+		};
+	});
+}
+
+export function applyLongformVideoRules<
+	T extends ShotSceneInput & {
+		transition?: string;
+		mood?: string;
+		textEffect?: string;
+	},
+>(
+	scenes: T[],
+	sources: ShotSource[],
+	options: LongformVideoRuleOptions = {},
+): T[] {
+	if (scenes.length === 0) return scenes;
+
+	const editFirstScenes = scenes.map((scene) =>
+		normalizeTextEmphasisToEditFirst(scene, sources),
+	);
+	const targetTotalSeconds = Math.max(
+		360,
+		options.targetTotalSeconds ?? 360,
+	);
+	const featureLength = targetTotalSeconds >= 1800;
+	const targetAverage = targetTotalSeconds / Math.max(1, scenes.length);
+	let elapsed = 0;
+	const paced = editFirstScenes.map((scene, index) => {
+		const start = elapsed;
+		const isFirst = index === 0;
+		const isLast = index === scenes.length - 1;
+		let minDuration = featureLength
+			? Math.min(70, Math.max(isFirst ? 24 : 28, targetAverage * 0.55))
+			: isFirst
+				? 8
+				: 10;
+		let maxDuration = featureLength
+			? Math.min(180, Math.max(isLast ? 60 : 50, targetAverage * 1.55))
+			: isLast
+				? 32
+				: 28;
+
+		if (scene.type === "text_emphasis") {
+			minDuration = 3.5;
+			maxDuration = featureLength ? 10 : 6;
+		}
+		if (scene.type === "news_overlay") {
+			minDuration = 7;
+			maxDuration = featureLength ? 36 : 16;
+		}
+		if (start > 180 && scene.type !== "text_emphasis") {
+			minDuration = Math.max(minDuration, 12);
+		}
+
+		const duration = Number(
+			clamp(scene.duration, minDuration, maxDuration).toFixed(2),
+		);
+		elapsed += duration;
+		return { ...scene, duration };
+	});
+	const stretched = stretchLongformDurations(paced, {
+		targetTotalSeconds,
+	});
+
+	const candidates = stretched
+		.map((scene, index) => ({ scene, index }))
+		.filter(
+			({ scene }) =>
+				scene.type !== "text_emphasis" && scene.type !== "news_overlay",
+		);
+	const selected = new Set(
+		candidates
+			.filter(({ scene }) => scene.type === "video")
+			.map(({ index }) => index),
+	);
+	const hasVideoSource = sources.some((source) => source.type === "video");
+	if (hasVideoSource && candidates.length > 0) {
+		const minVideoCount = Math.max(1, Math.ceil(candidates.length * 0.4));
+		const maxVideoCount = Math.max(minVideoCount, Math.ceil(candidates.length * 0.55));
+
+		if (selected.size < minVideoCount) {
+			const ranked = candidates
+				.filter(({ index }) => !selected.has(index))
+				.map(({ scene, index }) => ({
+					index,
+					score:
+						sceneMotionScore(scene) +
+						(pickBestVideoSourceIndex(scene, sources) >= 0 ? 90 : 0) -
+						(index === stretched.length - 1 ? 40 : 0),
+				}))
+				.sort((a, b) => b.score - a.score);
+
+			for (const item of ranked) {
+				if (selected.size >= minVideoCount) break;
+				selected.add(item.index);
+			}
+		}
+
+		if (selected.size > maxVideoCount) {
+			const keep = new Set(
+				candidates
+					.filter(({ index }) => selected.has(index))
+					.map(({ scene, index }) => ({
+						index,
+						score:
+							sceneMotionScore(scene) +
+							(pickBestVideoSourceIndex(scene, sources) >= 0 ? 80 : 0),
+					}))
+					.sort((a, b) => b.score - a.score)
+					.slice(0, maxVideoCount)
+					.map((item) => item.index),
+			);
+			selected.clear();
+			for (const index of keep) selected.add(index);
+		}
+	}
+
+	return stretched.map((scene, index) => {
+		const prevType = index > 0 ? stretched[index - 1].type : undefined;
+		const shouldBeVideo =
+			hasVideoSource &&
+			selected.has(index) &&
+			scene.type !== "text_emphasis" &&
+			scene.type !== "news_overlay";
+		const nextType = shouldBeVideo
+			? "video"
+			: hasVideoSource && scene.type === "video"
+				? "image"
+				: scene.type;
+		const nextSourceIndex =
+			nextType === "video" ? pickBestVideoSourceIndex(scene, sources) : scene.sourceIndex;
+
+		return {
+			...scene,
+			type: nextType,
+			sourceIndex: nextSourceIndex,
+			transition: preferredLongformTransition(index, nextType, prevType),
+			textEffect:
+				nextType === "text_emphasis" &&
+				(!scene.textEffect || scene.textEffect === "none")
+					? "scale_in"
+					: scene.textEffect,
+			mood: scene.mood && scene.mood !== "horror" ? scene.mood : "mystery",
+		};
+	});
+}
+
 export function applyShortsVideoRules<
 	T extends ShotSceneInput & {
 		transition?: string;
@@ -1251,8 +1740,11 @@ export function applyShortsVideoRules<
 >(scenes: T[], sources: ShotSource[]): T[] {
 	if (scenes.length === 0) return scenes;
 
+	const editFirstScenes = scenes.map((scene) =>
+		normalizeTextEmphasisToEditFirst(scene, sources),
+	);
 	let elapsed = 0;
-	const paced = scenes.map((scene, index) => {
+	const paced = editFirstScenes.map((scene, index) => {
 		const start = elapsed;
 		const isLast = index === scenes.length - 1;
 		let minDuration = start < 10 ? 1.4 : 1.8;
@@ -1425,7 +1917,7 @@ export function applyShortsVideoRules<
 		);
 	}
 
-	return injectShortsPatternInterrupts(withInterrupts);
+	return injectShortsPatternInterrupts(withInterrupts, sources);
 }
 
 export function intensifyHookScenes<

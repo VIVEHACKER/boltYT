@@ -18,7 +18,12 @@ type SceneMediaLike = Pick<
 
 type ShotMediaLike = Pick<
 	SceneShot,
-	"visual_prompt" | "source_url" | "source_title" | "caption"
+	| "visual_prompt"
+	| "source_url"
+	| "source_title"
+	| "caption"
+	| "search_terms"
+	| "visual_role"
 >;
 
 function normalizeText(value?: string): string {
@@ -56,7 +61,7 @@ export function buildSceneSearchQueries(scene: SceneMediaLike): {
 	queryEn: string;
 	locale: "ko" | "en";
 } {
-	const sourceHeadline = [scene.news_date, scene.news_title, scene.news_source]
+	const sourceHeadline = [scene.news_title, scene.news_source]
 		.map(normalizeText)
 		.filter(Boolean)
 		.join(" ");
@@ -66,14 +71,17 @@ export function buildSceneSearchQueries(scene: SceneMediaLike): {
 	const queryKo = firstNonEmpty([
 		scene.searchQueryKo,
 		sourceHeadline,
-		narration,
 		looksEnglish(visualPrompt) ? "" : visualPrompt,
+		narration,
+		normalizeText(scene.news_date)
+			? `${normalizeText(scene.news_date)} ${sourceHeadline}`.trim()
+			: "",
 	]);
 	const queryEn = firstNonEmpty([
 		scene.searchQueryEn,
 		looksEnglish(visualPrompt) ? visualPrompt : "",
-		scene.searchQueryKo,
 		sourceHeadline,
+		scene.searchQueryKo,
 		narration,
 	]);
 
@@ -109,6 +117,17 @@ export function buildShotSearchQueries(
 	const shotPrompt = normalizeText(shot?.visual_prompt);
 	const shotCaption = normalizeText(shot?.caption);
 	const shotTitle = normalizeText(shot?.source_title);
+	const shotTerms = shot?.search_terms?.map(normalizeText).filter(Boolean) ?? [];
+	const roleSuffix =
+		shot?.visual_role === "document"
+			? "document record evidence"
+			: shot?.visual_role === "map"
+				? "timeline map"
+				: shot?.visual_role === "archive"
+					? "archive documentary"
+					: shot?.visual_role === "reconstruction"
+						? "cinematic reconstruction"
+						: "";
 	const shotHeadline = [scene.news_date, shotTitle, shotCaption]
 		.map(normalizeText)
 		.filter(Boolean)
@@ -116,13 +135,16 @@ export function buildShotSearchQueries(
 
 	return {
 		queryKo: firstNonEmpty([
+			...shotTerms.filter((term) => !looksEnglish(term)),
 			looksEnglish(shotPrompt) ? "" : shotPrompt,
 			shotHeadline,
 			scene.searchQueryKo,
 			sceneQueries.queryKo,
 		]),
 		queryEn: firstNonEmpty([
+			...shotTerms.filter(looksEnglish),
 			looksEnglish(shotPrompt) ? shotPrompt : "",
+			roleSuffix,
 			scene.searchQueryEn,
 			looksEnglish(scene.visual_prompt ?? "")
 				? normalizeText(scene.visual_prompt)

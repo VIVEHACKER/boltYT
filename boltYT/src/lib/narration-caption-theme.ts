@@ -56,22 +56,22 @@ export function getNarrationCaptionContainerToneStyle(params: {
 	switch (tone) {
 		case "witness":
 			return {
-				borderLeft: `3px solid ${hexToRgba(accentColor, 0.52)}`,
-				paddingLeft: 12,
-				boxShadow: `inset 1px 0 0 ${hexToRgba(accentColor, 0.16)}, 0 0 18px ${glow}`,
+				borderLeft: `2px solid ${hexToRgba(accentColor, 0.42)}`,
+				paddingLeft: 10,
+				boxShadow: `inset 1px 0 0 ${hexToRgba(accentColor, 0.12)}, 0 0 14px ${glow}`,
 			};
 		case "evidence":
 			return {
-				border: `1px dashed ${hexToRgba(accentColor, 0.34)}`,
-				boxShadow: `0 0 0 1px ${hexToRgba(accentColor, 0.12)}, 0 10px 28px ${hexToRgba(accentColor, 0.1)}`,
+				border: `1px dashed ${hexToRgba(accentColor, 0.26)}`,
+				boxShadow: `0 0 0 1px ${hexToRgba(accentColor, 0.08)}, 0 8px 20px ${hexToRgba(accentColor, 0.08)}`,
 				backgroundImage:
 					"repeating-linear-gradient(180deg, rgba(255,255,255,0.04) 0 1px, transparent 1px 10px)",
 			};
 		case "timeline":
 			return {
-				borderTop: `1px solid ${hexToRgba(accentColor, 0.34)}`,
-				borderBottom: `1px solid ${hexToRgba(accentColor, 0.24)}`,
-				boxShadow: `0 0 18px ${glow}`,
+				borderTop: `1px solid ${hexToRgba(accentColor, 0.26)}`,
+				borderBottom: `1px solid ${hexToRgba(accentColor, 0.18)}`,
+				boxShadow: `0 0 14px ${glow}`,
 			};
 		default:
 			return {};

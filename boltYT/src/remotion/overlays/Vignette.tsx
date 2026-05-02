@@ -47,17 +47,3 @@ export function Vignette({ intensity = "medium", opacity = 1 }: Props) {
 		/>
 	);
 }
-
-/**
- * Mood → 권장 vignette intensity.
- * horror/mystery 는 heavy, news 는 none, 그 외 light.
- */
-export function suggestVignetteIntensity(
-	mood?: string,
-): VignetteIntensity | null {
-	if (mood === "horror") return "heavy";
-	if (mood === "mystery") return "medium";
-	if (mood === "warm") return "light";
-	if (mood === "news") return null;
-	return null;
-}

@@ -17,6 +17,15 @@ import {
 	estimatedBpmFromTempo,
 	retimeScenesToBeatGrid,
 } from "../../lib/beat-sync";
+import { generateContinuousNarration } from "../../lib/ai";
+import {
+	planBgmCuePlan,
+	type BgmCuePlan,
+} from "../../lib/bgm-cue-plan";
+import {
+	loadChannelBranding,
+	type ChannelBranding,
+} from "../../lib/channel-branding";
 import { autoPickBgm, inferAutoBgmPreset } from "../../lib/bgm";
 import { type BgmAnalysis, isBpmReliable } from "../../lib/bgm-analyze";
 import { buildHookFlags } from "../../lib/hook-detector";
@@ -32,10 +41,36 @@ import {
 	type RenderQualityPreset,
 	resolveRenderOptions,
 } from "../../lib/render-options";
-import { pollRenderProgress, submitRender } from "../../lib/render-queue";
+import {
+	isRenderJobError,
+	pollRenderProgress,
+	submitRender,
+	type RenderJob,
+} from "../../lib/render-queue";
 import type { SceneShot } from "../../lib/scene-shot-types";
-import { assignSfxToScenes } from "../../lib/sfx";
+import { assignSfxToScenes, type SfxCategory } from "../../lib/sfx";
 import { supabase } from "../../lib/supabase";
+import { generateAndSaveThumbnail } from "../../lib/thumbnail";
+import {
+	buildYouTubeMetadata,
+	type YouTubeMetadata,
+} from "../../lib/youtube-metadata";
+import { analyzeYouTubePolicyRisk } from "../../lib/youtube-policy-risk";
+import {
+	analyzeProductionQuality,
+	type ProductionQualityReport,
+	type ProductionQualityScene,
+} from "../../lib/youtube-production-quality";
+import {
+	buildReferenceRepairGuidance,
+	buildMotionRepairPatch,
+	renderOutputIssueCodesToProductionIssueCodes,
+	shouldRepairMotionDesign,
+	shouldRepairNarrationEnding,
+	shouldRepairRenderOutput,
+	strengthenEndingNarration,
+} from "../../lib/youtube-production-repair";
+import { analyzeOpeningRetention } from "../../lib/youtube-retention";
 import {
 	calculateTotalFrames,
 	VideoComposition,
@@ -57,7 +92,464 @@ interface StepPreviewProps {
 	onBack: () => void;
 }
 
-type SceneWithAssets = Scene & { imageUrl?: string; audioUrl?: string };
+type SceneWithAssets = Scene & {
+	imageUrl?: string;
+	videoUrl?: string;
+	audioUrl?: string;
+};
+
+function sceneShots(scene: SceneWithAssets | Scene): SceneShot[] {
+	return (
+		((scene as Record<string, unknown>).shots as SceneShot[] | undefined) ?? []
+	);
+}
+
+function animationSfxHints(scene: SceneWithAssets | Scene) {
+	const animationShots = sceneShots(scene).filter(
+		(shot) => shot.selection_provider === "animation" || shot.animation_family,
+	);
+	const productionFamily = animationShots.find(
+		(shot) => typeof shot.animation_family === "string",
+	)?.animation_family;
+	const needsActionSfx = animationShots.some(
+		(shot) =>
+			shot.kind === "detail" ||
+			shot.kind === "punch" ||
+			(shot.animation_rig?.actionIntensity ?? 0) >= 0.65 ||
+			(shot.sfx_cue?.intensity ?? 0) >= 0.65,
+	);
+	const animationEndingShot = animationShots.some(
+		(shot) => shot.kind === "punch" || shot.visual_role === "ending",
+	);
+	const sfxCues = animationShots
+		.map((shot) => shot.sfx_cue)
+		.filter((cue): cue is NonNullable<SceneShot["sfx_cue"]> =>
+			Boolean(cue?.category),
+		)
+		.sort((a, b) => b.intensity - a.intensity);
+	const firstCue = sfxCues.find((cue) => cue.category !== "none");
+	const endingCue =
+		animationShots
+			.filter((shot) => shot.kind === "punch" || shot.visual_role === "ending")
+			.map((shot) => shot.sfx_cue)
+			.filter((cue): cue is NonNullable<SceneShot["sfx_cue"]> =>
+				Boolean(cue?.category && cue.category !== "none"),
+			)
+			.sort((a, b) => b.intensity - a.intensity)[0] ?? firstCue;
+	return {
+		productionType: animationShots.length > 0 ? "animation" : undefined,
+		productionFamily,
+		animationShotCount: animationShots.length,
+		animationEndingShot,
+		needsActionSfx,
+		preferredEnterSfxCategory: firstCue?.category as SfxCategory | undefined,
+		preferredTransitionSfxCategory: endingCue?.category as
+			| SfxCategory
+			| undefined,
+	};
+}
+
+function toPolicyScene(scene: SceneWithAssets) {
+	return {
+		narration_text: scene.narration_text,
+		scene_type: scene.scene_type,
+		visual_prompt: scene.visual_prompt,
+		news_title: scene.news_title,
+		news_source: scene.news_source,
+		source_url: scene.source_url,
+		shots: sceneShots(scene),
+	};
+}
+
+function toProductionScene(
+	scene: SceneWithAssets,
+	remotionScene?: RemotionScene,
+): ProductionQualityScene {
+	return {
+		narration_text: scene.narration_text,
+		scene_type: scene.scene_type,
+		duration_seconds: Number(scene.duration_seconds),
+		imageUrl: scene.imageUrl ?? remotionScene?.imageUrl,
+		videoUrl: scene.videoUrl ?? remotionScene?.videoUrl,
+		audioUrl: scene.audioUrl ?? remotionScene?.audioUrl,
+		visual_prompt: scene.visual_prompt,
+		news_title: scene.news_title,
+		news_source: scene.news_source,
+		news_date: scene.news_date,
+		source_url: scene.source_url,
+		sourceAttribution: remotionScene?.sourceAttribution,
+		transition: scene.transition ?? remotionScene?.transition,
+		wordTimings: scene.word_timings ?? remotionScene?.wordTimings,
+		motionGraphics: scene.motion_graphics ?? remotionScene?.motionGraphics,
+		shots: remotionScene?.shots ?? sceneShots(scene),
+	};
+}
+
+type RenderOutputQcLike = {
+	passed?: boolean;
+	score?: number;
+	verdict?: string;
+	metrics?: unknown;
+	referenceComparison?: unknown;
+	issues?: unknown[];
+	requiredActions?: unknown[];
+};
+
+type PreviewNicheVideoQualityTarget = {
+	key?: string;
+	label?: string;
+	target?: string;
+	rationale?: string;
+};
+
+type PreviewNicheResearch = {
+	id?: string;
+	topic?: string;
+	query?: string;
+	decision?: "scale" | "test" | "hold";
+	score?: number;
+	playbook?: {
+		headline?: string;
+		openingFormula?: string[];
+		productionConstraints?: string[];
+		videoQualityTargets?: PreviewNicheVideoQualityTarget[];
+		analysisQuality?: {
+			score?: number;
+			label?: string;
+			warnings?: string[];
+		};
+	};
+};
+
+function referenceFrameProfileFromTemplate(
+	referenceTemplate?: ReferenceTemplate | null,
+): Record<string, unknown> | undefined {
+	const raw = referenceTemplate?.raw_analysis;
+	if (!raw || typeof raw !== "object") return undefined;
+	const profile = (raw as { frame_profile?: unknown }).frame_profile;
+	return profile && typeof profile === "object"
+		? (profile as Record<string, unknown>)
+		: undefined;
+}
+
+function referenceProductionDnaFromTemplate(
+	referenceTemplate?: ReferenceTemplate | null,
+): unknown {
+	const raw = referenceTemplate?.raw_analysis;
+	if (!raw || typeof raw !== "object") return undefined;
+	return (raw as { production_dna?: unknown }).production_dna;
+}
+
+function renderOutputIssueCodes(qc: RenderOutputQcLike | undefined): string[] {
+	return (qc?.issues ?? []).filter(
+		(issue): issue is string => typeof issue === "string",
+	);
+}
+
+function mergeRenderOutputQc(
+	base: Record<string, unknown>,
+	qc: RenderOutputQcLike | undefined,
+	extra: Record<string, unknown> = {},
+) {
+	return {
+		...base,
+		render_output_qc_passed: qc?.passed ?? false,
+		render_output_qc_score: qc?.score,
+		render_output_qc_verdict: qc?.verdict,
+		render_output_qc_metrics: qc?.metrics,
+		render_output_reference_comparison: qc?.referenceComparison,
+		render_output_qc_issues: qc?.issues ?? [],
+		render_output_qc_actions: qc?.requiredActions ?? [],
+		...extra,
+	};
+}
+
+function renderFailureMessage(error: unknown): string {
+	if (!isRenderJobError(error)) {
+		return error instanceof Error ? error.message : "렌더링 실패";
+	}
+	const qc = error.job.qcResult as RenderOutputQcLike | undefined;
+	if (error.job.errorCategory === "quality_gate" && qc) {
+		const issues = renderOutputIssueCodes(qc).slice(0, 3).join(", ");
+		return `렌더 산출물 품질 기준 미달: ${qc.score ?? "?"}/100${
+			issues ? ` (${issues})` : ""
+		}`;
+	}
+	return error.message || "렌더링 실패";
+}
+
+function formatMetricRatio(value: number): string {
+	if (!Number.isFinite(value)) return "--";
+	return `${Math.round(value * 100)}%`;
+}
+
+function formatMetricScore(value: number): string {
+	if (!Number.isFinite(value)) return "--";
+	return `${Math.round(value)}점`;
+}
+
+function productionStatusColor(
+	report: ProductionQualityReport,
+):
+	| "notification-success-soft"
+	| "notification-warning-soft"
+	| "notification-error-soft" {
+	if (report.passed) return "notification-success-soft";
+	if (report.score >= 70 && report.metrics.premiumFloorScore >= 78) {
+		return "notification-warning-soft";
+	}
+	return "notification-error-soft";
+}
+
+function productionStatusLabel(report: ProductionQualityReport): string {
+	if (report.passed) return "렌더 가능";
+	if (report.score < 78) return "QC 점수 미달";
+	if (report.metrics.premiumFloorScore < 86) return "프리미엄 기준 미달";
+	return "보강 필요";
+}
+
+function nicheDecisionLabel(decision?: PreviewNicheResearch["decision"]): string {
+	if (decision === "scale") return "증폭 후보";
+	if (decision === "test") return "파일럿 후보";
+	if (decision === "hold") return "보류";
+	return "니치 기준";
+}
+
+function ProductionQualityPanel({
+	report,
+	nicheResearch,
+}: {
+	report: ProductionQualityReport;
+	nicheResearch: PreviewNicheResearch | null;
+}) {
+	const metrics = report.metrics;
+	const visibleIssues = report.issues
+		.filter((issue) => issue.severity === "critical" || issue.severity === "warning")
+		.slice(0, 4);
+	const visibleActions = report.requiredActions.slice(0, 4);
+	const nicheTargets =
+		nicheResearch?.playbook?.videoQualityTargets
+			?.filter((target) => target.label || target.target)
+			.slice(0, 4) ?? [];
+	const openingFormula =
+		nicheResearch?.playbook?.openingFormula?.filter(Boolean).slice(0, 2) ?? [];
+	const nicheQuality = nicheResearch?.playbook?.analysisQuality;
+
+	return (
+		<div className="rounded-[8px] border border-contrast-low bg-canvas p-static-lg mb-static-lg">
+			<div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-static-md mb-static-md">
+				<div className="min-w-0">
+					<PHeading size="small" tag="h3">
+						실제 영상 수준 리포트
+					</PHeading>
+					<PText size="small" color="contrast-medium" className="mt-static-xs">
+						렌더 승인 전에 씬, 컷 밀도, 출처, 모션, 자막, BGM, 썸네일 기준을
+						수치로 검증합니다.
+					</PText>
+				</div>
+				<div className="flex flex-wrap gap-static-xs">
+					<PTag color={productionStatusColor(report)}>
+						{productionStatusLabel(report)}
+					</PTag>
+					<PTag color="notification-info-soft">
+						QC {formatMetricScore(report.score)}
+					</PTag>
+				</div>
+			</div>
+
+			<div className="grid grid-cols-2 lg:grid-cols-4 gap-static-sm">
+				<ProductionMetric label="제작 QC" value={formatMetricScore(report.score)} />
+				<ProductionMetric
+					label="프리미엄 바닥선"
+					value={formatMetricScore(metrics.premiumFloorScore)}
+				/>
+				<ProductionMetric
+					label="출처 앵커"
+					value={formatMetricRatio(metrics.sourceAnchorRatio)}
+				/>
+				<ProductionMetric
+					label="모션 비주얼"
+					value={formatMetricRatio(metrics.motionVisualRatio)}
+				/>
+				<ProductionMetric
+					label="디자인 비주얼"
+					value={formatMetricRatio(metrics.designedVisualRatio)}
+				/>
+				<ProductionMetric
+					label="자막 싱크"
+					value={formatMetricRatio(metrics.captionSyncRatio)}
+				/>
+				<ProductionMetric
+					label="초반 비트"
+					value={`${metrics.openingDynamicBeatCount}개`}
+				/>
+				<ProductionMetric
+					label="평균 컷"
+					value={`${metrics.averageShotsPerVisualScene.toFixed(1)}컷/씬`}
+				/>
+			</div>
+
+			{nicheResearch && (
+				<div className="mt-static-md rounded-[8px] bg-surface p-static-md">
+					<div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-static-sm">
+						<div className="min-w-0">
+							<PText size="small" weight="semi-bold">
+								니치 목표: {nicheResearch.query ?? nicheResearch.topic ?? "선택 주제"}
+							</PText>
+							<PText size="x-small" color="contrast-medium" className="mt-static-xs">
+								{nicheResearch.playbook?.headline ??
+									"니치 리서치에서 넘어온 제작 기준을 프리뷰 QC와 대조합니다."}
+							</PText>
+						</div>
+						<div className="flex flex-wrap gap-static-xs">
+							<PTag color="notification-info-soft">
+								{nicheDecisionLabel(nicheResearch.decision)}
+							</PTag>
+							{typeof nicheResearch.score === "number" && (
+								<PTag color="notification-info-soft">
+									니치 {nicheResearch.score}점
+								</PTag>
+							)}
+							{typeof nicheQuality?.score === "number" && (
+								<PTag color="notification-info-soft">
+									신뢰도 {nicheQuality.score}점
+								</PTag>
+							)}
+						</div>
+					</div>
+
+					{nicheTargets.length > 0 && (
+						<div className="mt-static-sm grid grid-cols-1 lg:grid-cols-2 gap-static-xs">
+							{nicheTargets.map((target, index) => (
+								<div
+									key={`${target.key ?? target.label ?? "target"}-${index}`}
+									className="rounded-[6px] bg-canvas p-static-sm"
+								>
+									<PText size="x-small" weight="semi-bold">
+										{target.label ?? "영상 목표"}
+									</PText>
+									<PText size="x-small" color="contrast-medium" className="mt-static-xs">
+										{target.target ?? target.rationale ?? "목표 기준 없음"}
+									</PText>
+								</div>
+							))}
+						</div>
+					)}
+
+					{openingFormula.length > 0 && (
+						<div className="mt-static-sm flex flex-wrap gap-static-xs">
+							{openingFormula.map((formula) => (
+								<PTag key={formula} color="notification-info-soft">
+									{formula}
+								</PTag>
+							))}
+						</div>
+					)}
+				</div>
+			)}
+
+			<div className="mt-static-md grid grid-cols-1 lg:grid-cols-2 gap-static-sm">
+				<div className="rounded-[8px] bg-surface p-static-md">
+					<PText size="small" weight="semi-bold" className="mb-static-xs">
+						차단/주의 항목
+					</PText>
+					<div className="flex flex-wrap gap-static-xs">
+						{visibleIssues.length > 0 ? (
+							visibleIssues.map((issue) => (
+								<PTag
+									key={`${issue.code}-${issue.sceneIndex ?? "global"}`}
+									color={
+										issue.severity === "critical"
+											? "notification-error-soft"
+											: "notification-warning-soft"
+									}
+								>
+									{issue.message}
+								</PTag>
+							))
+						) : (
+							<PTag color="notification-success-soft">치명 이슈 없음</PTag>
+						)}
+					</div>
+				</div>
+
+				<div className="rounded-[8px] bg-surface p-static-md">
+					<PText size="small" weight="semi-bold" className="mb-static-xs">
+						필수 보강 액션
+					</PText>
+					<div className="flex flex-wrap gap-static-xs">
+						{visibleActions.length > 0 ? (
+							visibleActions.map((action) => (
+								<PTag key={action} color="notification-warning-soft">
+									{action}
+								</PTag>
+							))
+						) : (
+							<PTag color="notification-success-soft">렌더 전 보강 없음</PTag>
+						)}
+					</div>
+				</div>
+			</div>
+		</div>
+	);
+}
+
+function ProductionMetric({ label, value }: { label: string; value: string }) {
+	return (
+		<div className="rounded-[8px] bg-surface p-static-sm min-w-0">
+			<PText size="x-small" color="contrast-medium">
+				{label}
+			</PText>
+			<PText weight="semi-bold" className="truncate">
+				{value}
+			</PText>
+		</div>
+	);
+}
+
+function buildProductionScenes(
+	scenes: SceneWithAssets[],
+	remotionScenes: RemotionScene[],
+): ProductionQualityScene[] {
+	return scenes.map((scene, index) =>
+		toProductionScene(scene, remotionScenes[index]),
+	);
+}
+
+function cloneShots(shots?: SceneShot[]): SceneShot[] {
+	return (shots ?? []).map((shot) => ({ ...shot }));
+}
+
+function thumbnailPathForScript(scriptId: string): string {
+	return `scripts/${scriptId}/thumbnail.jpg`;
+}
+
+function compactThumbnailTitle(title: string, fallback: string): string {
+	const primary = (title.split("|")[0] ?? title)
+		.replace(/\s*(타임라인 분석|확인된 사실과 남은 의문|핵심만 60초 요약)$/g, "")
+		.trim();
+	if (primary.length > 0 && primary.length <= 18) return primary;
+	return (primary || fallback).slice(0, 18).trim() || "사건 타임라인";
+}
+
+function chooseThumbnailBackground(scenes: SceneWithAssets[]): string {
+	const ranked = scenes
+		.map((scene, index) => {
+			const url = scene.imageUrl ?? "";
+			const hasPunchShot = sceneShots(scene).some((shot) => shot.kind === "punch");
+			return {
+				url,
+				score:
+					(url ? 100 : 0) +
+					(index < 3 ? 35 - index * 8 : 0) +
+					(scene.scene_type === "video" ? 18 : 0) +
+					(hasPunchShot ? 12 : 0),
+			};
+		})
+		.filter((item) => item.url)
+		.sort((a, b) => b.score - a.score);
+	return ranked[0]?.url ?? "";
+}
 
 /** 연속 나레이션 URL을 IndexedDB에서 복원 */
 async function loadNarrationUrl(
@@ -68,6 +560,24 @@ async function loadNarrationUrl(
 	if (!narPath) return "";
 	const blobMap = await ensureFn([narPath]);
 	return blobMap.get(narPath) ?? "";
+}
+
+async function loadStoredBgmUrl(
+	scriptId: string,
+	ensureFn: (paths: string[]) => Promise<Map<string, string>>,
+): Promise<string> {
+	const storedUrl =
+		localStorage.getItem(`bgm_url_${scriptId}`) ??
+		localStorage.getItem("bgm_url") ??
+		"";
+	if (storedUrl) return storedUrl;
+
+	const storedPath = localStorage.getItem(`bgm_path_${scriptId}`);
+	if (!storedPath) return "";
+	if (storedPath.startsWith("/")) return storedPath;
+
+	const blobMap = await ensureFn([storedPath]);
+	return blobMap.get(storedPath) ?? "";
 }
 
 function loadStoredBgmAnalysis(scriptId: string): BgmAnalysis | null {
@@ -94,9 +604,19 @@ export default function StepPreview({
 	const [title, setTitle] = useState("");
 	const [description, setDescription] = useState("");
 	const [tags, setTags] = useState("");
+	const [channelName, setChannelName] = useState("");
+	const [channelBranding, setChannelBranding] = useState<ChannelBranding>(() =>
+		loadChannelBranding(),
+	);
+	const [thumbnailPlan, setThumbnailPlan] = useState<
+		YouTubeMetadata["thumbnail"] | null
+	>(null);
+	const [nicheResearch, setNicheResearch] =
+		useState<PreviewNicheResearch | null>(null);
 	const [rejecting, setRejecting] = useState(false);
 	const [rejectionReason, setRejectionReason] = useState("");
 	const [approving, setApproving] = useState(false);
+	const [approvalError, setApprovalError] = useState("");
 	const [approved, setApproved] = useState(false);
 	const [rendering, setRendering] = useState(false);
 	const [renderProgress, setRenderProgress] = useState("");
@@ -110,24 +630,33 @@ export default function StepPreview({
 		resolveRenderOptions({ preset: renderQuality }).hardwareAccel;
 	const [isShorts, setIsShorts] = useState(false);
 	const [narrationUrl, setNarrationUrl] = useState("");
+	const [bgmUrl, setBgmUrl] = useState("");
+	const [bgmCuePlan, setBgmCuePlan] = useState<BgmCuePlan | null>(null);
 
-	const compositionOverrides = useMemo(() => {
-		if (!referenceTemplate) return {};
-		const preset = referenceToPreset(
+	const referencePreset = useMemo(() => {
+		if (!referenceTemplate) return undefined;
+		return referenceToPreset(
 			referenceTemplate,
 			isShorts ? "shorts" : "longform",
 		);
-		return {
-			subtitleStyle: preset.composition.subtitleStyle,
-			captionStyle: preset.composition.captionStyle,
-			subtitlePosition: preset.composition.subtitlePosition,
-			subtitleBgStyle: preset.composition.subtitleBgStyle,
-			subtitleAccentColor: referenceTemplate.subtitle_accent_color,
-		};
 	}, [referenceTemplate, isShorts]);
+
+	const compositionOverrides = useMemo(() => {
+		if (!referenceTemplate || !referencePreset) return {};
+		return {
+			subtitleStyle: referencePreset.composition.subtitleStyle,
+			captionStyle: referencePreset.composition.captionStyle,
+			subtitlePosition: referencePreset.composition.subtitlePosition,
+			subtitleBgStyle: referencePreset.composition.subtitleBgStyle,
+			subtitleAccentColor: referenceTemplate.subtitle_accent_color,
+			sceneLayout: referencePreset.composition.sceneLayout,
+		};
+	}, [referenceTemplate, referencePreset]);
 
 	useEffect(() => {
 		async function load() {
+			const branding = loadChannelBranding();
+			setChannelBranding(branding);
 			const [scenesRes, scriptRes] = await Promise.all([
 				supabase
 					.from("scenes")
@@ -144,7 +673,11 @@ export default function StepPreview({
 			const rawScenes = scenesRes.data ?? [];
 			const scriptData = scriptRes.data as {
 				format: string;
-				content_json: { shorts_script?: string; format_selection?: string };
+				content_json: {
+					shorts_script?: string;
+					format_selection?: string;
+					niche_research?: PreviewNicheResearch | null;
+				};
 				briefs?: {
 					topics?: { title?: string; channels?: { name?: string } };
 				};
@@ -209,9 +742,7 @@ export default function StepPreview({
 			const scenesWithAssets: SceneWithAssets[] = (rawScenes as Scene[]).map(
 				(s) => {
 					const sourceUrl = s.source_url as string | undefined;
-					const shots =
-						((s as Record<string, unknown>).shots as SceneShot[] | undefined) ??
-						[];
+					const shots = sceneShots(s);
 					let imgUrl = imageMap.get(s.id as string);
 					// IndexedDB에 이미지가 없으면 이미지 URL만 fallback (기사 URL 제외)
 					if (!imgUrl && sourceUrl) {
@@ -259,6 +790,31 @@ export default function StepPreview({
 			// 연속 나레이션 로드
 			const narUrl = await loadNarrationUrl(scriptId, ensureBlobUrls);
 			setNarrationUrl(narUrl);
+			let activeBgmUrl = await loadStoredBgmUrl(scriptId, ensureBlobUrls);
+			if (activeBgmUrl) {
+				localStorage.setItem(`bgm_url_${scriptId}`, activeBgmUrl);
+			} else {
+				try {
+					const bgmResult = await autoPickBgm(
+						scriptId,
+						preset?.bgm ??
+							inferAutoBgmPreset(
+								beatRetimedScenes.map((scene) => ({
+									mood: scene.mood,
+									durationSeconds: Number(scene.duration_seconds),
+									sceneType: scene.scene_type,
+								})),
+							),
+					);
+					activeBgmUrl = bgmResult?.url ?? "";
+					if (activeBgmUrl) {
+						localStorage.setItem(`bgm_url_${scriptId}`, activeBgmUrl);
+					}
+				} catch (error) {
+					console.warn("Preview BGM auto-pick failed:", error);
+				}
+			}
+			setBgmUrl(activeBgmUrl);
 
 			// 훅 패턴 감지 (콘텐츠 기반) + 시간 기반 hookBoost 통합
 			const hookResults = buildHookFlags(
@@ -282,6 +838,7 @@ export default function StepPreview({
 						| Array<{ word: string; startFrame: number; endFrame: number }>
 						| undefined,
 					beatTimes: bgmAnalysis?.beats,
+					...animationSfxHints(s),
 				})),
 			);
 
@@ -374,16 +931,44 @@ export default function StepPreview({
 				};
 			});
 			setRemotionScenes(rScenes);
+			setBgmCuePlan(
+				planBgmCuePlan(rScenes, {
+					beats: bgmAnalysis?.beats,
+					bpm:
+						bgmAnalysis?.bpm ??
+						(preset?.bgm.tempo
+							? estimatedBpmFromTempo(preset.bgm.tempo)
+							: undefined),
+					fps: VIDEO_FPS,
+				}),
+			);
 
 			if (scriptData) {
 				setIsShorts(shortsMode);
 				setShortsScript(scriptData.content_json?.shorts_script ?? "");
-				const topicTitle = scriptData.briefs?.topics?.title ?? "";
-				setTitle(topicTitle);
-				setDescription(
-					`${topicTitle}에 대해 알아봅니다.\n\n#shorts #유튜브 #자동화`,
-				);
-				setTags("AI, 유튜브, 자동화, 지식");
+				setNicheResearch(scriptData.content_json?.niche_research ?? null);
+				const effectiveChannelName =
+					scriptData.briefs?.topics?.channels?.name?.trim() ||
+					branding.channelName;
+				setChannelName(effectiveChannelName);
+				const metadata = buildYouTubeMetadata({
+					topicTitle: scriptData.briefs?.topics?.title ?? "",
+					channelName: effectiveChannelName,
+					format: shortsMode ? "shorts" : "longform",
+					scenes: beatRetimedScenes.map((scene) => ({
+						narration_text: scene.narration_text,
+						scene_type: scene.scene_type,
+						duration_seconds: Number(scene.duration_seconds),
+						news_title: scene.news_title,
+						news_source: scene.news_source,
+						news_date: scene.news_date,
+						shots: sceneShots(scene),
+					})),
+				});
+				setTitle(metadata.title);
+				setDescription(metadata.description);
+				setTags(metadata.tags.join(", "));
+				setThumbnailPlan(metadata.thumbnail);
 			}
 
 			setLoading(false);
@@ -391,87 +976,575 @@ export default function StepPreview({
 		load();
 	}, [scriptId, referenceTemplate]);
 
-	async function handleApprove() {
-		setApproving(true);
-		setRendering(true);
-		setRenderProgress("렌더 자산을 준비하고 있습니다...");
+	const uploadPolicyReport = useMemo(
+		() =>
+			analyzeYouTubePolicyRisk({
+				title,
+				description,
+				format: isShorts ? "shorts" : "longform",
+				scenes: scenes.map(toPolicyScene),
+			}),
+		[title, description, isShorts, scenes],
+	);
 
-		const totalDuration = scenes.reduce(
-			(sum, s) => sum + Number(s.duration_seconds),
-			0,
+	const blockingPolicyIssue = uploadPolicyReport.issues.find(
+		(issue) => issue.severity === "critical",
+	);
+	const visiblePolicyIssue = uploadPolicyReport.issues.find(
+		(issue) => issue.severity === "critical" || issue.severity === "warning",
+	);
+	const openingRetentionReport = useMemo(
+		() =>
+			analyzeOpeningRetention({
+				title,
+				format: isShorts ? "shorts" : "longform",
+				scenes: scenes.map((scene) => ({
+					narration_text: scene.narration_text,
+					scene_type: scene.scene_type,
+					duration_seconds: Number(scene.duration_seconds),
+					news_title: scene.news_title,
+					shots: sceneShots(scene),
+				})),
+			}),
+		[title, isShorts, scenes],
+	);
+	const visibleRetentionIssue = openingRetentionReport.issues.find(
+		(issue) => issue.severity === "critical" || issue.severity === "warning",
+	);
+	const productionScenes = useMemo(
+		() => buildProductionScenes(scenes, remotionScenes),
+		[scenes, remotionScenes],
+	);
+	const buildProductionReport = (
+		finalBgmUrl = bgmUrl,
+		thumbnailPath = localStorage.getItem(`thumbnail_path_${scriptId}`) ?? "",
+		sourceScenes = scenes,
+		sourceRemotionScenes = remotionScenes,
+		finalNarrationUrl = narrationUrl,
+	): ProductionQualityReport =>
+		analyzeProductionQuality({
+			title,
+			description,
+			format: isShorts ? "shorts" : "longform",
+			scenes: buildProductionScenes(sourceScenes, sourceRemotionScenes),
+			narrationUrl: finalNarrationUrl,
+			bgmUrl: finalBgmUrl,
+			thumbnailPath,
+			thumbnailPlanned: Boolean(thumbnailPlan),
+		});
+	const productionQualityReport = useMemo(
+		() =>
+			analyzeProductionQuality({
+				title,
+				description,
+				format: isShorts ? "shorts" : "longform",
+				scenes: productionScenes,
+				narrationUrl,
+				bgmUrl,
+				thumbnailPath: localStorage.getItem(`thumbnail_path_${scriptId}`) ?? "",
+				thumbnailPlanned: Boolean(thumbnailPlan),
+			}),
+		[
+			title,
+			description,
+			isShorts,
+			productionScenes,
+			narrationUrl,
+			bgmUrl,
+			thumbnailPlan,
+			scriptId,
+		],
+	);
+	const visibleProductionIssue = productionQualityReport.issues.find(
+		(issue) =>
+			(issue.severity === "critical" || issue.severity === "warning") &&
+			!issue.code.startsWith("policy_") &&
+			!issue.code.startsWith("opening_"),
+	);
+
+	async function ensureBgmUrl(): Promise<string> {
+		const current =
+			bgmUrl ||
+			localStorage.getItem(`bgm_url_${scriptId}`) ||
+			localStorage.getItem("bgm_url") ||
+			"";
+		if (current) return current;
+
+		const restored = await loadStoredBgmUrl(scriptId, ensureBlobUrls);
+		if (restored) {
+			localStorage.setItem(`bgm_url_${scriptId}`, restored);
+			setBgmUrl(restored);
+			return restored;
+		}
+
+		const bgmResult = await autoPickBgm(
+			scriptId,
+			inferAutoBgmPreset(
+				scenes.map((scene) => ({
+					mood: scene.mood,
+					durationSeconds: Number(scene.duration_seconds),
+					sceneType: scene.scene_type,
+				})),
+			),
+		);
+		const pickedUrl = bgmResult?.url ?? "";
+		if (pickedUrl) {
+			localStorage.setItem(`bgm_url_${scriptId}`, pickedUrl);
+			setBgmUrl(pickedUrl);
+			return pickedUrl;
+		}
+		throw new Error("BGM 자동 선택에 실패했습니다. 기본 BGM 또는 로컬 BGM을 먼저 설정하세요.");
+	}
+
+	async function updateSceneRecord(
+		sceneId: string,
+		patch: Record<string, unknown>,
+	) {
+		const { error } = await supabase.from("scenes").update(patch).eq("id", sceneId);
+		if (error) throw new Error(`씬 품질 보강 저장 실패: ${error.message}`);
+	}
+
+	async function regenerateNarration(
+		workingScenes: SceneWithAssets[],
+		workingRemotionScenes: RemotionScene[],
+	): Promise<string> {
+		setRenderProgress("품질 자동 보강: 엔딩 TTS를 다시 생성하고 있습니다...");
+		const { url, sceneDurations } = await generateContinuousNarration(
+			scriptId,
+			workingScenes.map((scene) => ({
+				id: scene.id,
+				narration_text: scene.narration_text,
+			})),
+			referencePreset?.tts,
+		);
+		setNarrationUrl(url);
+
+		const { data: refreshed } = await supabase
+			.from("scenes")
+			.select("id, duration_seconds, word_timings")
+			.in(
+				"id",
+				workingScenes.map((scene) => scene.id),
+			);
+		const timingMap = new Map(
+			(refreshed ?? []).map((scene) => [
+				scene.id as string,
+				scene as {
+					id: string;
+					duration_seconds?: number;
+					word_timings?: RemotionScene["wordTimings"];
+				},
+			]),
 		);
 
-		const renderFormat = isShorts ? "shorts" : "longform";
-		const { data: render } = await supabase
-			.from("renders")
-			.insert({
-				script_id: scriptId,
-				format: renderFormat,
-				aspect_ratio: isShorts ? "9:16" : "16:9",
-				storage_path: `renders/${scriptId}/final.mp4`,
-				duration_seconds: totalDuration,
-				status: "rendering",
-				qc_result_json: {
-					duration_ok: true,
-					subtitles_ok: true,
-					forbidden_words_ok: true,
-					silence_gaps_ok: true,
-				},
-			})
-			.select()
-			.maybeSingle();
+		for (let index = 0; index < workingScenes.length; index++) {
+			const refreshedScene = timingMap.get(workingScenes[index].id);
+			const duration =
+				Number(refreshedScene?.duration_seconds) ||
+				sceneDurations[index] ||
+				Number(workingScenes[index].duration_seconds);
+			const wordTimings = refreshedScene?.word_timings;
+			workingScenes[index] = {
+				...workingScenes[index],
+				duration_seconds: duration,
+				word_timings: wordTimings,
+			};
+			workingRemotionScenes[index] = {
+				...workingRemotionScenes[index],
+				durationInFrames: Math.ceil(duration * VIDEO_FPS),
+				narration: workingScenes[index].narration_text,
+				wordTimings,
+			};
+		}
 
-		if (render) {
-			// 렌더큐 서버에 실제 렌더 요청 (템플릿 오버라이드 + quality preset + HW accel)
-			try {
-				let bgmUrl =
-					localStorage.getItem(`bgm_url_${scriptId}`) ??
-					localStorage.getItem("bgm_url") ??
-					"";
-				if (!bgmUrl) {
-					const bgmResult = await autoPickBgm(
-						scriptId,
-						inferAutoBgmPreset(
-							scenes.map((scene) => ({
-								mood: scene.mood,
-								durationSeconds: Number(scene.duration_seconds),
-								sceneType: scene.scene_type,
-							})),
+		return url;
+	}
+
+	async function repairProductionQuality(
+		finalBgmUrl: string,
+		options: {
+			forcedIssueCodes?: string[];
+			denseMotion?: boolean;
+			progressMessage?: string;
+		} = {},
+	): Promise<{
+		report: ProductionQualityReport;
+		scenes: SceneWithAssets[];
+		remotionScenes: RemotionScene[];
+		narrationUrl: string;
+		repaired: boolean;
+	}> {
+		const workingScenes = scenes.map((scene) => ({
+			...scene,
+			shots: cloneShots(sceneShots(scene)),
+		}));
+		const workingRemotionScenes = remotionScenes.map((scene) => ({
+			...scene,
+			shots: cloneShots(scene.shots),
+		}));
+		let report = buildProductionReport(
+			finalBgmUrl,
+			"",
+			workingScenes,
+			workingRemotionScenes,
+		);
+		if (report.passed && !options.forcedIssueCodes?.length) {
+			return {
+				report,
+				scenes: workingScenes,
+				remotionScenes: workingRemotionScenes,
+				narrationUrl,
+				repaired: false,
+			};
+		}
+
+		let repaired = false;
+		let narrationDirty = false;
+		let finalNarrationUrl = narrationUrl;
+		const issueCodes = [
+			...new Set([
+				...report.issues.map((issue) => issue.code),
+				...(options.forcedIssueCodes ?? []),
+			]),
+		];
+		const referenceRepairGuidance = buildReferenceRepairGuidance(
+			referenceProductionDnaFromTemplate(referenceTemplate),
+		);
+		if (issueCodes.includes("missing_narration")) {
+			narrationDirty = true;
+			repaired = true;
+		}
+
+		if (shouldRepairMotionDesign(issueCodes)) {
+			setRenderProgress(
+				options.progressMessage ??
+					"품질 자동 보강: 정적 이미지 씬에 모션/출처 표시를 보강하고 있습니다...",
+			);
+			for (let index = 0; index < workingScenes.length; index++) {
+				if (workingScenes[index].scene_type === "text_emphasis") continue;
+				const patch = buildMotionRepairPatch(workingScenes[index], index, {
+					dense: options.denseMotion,
+					forceMotion: options.denseMotion,
+					reason: options.denseMotion
+						? "실제 렌더 QC 실패 후 화면 변화량/컷 밀도 강제 보강"
+						: undefined,
+					referenceGuidance: referenceRepairGuidance,
+				});
+				await updateSceneRecord(
+					workingScenes[index].id,
+					patch as unknown as Record<string, unknown>,
+				);
+				workingScenes[index] = {
+					...workingScenes[index],
+					...patch,
+				};
+				workingRemotionScenes[index] = {
+					...workingRemotionScenes[index],
+					transition:
+						(patch.transition as RemotionScene["transition"]) ??
+						workingRemotionScenes[index].transition,
+					shots: patch.shots ?? workingRemotionScenes[index].shots,
+					motionGraphics:
+						patch.motion_graphics ?? workingRemotionScenes[index].motionGraphics,
+				};
+				repaired = true;
+			}
+		}
+
+		if (shouldRepairNarrationEnding(issueCodes) && workingScenes.length > 0) {
+			const lastIndex = workingScenes.length - 1;
+			const last = workingScenes[lastIndex];
+			const narration = strengthenEndingNarration(
+				last.narration_text,
+				isShorts ? "shorts" : "longform",
+			);
+			const duration = Math.max(
+				Number(last.duration_seconds) || 0,
+				isShorts ? 3 : 7,
+			);
+			await updateSceneRecord(last.id, {
+				narration_text: narration,
+				duration_seconds: duration,
+			});
+			workingScenes[lastIndex] = {
+				...last,
+				narration_text: narration,
+				duration_seconds: duration,
+			};
+			workingRemotionScenes[lastIndex] = {
+				...workingRemotionScenes[lastIndex],
+				narration,
+				durationInFrames: Math.ceil(duration * VIDEO_FPS),
+			};
+			narrationDirty = true;
+			repaired = true;
+		}
+
+		if (narrationDirty) {
+			finalNarrationUrl = await regenerateNarration(
+				workingScenes,
+				workingRemotionScenes,
+			);
+		}
+
+		report = buildProductionReport(
+			finalBgmUrl,
+			"",
+			workingScenes,
+			workingRemotionScenes,
+			finalNarrationUrl,
+		);
+		setScenes(workingScenes);
+		setRemotionScenes(workingRemotionScenes);
+		setBgmCuePlan(planBgmCuePlan(workingRemotionScenes, { fps: VIDEO_FPS }));
+
+		return {
+			report,
+			scenes: workingScenes,
+			remotionScenes: workingRemotionScenes,
+			narrationUrl: finalNarrationUrl,
+			repaired,
+		};
+	}
+
+	async function handleApprove() {
+		if (blockingPolicyIssue) {
+			setApprovalError(blockingPolicyIssue.message);
+			return;
+		}
+		if (!openingRetentionReport.passed && visibleRetentionIssue) {
+			setApprovalError(
+				`초반 유지율 기준 미달: ${visibleRetentionIssue.message}`,
+			);
+			return;
+		}
+		setApprovalError("");
+		setApproving(true);
+		setRendering(true);
+		setRenderProgress("품질 게이트를 검증하고 있습니다...");
+
+		try {
+			const ensuredBgmUrl = await ensureBgmUrl();
+			const repaired = await repairProductionQuality(ensuredBgmUrl);
+			if (!repaired.report.passed) {
+				const blockingIssue =
+					repaired.report.issues.find((issue) => issue.severity === "critical") ??
+					repaired.report.issues.find((issue) => issue.severity === "warning");
+				setApprovalError(
+					`품질 기준 미달: ${
+						blockingIssue?.message ??
+						"자동 보강 후에도 영상 품질 점수가 기준보다 낮습니다."
+					}`,
+				);
+				setRenderProgress(
+					"자동 보강 후에도 품질 기준 미달이라 렌더를 시작하지 않았습니다.",
+				);
+				return;
+			}
+
+			setRenderProgress("썸네일을 생성하고 있습니다...");
+			await generateAndSaveThumbnail(scriptId, {
+				backgroundUrl: chooseThumbnailBackground(repaired.scenes),
+				title: compactThumbnailTitle(
+					title,
+					thumbnailPlan?.title ?? "사건 타임라인",
+				),
+				subtitle:
+					thumbnailPlan?.subtitle ??
+					(isShorts ? "핵심 60초" : "확인된 흐름"),
+				channelName,
+				accentColor: thumbnailPlan?.accentColor,
+				preset: thumbnailPlan?.preset ?? "mystery",
+			});
+			const thumbnailPath = thumbnailPathForScript(scriptId);
+			const finalReport = buildProductionReport(
+				ensuredBgmUrl,
+				thumbnailPath,
+				repaired.scenes,
+				repaired.remotionScenes,
+				repaired.narrationUrl,
+			);
+			if (!finalReport.passed) {
+				const blockingIssue =
+					finalReport.issues.find((issue) => issue.severity === "critical") ??
+					finalReport.issues.find((issue) => issue.severity === "warning");
+				setApprovalError(
+					`품질 기준 미달: ${
+						blockingIssue?.message ?? "썸네일 생성 후 품질 기준을 통과하지 못했습니다."
+					}`,
+				);
+				setRenderProgress("품질 기준 미달로 렌더를 시작하지 않았습니다.");
+				return;
+			}
+
+			setRenderProgress("렌더 자산을 준비하고 있습니다...");
+			const totalDuration = repaired.scenes.reduce(
+				(sum, s) => sum + Number(s.duration_seconds),
+				0,
+			);
+
+			const renderFormat = isShorts ? "shorts" : "longform";
+			const { data: render } = await supabase
+				.from("renders")
+				.insert({
+					script_id: scriptId,
+					format: renderFormat,
+					aspect_ratio: isShorts ? "9:16" : "16:9",
+					storage_path: `renders/${scriptId}/final.mp4`,
+					duration_seconds: totalDuration,
+					status: "rendering",
+					qc_result_json: {
+						duration_ok: true,
+						subtitles_ok:
+							finalReport.metrics.captionSyncRatio >= 0.65 ||
+							remotionScenes.every((scene) => scene.type === "text_emphasis"),
+						premium_floor_ok: finalReport.metrics.premiumFloorScore >= 86,
+						forbidden_words_ok: !uploadPolicyReport.issues.some(
+							(issue) => issue.severity === "critical",
 						),
-					);
-					bgmUrl = bgmResult?.url ?? "";
-					if (bgmUrl) {
-						localStorage.setItem(`bgm_url_${scriptId}`, bgmUrl);
-					}
-				}
+						silence_gaps_ok: finalReport.metrics.hasNarration,
+						auto_repair_applied: repaired.repaired,
+						production_quality_score: finalReport.score,
+						production_quality_passed: finalReport.passed,
+						production_quality_metrics: finalReport.metrics,
+						production_quality_issues: finalReport.issues,
+						production_quality_actions: finalReport.requiredActions,
+					},
+				})
+				.select()
+				.maybeSingle();
+
+			if (!render) {
+				throw new Error("렌더 레코드 생성에 실패했습니다.");
+			}
+
+			const submitRenderAttempt = async (
+				input: Awaited<ReturnType<typeof repairProductionQuality>>,
+				progressLabel: string,
+			): Promise<RenderJob> => {
+				const referenceFrameProfile =
+					referenceFrameProfileFromTemplate(referenceTemplate);
 				const renderPayload = await prepareRenderPayload({
 					scriptId,
-					scenes: remotionScenes,
-					narrationUrl,
-					bgmUrl,
+					scenes: input.remotionScenes,
+					narrationUrl: input.narrationUrl,
+					bgmUrl: ensuredBgmUrl,
 				});
-				setRenderProgress("영상을 렌더링하고 있습니다...");
+				setRenderProgress(progressLabel);
 				const job = await submitRender(
 					scriptId,
 					renderFormat,
 					{
 						scenes: renderPayload.scenes,
 						bgmUrl: renderPayload.bgmUrl,
+						bgmCuePlan:
+							planBgmCuePlan(input.remotionScenes, { fps: VIDEO_FPS }) ??
+							bgmCuePlan ??
+							undefined,
 						narrationUrl: renderPayload.narrationUrl,
+						brand: channelBranding,
 						...compositionOverrides,
+						...(referenceFrameProfile ? { referenceFrameProfile } : {}),
 					},
 					{
 						preset: renderQuality,
 						...(hwAccelOverride ? { hardwareAccel: hwAccelOverride } : {}),
 					},
 				);
-				const completed = await pollRenderProgress(
-					job.id,
-					(progress, status) => {
-						setRenderProgress(`렌더링 중... ${progress}% (${status})`);
-					},
-				);
+				return pollRenderProgress(job.id, (progress, status) => {
+					setRenderProgress(`렌더링 중... ${progress}% (${status})`);
+				});
+			};
 
+			let renderQcBase =
+				(render.qc_result_json as Record<string, unknown> | null) ?? {};
+			let finalRenderResult = repaired;
+			let renderOutputRepairAttempted = false;
+
+			// 렌더큐 서버에 실제 렌더 요청 (템플릿 오버라이드 + quality preset + HW accel)
+			try {
+				let completed: RenderJob | null = null;
+				const maxRenderOutputRepairAttempts = 2;
+				for (
+					let attempt = 0;
+					attempt <= maxRenderOutputRepairAttempts;
+					attempt++
+				) {
+					try {
+						completed = await submitRenderAttempt(
+							finalRenderResult,
+							attempt === 0
+								? "영상을 렌더링하고 있습니다..."
+								: `보강 ${attempt}차 후 영상을 다시 렌더링하고 있습니다...`,
+						);
+						break;
+					} catch (renderError) {
+						const failedJob = isRenderJobError(renderError)
+							? renderError.job
+							: null;
+						const qc = failedJob?.qcResult as RenderOutputQcLike | undefined;
+						const issueCodes = renderOutputIssueCodes(qc);
+						if (
+							failedJob?.errorCategory !== "quality_gate" ||
+							!shouldRepairRenderOutput(issueCodes) ||
+							attempt >= maxRenderOutputRepairAttempts
+						) {
+							throw renderError;
+						}
+
+						renderOutputRepairAttempted = true;
+						renderQcBase = mergeRenderOutputQc(renderQcBase, qc, {
+							render_output_repair_attempted: true,
+							render_output_repair_attempt: attempt + 1,
+							render_output_repair_reason: issueCodes,
+							render_output_repair_stage: `render_failed_attempt_${attempt + 1}`,
+						});
+						await supabase
+							.from("renders")
+							.update({
+								status: "rendering",
+								...(failedJob.outputPath
+									? { storage_path: failedJob.outputPath }
+									: {}),
+								qc_result_json: renderQcBase,
+							})
+							.eq("id", render.id);
+
+						const forcedIssueCodes =
+							renderOutputIssueCodesToProductionIssueCodes(issueCodes);
+						finalRenderResult = await repairProductionQuality(ensuredBgmUrl, {
+							forcedIssueCodes,
+							denseMotion: true,
+							progressMessage: `실제 렌더 QC 실패(${attempt + 1}/${maxRenderOutputRepairAttempts}): 레퍼런스 대비 화면 변화량과 컷 밀도를 보강하고 있습니다...`,
+						});
+						if (!finalRenderResult.report.passed) {
+							const blockingIssue =
+								finalRenderResult.report.issues.find(
+									(issue) => issue.severity === "critical",
+								) ??
+								finalRenderResult.report.issues.find(
+									(issue) => issue.severity === "warning",
+								);
+							throw new Error(
+								`실제 렌더 QC 보강 실패: ${
+									blockingIssue?.message ??
+									"자동 보강 후에도 제작 품질 기준을 통과하지 못했습니다."
+								}`,
+							);
+						}
+
+						renderQcBase = {
+							...renderQcBase,
+							auto_repair_applied: true,
+							render_output_repair_production_score:
+								finalRenderResult.report.score,
+							render_output_repair_production_metrics:
+								finalRenderResult.report.metrics,
+						};
+					}
+				}
+
+				if (!completed) throw new Error("렌더링 결과를 확인하지 못했습니다.");
 				if (completed.status === "failed") {
 					throw new Error(completed.error ?? "렌더링 실패");
 				}
@@ -480,20 +1553,40 @@ export default function StepPreview({
 					.from("renders")
 					.update({
 						status: "complete",
-						storage_path:
-							completed.outputPath || `renders/${scriptId}/final.mp4`,
-					})
-					.eq("id", render.id);
+							storage_path:
+								completed.outputPath || `renders/${scriptId}/final.mp4`,
+							qc_result_json: mergeRenderOutputQc(
+								renderQcBase,
+								completed.qcResult as RenderOutputQcLike | undefined,
+								{
+									render_output_repair_attempted: renderOutputRepairAttempted,
+									render_output_repair_succeeded:
+										renderOutputRepairAttempted || undefined,
+								},
+							),
+						})
+						.eq("id", render.id);
 			} catch (e) {
-				const msg = e instanceof Error ? e.message : "렌더링 실패";
+				const msg = renderFailureMessage(e);
+				const failedJob = isRenderJobError(e) ? e.job : null;
 				await supabase
 					.from("renders")
-					.update({ status: "failed" })
+					.update({
+						status: "failed",
+						...(failedJob?.outputPath
+							? { storage_path: failedJob.outputPath }
+							: {}),
+						qc_result_json: mergeRenderOutputQc(
+							renderQcBase,
+							failedJob?.qcResult as RenderOutputQcLike | undefined,
+							{
+								render_output_repair_attempted: renderOutputRepairAttempted,
+								render_output_repair_succeeded: false,
+							},
+						),
+					})
 					.eq("id", render.id);
-				setRenderProgress(`렌더 실패: ${msg}`);
-				setRendering(false);
-				setApproving(false);
-				return;
+				throw new Error(msg);
 			}
 
 			setRenderProgress("렌더링 완료, 업로드 정보 저장 중...");
@@ -512,13 +1605,18 @@ export default function StepPreview({
 					.split(",")
 					.map((t) => t.trim())
 					.filter(Boolean),
+				thumbnail_path: thumbnailPath,
 				status: "queued",
 			});
+			setApproved(true);
+		} catch (e) {
+			const msg = e instanceof Error ? e.message : "승인 처리 실패";
+			setApprovalError(msg);
+			setRenderProgress(`처리 실패: ${msg}`);
+		} finally {
+			setRendering(false);
+			setApproving(false);
 		}
-
-		setRendering(false);
-		setApproved(true);
-		setApproving(false);
 	}
 
 	if (loading) {
@@ -581,9 +1679,14 @@ export default function StepPreview({
 					<PText size="x-small" color="contrast-medium">
 						미디어
 					</PText>
-					<PTag color="notification-success-soft">이미지+음성 완료</PTag>
+					<PTag color="notification-success-soft">영상/이미지+음성 완료</PTag>
 				</div>
 			</div>
+
+			<ProductionQualityPanel
+				report={productionQualityReport}
+				nicheResearch={nicheResearch}
+			/>
 
 			{/* Remotion Player - Real Video Preview */}
 			{remotionScenes.length > 0 && (
@@ -593,11 +1696,10 @@ export default function StepPreview({
 						inputProps={{
 							scenes: remotionScenes,
 							// script-scoped BGM URL 우선 (리로드 후에도 안전), legacy 전역 키는 fallback
-							bgmUrl:
-								localStorage.getItem(`bgm_url_${scriptId}`) ??
-								localStorage.getItem("bgm_url") ??
-								"",
+							bgmUrl,
+							bgmCuePlan: bgmCuePlan ?? undefined,
 							narrationUrl,
+							brand: channelBranding,
 							...(isShorts ? { subtitleStyle: SHORTS_SUBTITLE } : {}),
 							...compositionOverrides,
 						}}
@@ -646,7 +1748,7 @@ export default function StepPreview({
 					name="description"
 					label="설명"
 					value={description}
-					rows={4}
+					rows={7}
 					onInput={(e) =>
 						setDescription((e.target as HTMLTextAreaElement).value)
 					}
@@ -658,6 +1760,63 @@ export default function StepPreview({
 					onInput={(e) => setTags((e.target as HTMLInputElement).value)}
 				/>
 			</div>
+
+			{approvalError && (
+				<PInlineNotification
+					state="error"
+					dismissButton={false}
+					className="mb-static-md"
+				>
+					{approvalError}
+				</PInlineNotification>
+			)}
+
+			{visiblePolicyIssue && !approvalError && (
+				<PInlineNotification
+					state={visiblePolicyIssue.severity === "critical" ? "error" : "warning"}
+					dismissButton={false}
+					className="mb-static-md"
+				>
+					{visiblePolicyIssue.message}
+					{uploadPolicyReport.requiredActions[0]
+						? ` ${uploadPolicyReport.requiredActions[0]}`
+						: ""}
+				</PInlineNotification>
+			)}
+
+			{visibleRetentionIssue && !approvalError && (
+				<PInlineNotification
+					state={
+						visibleRetentionIssue.severity === "critical"
+							? "error"
+							: "warning"
+					}
+					dismissButton={false}
+					className="mb-static-md"
+				>
+					{visibleRetentionIssue.message}
+					{openingRetentionReport.requiredActions[0]
+						? ` ${openingRetentionReport.requiredActions[0]}`
+						: ""}
+				</PInlineNotification>
+			)}
+
+			{visibleProductionIssue && !approvalError && (
+				<PInlineNotification
+					state={
+						visibleProductionIssue.severity === "critical"
+							? "error"
+							: "warning"
+					}
+					dismissButton={false}
+					className="mb-static-md"
+				>
+					{visibleProductionIssue.message}
+					{productionQualityReport.requiredActions[0]
+						? ` ${productionQualityReport.requiredActions[0]}`
+						: ""}
+				</PInlineNotification>
+			)}
 
 			{rendering && (
 				<PInlineNotification

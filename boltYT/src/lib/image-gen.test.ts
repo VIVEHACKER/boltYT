@@ -12,7 +12,13 @@ vi.mock("./proxy", () => ({ getApiProxyUrl: () => "http://localhost:3456" }));
 const mockStoreLocalFile = vi.hoisted(() =>
 	vi.fn().mockResolvedValue("blob://stored"),
 );
-vi.mock("./local-db", () => ({ storeLocalFile: mockStoreLocalFile }));
+const mockLoadLocalFileData = vi.hoisted(() =>
+	vi.fn().mockResolvedValue(new Uint8Array([9, 8, 7]).buffer),
+);
+vi.mock("./local-db", () => ({
+	loadLocalFileData: mockLoadLocalFileData,
+	storeLocalFile: mockStoreLocalFile,
+}));
 
 const mockSupabaseInsert = vi.hoisted(() =>
 	vi.fn().mockResolvedValue({ error: null }),
@@ -294,6 +300,84 @@ describe("generateImage", () => {
 			expect.any(Uint8Array),
 			"image/png",
 		);
+	});
+
+	it("애니메이션 프롬프트에는 실사 시네마틱 접두어를 붙이지 않는다", async () => {
+		mockStorage.setItem("image_gen_active", "dalle");
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			json: () => Promise.resolve({ data: [{ b64_json: fakeB64 }] }),
+		});
+		vi.stubGlobal("fetch", fetchMock);
+
+		await generateImageToPath(
+			"scripts/s1/animation/character-sheet.png",
+			"consistent 2D animation character sheet, blue robot",
+		);
+
+		const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+		expect(body.prompt).toContain("animated keyframe");
+		expect(body.prompt).not.toContain("Photorealistic cinematic still frame");
+	});
+
+	it("로컬 생성기에는 고정 시드와 애니메이션 negative prompt를 전달한다", async () => {
+		mockStorage.setItem("image_gen_active", "a1111");
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			json: () => Promise.resolve({ images: [btoa("seeded-image")] }),
+		});
+		vi.stubGlobal("fetch", fetchMock);
+		vi.stubGlobal("atob", (b64: string) =>
+			Buffer.from(b64, "base64").toString("binary"),
+		);
+
+		await generateImageToPath(
+			"scenes/s1/shot.png",
+			"animated keypose of a robot",
+			"a1111",
+			undefined,
+			{ styleMode: "animation", seed: 123456 },
+		);
+
+		const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+		expect(body.seed).toBe(123456);
+		expect(body.negative_prompt).toContain("photorealistic");
+		expect(body.prompt).toContain("animated keyframe");
+	});
+
+	it("referenceImagePath가 있으면 A1111 img2img를 우선 사용한다", async () => {
+		mockStorage.setItem("image_gen_active", "dalle");
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			json: () => Promise.resolve({ images: [btoa("reference-conditioned")] }),
+		});
+		vi.stubGlobal("fetch", fetchMock);
+		vi.stubGlobal("atob", (b64: string) =>
+			Buffer.from(b64, "base64").toString("binary"),
+		);
+
+		const result = await generateImageToPath(
+			"scenes/s1/shot.png",
+			"animated keypose of a robot",
+			undefined,
+			undefined,
+			{
+				styleMode: "animation",
+				seed: 42,
+				referenceImagePath: "scripts/s1/animation/character-sheet.png",
+				referenceStrength: 0.38,
+			},
+		);
+
+		const [url, request] = fetchMock.mock.calls[0];
+		const body = JSON.parse(request.body);
+		expect(String(url)).toContain("/sdapi/v1/img2img");
+		expect(mockLoadLocalFileData).toHaveBeenCalledWith(
+			"scripts/s1/animation/character-sheet.png",
+		);
+		expect(body.init_images[0]).toBeTruthy();
+		expect(body.denoising_strength).toBe(0.38);
+		expect(result.provider).toBe("a1111");
 	});
 
 	it("provider='comfyui' 폴링 성공 → provider='comfyui' 반환", async () => {

@@ -6,6 +6,7 @@ import {
 	useCurrentFrame,
 	useVideoConfig,
 } from "remotion";
+import type { BgmCuePlan } from "../lib/bgm-cue-plan";
 import { computeCutFlashStyle } from "../lib/micro-edit";
 import { transitionDipFactor } from "../lib/sfx";
 import type { EndCardProps } from "./cards/EndCard";
@@ -21,6 +22,7 @@ import {
 import { getTransitionStyles } from "./transitions";
 import type {
 	CaptionStyle,
+	LayoutVariant,
 	RemotionScene,
 	SubtitleStyle,
 	TransitionType,
@@ -32,8 +34,14 @@ export type SubtitleBgStyle = "none" | "pill" | "block" | "stroke" | "glow";
 
 export interface CompositionProps extends Record<string, unknown> {
 	scenes: RemotionScene[];
+	brand?: {
+		channelName?: string;
+		channelHandle?: string;
+		tagline?: string;
+	};
 	bgmUrl?: string;
 	narrationUrl?: string;
+	bgmCuePlan?: BgmCuePlan;
 	subtitleStyle?: SubtitleStyle;
 	captionStyle?: CaptionStyle;
 	/** 자막 위치 (레퍼런스 템플릿 주입) */
@@ -42,6 +50,8 @@ export interface CompositionProps extends Record<string, unknown> {
 	subtitleBgStyle?: SubtitleBgStyle;
 	/** 자막 강조색 (레퍼런스 템플릿 주입) */
 	subtitleAccentColor?: string;
+	/** 씬 레벨 layout이 없을 때 적용할 글로벌 레퍼런스 레이아웃 */
+	sceneLayout?: LayoutVariant;
 	// 인트로/아웃트로
 	intro?: TitleCardProps;
 	outro?: EndCardProps;
@@ -55,7 +65,7 @@ const FULL_VOL = 0.38;
 const ATTACK_FRAMES = 8;
 const RELEASE_FRAMES = 20;
 
-const FINAL_VISUAL_FADE_FRAMES = 30;
+const FINAL_VISUAL_FADE_FRAMES = 6;
 const SCENE_AUDIO_FADE_IN = 5;
 const SCENE_AUDIO_FADE_OUT = 14;
 
@@ -138,6 +148,62 @@ function useSequenceAudioVolume(
 		{ extrapolateLeft: "clamp", extrapolateRight: "clamp" },
 	);
 	return Math.min(fadeIn, fadeOut);
+}
+
+function useBgmCueEnvelope(
+	bgmCuePlan: BgmCuePlan | undefined,
+	totalFrames: number,
+) {
+	const frame = useCurrentFrame();
+	if (!bgmCuePlan) return 1;
+
+	let lift = 1;
+	for (const burst of bgmCuePlan.bursts) {
+		const pulse = interpolate(
+			frame,
+			[
+				Math.max(0, burst.frame - burst.widthFrames),
+				burst.frame,
+				Math.min(totalFrames - 1, burst.frame + burst.widthFrames * 2),
+			],
+			[1, 1 + burst.strength, 1],
+			{
+				extrapolateLeft: "clamp",
+				extrapolateRight: "clamp",
+			},
+		);
+		lift = Math.max(lift, pulse);
+	}
+
+	if (bgmCuePlan.resolveFrame <= 0) return lift;
+
+	const resolveStart = Math.min(
+		Math.max(0, bgmCuePlan.resolveFrame),
+		Math.max(0, totalFrames - 1),
+	);
+	const resolveEnd = Math.max(0, totalFrames - 1);
+	if (resolveStart >= resolveEnd) return lift;
+
+	const resolveMid = Math.min(resolveEnd, resolveStart + 32);
+	if (resolveMid >= resolveEnd) {
+		const resolveFade = interpolate(frame, [resolveStart, resolveEnd], [1, 0.9], {
+			extrapolateLeft: "clamp",
+			extrapolateRight: "clamp",
+		});
+		return lift * resolveFade;
+	}
+
+	const resolveFade = interpolate(
+		frame,
+		[resolveStart, resolveMid, resolveEnd],
+		[1, 0.96, 0.9],
+		{
+			extrapolateLeft: "clamp",
+			extrapolateRight: "clamp",
+		},
+	);
+
+	return lift * resolveFade;
 }
 
 function SceneSequenceAudio({
@@ -234,13 +300,16 @@ function TransitionWrapper({
 
 export function VideoComposition({
 	scenes,
+	brand,
 	bgmUrl,
 	narrationUrl,
+	bgmCuePlan,
 	subtitleStyle,
 	captionStyle = "chunked",
 	subtitlePosition = "bottom",
 	subtitleBgStyle = "stroke",
 	subtitleAccentColor = "#FFD700",
+	sceneLayout,
 	intro,
 	outro,
 	usage = "render",
@@ -272,6 +341,7 @@ export function VideoComposition({
 		introFrames,
 		totalFrames,
 	);
+	const cueEnvelope = useBgmCueEnvelope(bgmCuePlan, totalFrames);
 
 	const fadeOutStart = Math.max(31, lastFrame - 59);
 	const edgeFade = bgmUrl
@@ -280,7 +350,7 @@ export function VideoComposition({
 				extrapolateRight: "clamp",
 			})
 		: 0;
-	const bgmVolume = duckVol * edgeFade;
+	const bgmVolume = duckVol * edgeFade * cueEnvelope;
 
 	const narrationVolume = narrationUrl
 		? interpolate(
@@ -345,6 +415,8 @@ export function VideoComposition({
 									subtitlePosition={subtitlePosition}
 									subtitleBgStyle={subtitleBgStyle}
 									subtitleAccentColor={subtitleAccentColor}
+									layoutVariant={sceneLayout}
+									brand={brand}
 									fadeOutFrames={
 										isLast && !outro ? FINAL_VISUAL_FADE_FRAMES : undefined
 									}
@@ -412,7 +484,14 @@ export function VideoComposition({
 				})}
 
 			{narrationUrl && <Audio src={narrationUrl} volume={narrationVolume} />}
-			{bgmUrl && <Audio src={bgmUrl} volume={bgmVolume} loop />}
+			{bgmUrl && (
+				<Audio
+					src={bgmUrl}
+					volume={bgmVolume}
+					loop
+					startFrom={bgmCuePlan?.startFromFrame ?? 0}
+				/>
+			)}
 			{!outro && (
 				<AbsoluteFill
 					style={{

@@ -352,6 +352,12 @@ async function idbGet(key: string): Promise<ArrayBuffer | null> {
 	});
 }
 
+export async function loadLocalFileData(
+	path: string,
+): Promise<ArrayBuffer | null> {
+	return idbGet(path);
+}
+
 // Blob URL cache — LRU 방식으로 오래된 것부터 해제
 const blobUrlCache = new Map<string, string>();
 const MAX_BLOB_CACHE = 50;
@@ -417,6 +423,7 @@ export async function loadLocalFileUrl(
 /** storage_path → content-type 추론 */
 function guessContentType(path: string): string {
 	if (path.endsWith(".png")) return "image/png";
+	if (path.endsWith(".svg")) return "image/svg+xml";
 	if (path.endsWith(".jpg") || path.endsWith(".jpeg")) return "image/jpeg";
 	if (path.endsWith(".webp")) return "image/webp";
 	if (path.endsWith(".mp3")) return "audio/mpeg";

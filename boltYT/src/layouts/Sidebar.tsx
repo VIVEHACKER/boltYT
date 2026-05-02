@@ -12,6 +12,7 @@ import {
 	Film,
 	LayoutDashboard,
 	Palette,
+	Radar,
 	Settings,
 	Tv,
 	Upload,
@@ -28,6 +29,7 @@ const navItems = [
 	{ to: "/content/new", label: "콘텐츠 생성", icon: FilePlus },
 	{ to: "/uploads", label: "업로드 관리", icon: Upload },
 	{ to: "/analytics", label: "성과 분석", icon: BarChart3 },
+	{ to: "/niche-research", label: "니치 리서치", icon: Radar },
 	{ to: "/settings", label: "설정", icon: Settings },
 	{ to: "/diagnostics", label: "진단", icon: Activity },
 ];

@@ -71,7 +71,7 @@ export function getActiveVideoProvider(): VideoGenProvider {
 	) {
 		return stored;
 	}
-	return "wan26"; // 기본: 가성비
+	return "wan26"; // 기본: 선택 보강용 가성비 I2V
 }
 
 export function setActiveVideoProvider(p: VideoGenProvider): void {

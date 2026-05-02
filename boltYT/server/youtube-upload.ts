@@ -22,9 +22,11 @@ import {
 	createReadStream,
 	existsSync,
 	readFileSync,
+	unlinkSync,
 	writeFileSync,
 } from "node:fs";
 import { createServer } from "node:http";
+import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { google } from "googleapis";
 import { loadEnv, validateEnv } from "./lib/env.ts";
@@ -162,6 +164,30 @@ function json(
 ) {
 	res.writeHead(status, cors(req, { "Content-Type": "application/json" }));
 	res.end(JSON.stringify(data));
+}
+
+function decodeThumbnailDataUrl(dataUrl: string): {
+	buffer: Buffer;
+	mimeType: "image/jpeg" | "image/png";
+	ext: "jpg" | "png";
+} {
+	const match = /^data:(image\/(?:jpeg|jpg|png));base64,([A-Za-z0-9+/=]+)$/i.exec(
+		dataUrl,
+	);
+	if (!match) {
+		throw new Error("썸네일은 JPEG 또는 PNG data URL이어야 합니다.");
+	}
+	const rawMime = match[1].toLowerCase();
+	const mimeType = rawMime === "image/png" ? "image/png" : "image/jpeg";
+	const buffer = Buffer.from(match[2], "base64");
+	if (buffer.length > 2 * 1024 * 1024) {
+		throw new Error("썸네일 파일은 2MB 이하여야 합니다.");
+	}
+	return {
+		buffer,
+		mimeType,
+		ext: mimeType === "image/png" ? "png" : "jpg",
+	};
 }
 
 const server = createServer(async (req, res) => {
@@ -333,6 +359,10 @@ const server = createServer(async (req, res) => {
 				? fields.tags.split(",")
 				: (fields.tags as unknown as string[])
 			: [];
+		const thumbnailDataUrl =
+			typeof fields.thumbnailDataUrl === "string"
+				? fields.thumbnailDataUrl
+				: "";
 		const privacyStatus = (fields.privacyStatus as string) || "private";
 		const scheduledAt = fields.scheduledAt as string | undefined;
 
@@ -390,10 +420,50 @@ const server = createServer(async (req, res) => {
 			const videoId = uploadRes.data.id;
 			log.info("Upload complete", { videoId });
 
+			let thumbnailSet = false;
+			let thumbnailError = "";
+			if (videoId && thumbnailDataUrl) {
+				let thumbnailFile = "";
+				try {
+					const decoded = decodeThumbnailDataUrl(thumbnailDataUrl);
+					thumbnailFile = join(
+						tmpdir(),
+						`boltyt-thumbnail-${videoId}.${decoded.ext}`,
+					);
+					writeFileSync(thumbnailFile, decoded.buffer);
+					await youtube.thumbnails.set({
+						videoId,
+						media: {
+							mimeType: decoded.mimeType,
+							body: createReadStream(thumbnailFile),
+						},
+					});
+					thumbnailSet = true;
+					log.info("Thumbnail set", { videoId });
+				} catch (e) {
+					thumbnailError =
+						e instanceof Error ? e.message : "Thumbnail upload failed";
+					log.warn("Thumbnail upload failed", {
+						videoId,
+						error: thumbnailError,
+					});
+				} finally {
+					if (thumbnailFile) {
+						try {
+							unlinkSync(thumbnailFile);
+						} catch {
+							// temp cleanup failure is non-fatal
+						}
+					}
+				}
+			}
+
 			json(req, res, 200, {
 				ok: true,
 				videoId,
 				url: `https://youtu.be/${videoId}`,
+				thumbnailSet,
+				thumbnailError: thumbnailError || undefined,
 			});
 		} catch (e) {
 			const msg = e instanceof Error ? e.message : "Upload failed";

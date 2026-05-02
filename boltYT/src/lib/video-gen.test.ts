@@ -65,7 +65,7 @@ afterEach(() => {
 
 // ─── getActiveVideoProvider ───────────────────────────────────────────────────
 describe("getActiveVideoProvider", () => {
-	it("localStorage 없으면 기본값 'wan26' (가성비)", () => {
+	it("localStorage 없으면 기본값 'wan26' (선택 보강용)", () => {
 		expect(getActiveVideoProvider()).toBe("wan26");
 	});
 

@@ -79,6 +79,13 @@ describe("loadEnv", () => {
 	it(".env 없어도 throw 없음", () => {
 		expect(() => loadEnv()).not.toThrow();
 	});
+
+	it("VITE_ 접두 키를 서버 키 alias로 승격", () => {
+		delete process.env.OPENAI_API_KEY;
+		process.env.VITE_OPENAI_API_KEY = "vite-openai-key";
+		loadEnv();
+		expect(process.env.OPENAI_API_KEY).toBe("vite-openai-key");
+	});
 });
 
 // ─── watchEnv ─────────────────────────────────────────────────────────────────

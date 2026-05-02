@@ -1,0 +1,234 @@
+{
+  "file": "/Users/jjuni/bolt/boltYT/public/generated/reference-style-mystery-v3-1777723750-shorts.mp4",
+  "score": 100,
+  "verdict": "pass",
+  "passed": true,
+  "metrics": {
+    "durationSeconds": 15.5,
+    "sizeBytes": 1655005,
+    "bitRate": 854196,
+    "video": {
+      "codec": "h264",
+      "width": 1080,
+      "height": 1920,
+      "fps": 24,
+      "frames": 372,
+      "bitRate": 685706
+    },
+    "audio": {
+      "codec": "aac",
+      "channels": 1,
+      "sampleRate": 96000,
+      "bitRate": 160587
+    },
+    "volume": {
+      "meanDb": -14.9,
+      "maxDb": -1.4
+    },
+    "loudness": {
+      "integratedLufs": -15.6,
+      "loudnessRangeLu": 0.7,
+      "truePeakDbfs": -1.4
+    },
+    "visualRegion": {
+      "frameCount": 20,
+      "avgDiff": 0.07018,
+      "maxDiff": 0.31853,
+      "meaningfulDiffs": 8,
+      "strongDiffs": 5,
+      "first3AvgDiff": 0.03179,
+      "diffSeries": [
+        {
+          "timeSeconds": 0.5,
+          "diff": 0.01097
+        },
+        {
+          "timeSeconds": 1,
+          "diff": 0.00798
+        },
+        {
+          "timeSeconds": 1.5,
+          "diff": 0.13314
+        },
+        {
+          "timeSeconds": 2,
+          "diff": 0.00338
+        },
+        {
+          "timeSeconds": 2.5,
+          "diff": 0.00345
+        },
+        {
+          "timeSeconds": 3,
+          "diff": 0.16277
+        },
+        {
+          "timeSeconds": 3.5,
+          "diff": 0.01911
+        },
+        {
+          "timeSeconds": 4,
+          "diff": 0.00845
+        },
+        {
+          "timeSeconds": 4.5,
+          "diff": 0.1553
+        },
+        {
+          "timeSeconds": 5,
+          "diff": 0.03505
+        },
+        {
+          "timeSeconds": 5.5,
+          "diff": 0.01425
+        },
+        {
+          "timeSeconds": 6,
+          "diff": 0.06818
+        },
+        {
+          "timeSeconds": 6.5,
+          "diff": 0.06798
+        },
+        {
+          "timeSeconds": 7,
+          "diff": 0.00426
+        },
+        {
+          "timeSeconds": 7.5,
+          "diff": 0.00021
+        },
+        {
+          "timeSeconds": 8,
+          "diff": 0.31849
+        },
+        {
+          "timeSeconds": 8.5,
+          "diff": 0.00137
+        },
+        {
+          "timeSeconds": 9,
+          "diff": 0.0006
+        },
+        {
+          "timeSeconds": 9.5,
+          "diff": 0.31853
+        }
+      ]
+    },
+    "fullFrame": {
+      "frameCount": 20,
+      "avgDiff": 0.04832,
+      "maxDiff": 0.21463,
+      "meaningfulDiffs": 7,
+      "strongDiffs": 5,
+      "first3AvgDiff": 0.02412,
+      "diffSeries": [
+        {
+          "timeSeconds": 0.5,
+          "diff": 0.0058
+        },
+        {
+          "timeSeconds": 1,
+          "diff": 0.00345
+        },
+        {
+          "timeSeconds": 1.5,
+          "diff": 0.10509
+        },
+        {
+          "timeSeconds": 2,
+          "diff": 0.00409
+        },
+        {
+          "timeSeconds": 2.5,
+          "diff": 0.00218
+        },
+        {
+          "timeSeconds": 3,
+          "diff": 0.10594
+        },
+        {
+          "timeSeconds": 3.5,
+          "diff": 0.01465
+        },
+        {
+          "timeSeconds": 4,
+          "diff": 0.00492
+        },
+        {
+          "timeSeconds": 4.5,
+          "diff": 0.10576
+        },
+        {
+          "timeSeconds": 5,
+          "diff": 0.02882
+        },
+        {
+          "timeSeconds": 5.5,
+          "diff": 0.00894
+        },
+        {
+          "timeSeconds": 6,
+          "diff": 0.05439
+        },
+        {
+          "timeSeconds": 6.5,
+          "diff": 0.05383
+        },
+        {
+          "timeSeconds": 7,
+          "diff": 0.00245
+        },
+        {
+          "timeSeconds": 7.5,
+          "diff": 0.00017
+        },
+        {
+          "timeSeconds": 8,
+          "diff": 0.21463
+        },
+        {
+          "timeSeconds": 8.5,
+          "diff": 0.00073
+        },
+        {
+          "timeSeconds": 9,
+          "diff": 0.00033
+        },
+        {
+          "timeSeconds": 9.5,
+          "diff": 0.202
+        }
+      ]
+    },
+    "sceneCuts": {
+      "selectedFrames": 12,
+      "estimatedCuts": 11,
+      "times": [
+        0.0416667,
+        1.583333,
+        1.625,
+        3.125,
+        3.166667,
+        4.666667,
+        4.708333,
+        6.208333,
+        6.25,
+        7.75,
+        9.333333,
+        9.375
+      ]
+    },
+    "black": {
+      "segments": [],
+      "count": 0
+    }
+  },
+  "strengths": [
+    "platform_canvas_ok",
+    "audio_stream_and_level_ok"
+  ],
+  "issues": [],
+  "requiredActions": []
+}

@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1920" viewBox="0 0 1080 1920">
+
+  <defs>
+    <linearGradient id="paper" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#fffdf8"/>
+      <stop offset="1" stop-color="#f3f0e8"/>
+    </linearGradient>
+    <linearGradient id="sea" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#062836"/>
+      <stop offset="0.58" stop-color="#0e3c4b"/>
+      <stop offset="1" stop-color="#dceff3"/>
+    </linearGradient>
+    <linearGradient id="nightSea" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#061a29"/>
+      <stop offset="0.65" stop-color="#0a3443"/>
+      <stop offset="1" stop-color="#164f5f"/>
+    </linearGradient>
+    <linearGradient id="oldMap" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#f5daa1"/>
+      <stop offset="1" stop-color="#d4b66f"/>
+    </linearGradient>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="14" stdDeviation="14" flood-color="#000" flood-opacity="0.25"/>
+    </filter>
+    <filter id="inkShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="6" stdDeviation="0" flood-color="#111" flood-opacity="0.16"/>
+    </filter>
+    <clipPath id="artClip">
+      <rect x="20" y="334" width="1040" height="948" rx="20"/>
+    </clipPath>
+  </defs>
+  <rect width="1080" height="1920" fill="#f7f5ee"/>
+
+  <rect x="0" y="0" width="1080" height="338" fill="url(#paper)"/>
+  <path d="M0 326 C165 344 298 318 455 333 C626 349 777 318 1080 330 L1080 356 L0 356 Z" fill="#07313d"/>
+  <g transform="translate(58 55.97279737770759)">
+    <circle cx="0" cy="0" r="24" fill="#071821"/>
+    <circle cx="0" cy="0" r="14" fill="#00a6d6"/>
+    <circle cx="0" cy="0" r="7" fill="#fff"/>
+    <text x="42" y="-5" font-family="Apple SD Gothic Neo, sans-serif" font-size="25" font-weight="900" fill="#111" letter-spacing="-1">내 채널</text>
+    <text x="42" y="18" font-family="Apple SD Gothic Neo, sans-serif" font-size="17" font-weight="800" fill="#656565">@mychannel</text>
+  </g>
+  <g font-family="Apple SD Gothic Neo, sans-serif" text-anchor="middle" fill="#070707" font-weight="900" letter-spacing="-2.4">
+    <text x="540" y="128" font-size="50">바다 한가운데 잠든 왕릉</text>
+    <text x="540" y="191" font-size="50">사람들이 가장 궁금해한</text>
+    <text x="540" y="254" font-size="56">3가지</text>
+  </g>
+
+  <g clip-path="url(#artClip)">
+    <rect x="20" y="334" width="1040" height="948" fill="url(#nightSea)"/>
+    <g fill="#d9f6ff">
+      <circle cx="55" cy="392" r="1.8" opacity="0.42"/><circle cx="152" cy="451" r="2.8" opacity="0.5"/><circle cx="249" cy="510" r="3.8" opacity="0.58"/><circle cx="346" cy="569" r="1.8" opacity="0.6599999999999999"/><circle cx="443" cy="628" r="2.8" opacity="0.74"/><circle cx="540" cy="402" r="3.8" opacity="0.42"/><circle cx="637" cy="461" r="1.8" opacity="0.5"/><circle cx="734" cy="520" r="2.8" opacity="0.58"/><circle cx="831" cy="579" r="3.8" opacity="0.6599999999999999"/><circle cx="928" cy="638" r="1.8" opacity="0.74"/><circle cx="1025" cy="412" r="2.8" opacity="0.42"/><circle cx="142" cy="471" r="3.8" opacity="0.5"/><circle cx="239" cy="530" r="1.8" opacity="0.58"/><circle cx="336" cy="589" r="2.8" opacity="0.6599999999999999"/><circle cx="433" cy="648" r="3.8" opacity="0.74"/><circle cx="530" cy="422" r="1.8" opacity="0.42"/><circle cx="627" cy="481" r="2.8" opacity="0.5"/><circle cx="724" cy="540" r="3.8" opacity="0.58"/><circle cx="821" cy="599" r="1.8" opacity="0.6599999999999999"/><circle cx="918" cy="658" r="2.8" opacity="0.74"/><circle cx="1015" cy="432" r="3.8" opacity="0.42"/><circle cx="132" cy="491" r="1.8" opacity="0.5"/><circle cx="229" cy="550" r="2.8" opacity="0.58"/><circle cx="326" cy="609" r="3.8" opacity="0.6599999999999999"/><circle cx="423" cy="668" r="1.8" opacity="0.74"/><circle cx="520" cy="442" r="2.8" opacity="0.42"/><circle cx="617" cy="501" r="3.8" opacity="0.5"/><circle cx="714" cy="560" r="1.8" opacity="0.58"/><circle cx="811" cy="619" r="2.8" opacity="0.6599999999999999"/><circle cx="908" cy="393" r="3.8" opacity="0.74"/><circle cx="1005" cy="452" r="1.8" opacity="0.42"/><circle cx="122" cy="511" r="2.8" opacity="0.5"/><circle cx="219" cy="570" r="3.8" opacity="0.58"/><circle cx="316" cy="629" r="1.8" opacity="0.6599999999999999"/>
+    </g>
+    <path d="M20 935 C240 870 396 940 584 880 C745 829 900 895 1060 858 L1060 1282 L20 1282 Z" fill="#245d6f" opacity="0.95"/>
+    <path d="M20 1062 C235 1015 412 1082 617 1030 C774 990 911 1030 1060 1002 L1060 1282 L20 1282 Z" fill="#113c4b" opacity="0.9"/>
+    <g transform="translate(639.1764705882354 818.2099548785056)" filter="url(#inkShadow)">
+      <path d="M-174 102 L190 102 L140 190 L-108 190 Z" fill="#111" stroke="#f4d56b" stroke-width="9"/>
+      <rect x="-58" y="16" width="118" height="86" fill="#f4f5ee" stroke="#111" stroke-width="8"/>
+      <circle cx="138" cy="142" r="22" fill="#ffd45b"/>
+      <path d="M-102 191 C-190 239 -264 256 -352 257" stroke="#d8eef0" stroke-width="11" fill="none" opacity="0.72"/>
+    </g>
+    <path d="M327.17647058823536 384 C471.6052155200949 560 344.74772565637585 746 489.17647058823536 976" stroke="#d9f3f4" stroke-width="26" fill="none" opacity="0.45" stroke-linecap="round"/>
+    <path d="M229.17647058823536 431 C340.74772565637585 620 299.6052155200949 820 397.17647058823536 1114" stroke="#d9f3f4" stroke-width="16" fill="none" opacity="0.32" stroke-linecap="round"/>
+  </g>
+
+  <g font-family="Apple SD Gothic Neo, sans-serif" fill="#090909" text-anchor="middle" font-weight="900" letter-spacing="-2.2">
+    <text x="540" y="1376" font-size="64">조사선이 접근한 밤마다</text>
+    <text x="540" y="1454" font-size="64">안개가 바다 위를 덮었다고 함</text>
+  </g>
+
+  <g transform="translate(0 0)" font-family="Apple SD Gothic Neo, sans-serif">
+    <rect x="70" y="1620" width="62" height="62" rx="31" fill="#080808"/>
+    <text x="150" y="1658" font-size="22" font-weight="900" fill="#111">@mychannel</text>
+    <rect x="292" y="1623" width="85" height="44" rx="22" fill="#f2f2f2" stroke="#d7d7d7"/>
+    <text x="334" y="1653" font-size="20" font-weight="900" fill="#111" text-anchor="middle">구독</text>
+    <rect x="70" y="1705" width="940" height="44" rx="12" fill="#a1a1a1"/>
+    <rect x="70" y="1705" width="576.1290322580645" height="44" rx="12" fill="#111"/>
+    <text x="94" y="1734" font-size="18" font-weight="800" fill="#fff">original edit with mystery beat</text>
+  </g>
+</svg>

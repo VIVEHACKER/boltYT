@@ -58,6 +58,11 @@ describe("PIXABAY_QUERIES", () => {
 			);
 		}
 	});
+
+	it("자동 검색어에는 싼 느낌의 범용 배경음 키워드를 넣지 않는다", () => {
+		const allQueries = Object.values(PIXABAY_QUERIES).flat().join(" ");
+		expect(allQueries).not.toMatch(/corporate|meditation|lo-fi|jingle/i);
+	});
 });
 
 // ─── getUserDefaultBgm / setUserDefaultBgm / clearUserDefaultBgm ──────────────

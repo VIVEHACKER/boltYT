@@ -2,11 +2,42 @@
  * .env 로더 + 시작 시 필수 키 검증 + 런타임 파일 감시
  */
 
-import { readFileSync, unwatchFile, watchFile } from "node:fs";
+import { existsSync, readFileSync, unwatchFile, watchFile, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const ENV_URL = new URL("../../.env", import.meta.url);
 const ENV_PATH = fileURLToPath(ENV_URL);
+const ENV_ALIASES: Record<string, string[]> = {
+	OPENAI_API_KEY: ["VITE_OPENAI_API_KEY"],
+	YOUTUBE_API_KEY: ["VITE_YOUTUBE_API_KEY"],
+};
+export const EDITABLE_ENV_KEYS = [
+	"OPENAI_API_KEY",
+	"ELEVENLABS_API_KEY",
+	"PEXELS_API_KEY",
+	"PIXABAY_API_KEY",
+	"YOUTUBE_API_KEY",
+	"NAVER_CLIENT_ID",
+	"NAVER_CLIENT_SECRET",
+	"FAL_KEY",
+	"GOOGLE_CLIENT_ID",
+	"GOOGLE_CLIENT_SECRET",
+] as const;
+
+const EDITABLE_ENV_KEY_SET = new Set<string>(EDITABLE_ENV_KEYS);
+
+function applyAliases(overwrite: boolean): string[] {
+	const applied: string[] = [];
+	for (const [target, aliases] of Object.entries(ENV_ALIASES)) {
+		if (!overwrite && process.env[target]) continue;
+		if (process.env[target]) continue;
+		const alias = aliases.find((key) => process.env[key]);
+		if (!alias) continue;
+		process.env[target] = process.env[alias];
+		applied.push(target);
+	}
+	return applied;
+}
 
 function parseAndApply(overwrite: boolean): string[] {
 	const applied: string[] = [];
@@ -35,6 +66,69 @@ function parseAndApply(overwrite: boolean): string[] {
 
 export function loadEnv() {
 	parseAndApply(false);
+	applyAliases(false);
+}
+
+export function reloadEnv(): string[] {
+	const applied = parseAndApply(true);
+	return [...applied, ...applyAliases(true)];
+}
+
+function envValue(value: string): string {
+	if (/^[^\s"'#]+$/.test(value)) return value;
+	return JSON.stringify(value);
+}
+
+function parseEnvKey(line: string): string | null {
+	const trimmed = line.trim();
+	if (!trimmed || trimmed.startsWith("#")) return null;
+	const match = /^([A-Za-z_][A-Za-z0-9_]*)\s*=/.exec(trimmed);
+	return match?.[1] ?? null;
+}
+
+export function saveEnvValues(
+	values: Record<string, unknown>,
+): { updated: string[]; ignored: string[]; path: string } {
+	const nextValues = new Map<string, string>();
+	const ignored: string[] = [];
+	for (const [key, rawValue] of Object.entries(values)) {
+		if (!EDITABLE_ENV_KEY_SET.has(key)) {
+			ignored.push(key);
+			continue;
+		}
+		if (typeof rawValue !== "string") {
+			ignored.push(key);
+			continue;
+		}
+		const value = rawValue.trim();
+		if (!value) continue;
+		if (/[\r\n]/.test(value)) {
+			throw new Error(`${key} contains a newline`);
+		}
+		nextValues.set(key, value);
+	}
+
+	if (nextValues.size === 0) return { updated: [], ignored, path: ENV_PATH };
+
+	const lines = existsSync(ENV_PATH)
+		? readFileSync(ENV_PATH, "utf-8").split(/\r?\n/)
+		: ["# Local API keys for boltYT", ""];
+	const seen = new Set<string>();
+	const nextLines = lines.map((line) => {
+		const key = parseEnvKey(line);
+		if (!key || !nextValues.has(key)) return line;
+		seen.add(key);
+		return `${key}=${envValue(nextValues.get(key) ?? "")}`;
+	});
+
+	for (const [key, value] of nextValues.entries()) {
+		if (!seen.has(key)) nextLines.push(`${key}=${envValue(value)}`);
+		process.env[key] = value;
+	}
+
+	const content = `${nextLines.join("\n").replace(/\n+$/g, "")}\n`;
+	writeFileSync(ENV_PATH, content, "utf-8");
+	return { updated: [...nextValues.keys()], ignored, path: ENV_PATH };
 }
 
 /**

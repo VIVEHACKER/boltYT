@@ -46,6 +46,30 @@ export interface PexelsImageResult {
 	photographer: string;
 }
 
+export interface PixabayImageResult {
+	id: number;
+	pageUrl: string;
+	downloadUrl: string;
+	thumbnail: string;
+	width: number;
+	height: number;
+	tags: string;
+	user: string;
+}
+
+export interface WikimediaImageResult {
+	id: number;
+	title: string;
+	pageUrl: string;
+	downloadUrl: string;
+	thumbnail: string;
+	width: number;
+	height: number;
+	mime: string;
+	license: string;
+	artist: string;
+}
+
 export interface PixabayVideoResult {
 	id: number;
 	pageUrl: string;
@@ -129,6 +153,45 @@ interface PixabayVideoApiResponse {
 	}>;
 }
 
+interface PixabayImageApiResponse {
+	hits: Array<{
+		id: number;
+		pageURL: string;
+		largeImageURL: string;
+		webformatURL: string;
+		imageWidth: number;
+		imageHeight: number;
+		tags: string;
+		user: string;
+	}>;
+}
+
+interface WikimediaImageInfo {
+	url?: string;
+	thumburl?: string;
+	width?: number;
+	height?: number;
+	mime?: string;
+	descriptionshorturl?: string;
+	extmetadata?: {
+		LicenseShortName?: { value?: string };
+		Artist?: { value?: string };
+	};
+}
+
+interface WikimediaImageApiResponse {
+	query?: {
+		pages?: Record<
+			string,
+			{
+				pageid: number;
+				title: string;
+				imageinfo?: WikimediaImageInfo[];
+			}
+		>;
+	};
+}
+
 function stripHtml(html: string): string {
 	return html
 		.replace(/<[^>]*>/g, "")
@@ -190,6 +253,8 @@ export interface ArticleBody {
 	title: string;
 	body: string;
 	publisher: string;
+	thumbnail?: string;
+	images?: string[];
 }
 
 /**
@@ -213,11 +278,11 @@ export async function fetchArticleBody(
 					return "";
 				}
 			})();
-			return { title: "", body: "", publisher: host };
+			return { title: "", body: "", publisher: host, thumbnail: "", images: [] };
 		}
 		return (await res.json()) as ArticleBody;
 	} catch {
-		return { title: "", body: "", publisher: "" };
+		return { title: "", body: "", publisher: "", thumbnail: "", images: [] };
 	}
 }
 
@@ -312,6 +377,73 @@ export async function searchPexelsImages(
 			height: p.height ?? 0,
 			photographer: p.photographer ?? "",
 		}))
+		.slice(0, count);
+}
+
+/** Pixabay 이미지 검색 (프록시 경유) — 최소 1280px 긴 변 */
+export async function searchPixabayImages(
+	query: string,
+	count = 8,
+): Promise<PixabayImageResult[]> {
+	const proxy = getApiProxyUrl();
+	const res = await fetch(
+		`${proxy}/api/pixabay/images?q=${encodeURIComponent(query)}&per_page=${count * 2}`,
+	);
+	if (!res.ok) throw new Error(`Pixabay 이미지 검색 실패: ${res.status}`);
+	const data: PixabayImageApiResponse = await res.json();
+
+	return (data.hits ?? [])
+		.filter((hit) => Math.max(hit.imageWidth ?? 0, hit.imageHeight ?? 0) >= 1280)
+		.map((hit) => ({
+			id: hit.id,
+			pageUrl: hit.pageURL ?? "",
+			downloadUrl: hit.largeImageURL ?? hit.webformatURL ?? "",
+			thumbnail: hit.webformatURL ?? "",
+			width: hit.imageWidth ?? 0,
+			height: hit.imageHeight ?? 0,
+			tags: hit.tags ?? "",
+			user: hit.user ?? "",
+		}))
+		.filter((hit) => Boolean(hit.downloadUrl))
+		.slice(0, count);
+}
+
+/** Wikimedia Commons 이미지 검색 — 고유명사/장소/역사 주제 보정용 */
+export async function searchWikimediaImages(
+	query: string,
+	count = 8,
+): Promise<WikimediaImageResult[]> {
+	const proxy = getApiProxyUrl();
+	const res = await fetch(
+		`${proxy}/api/wikimedia/images?query=${encodeURIComponent(query)}&limit=${count * 2}`,
+	);
+	if (!res.ok) throw new Error(`Wikimedia 이미지 검색 실패: ${res.status}`);
+	const data: WikimediaImageApiResponse = await res.json();
+
+	return Object.values(data.query?.pages ?? {})
+		.map((page) => {
+			const info = page.imageinfo?.[0];
+			if (!info?.url && !info?.thumburl) return null;
+			const mime = info.mime ?? "";
+			if (mime && !mime.startsWith("image/")) return null;
+			const downloadUrl = info.thumburl ?? info.url ?? "";
+			return {
+				id: page.pageid,
+				title: page.title.replace(/^File:/, ""),
+				pageUrl:
+					info.descriptionshorturl ??
+					`https://commons.wikimedia.org/wiki/${encodeURIComponent(page.title)}`,
+				downloadUrl,
+				thumbnail: info.thumburl ?? info.url ?? "",
+				width: info.width ?? 0,
+				height: info.height ?? 0,
+				mime,
+				license: stripHtml(info.extmetadata?.LicenseShortName?.value ?? ""),
+				artist: stripHtml(info.extmetadata?.Artist?.value ?? ""),
+			};
+		})
+		.filter((item): item is WikimediaImageResult => Boolean(item?.downloadUrl))
+		.filter((item) => Math.max(item.width, item.height) >= 900)
 		.slice(0, count);
 }
 

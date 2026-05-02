@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1920" viewBox="0 0 1080 1920">
+
+  <defs>
+    <linearGradient id="pageBg" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.58" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#d7d7d7"/>
+    </linearGradient>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="13" stdDeviation="12" flood-color="#000" flood-opacity="0.32"/>
+    </filter>
+    <filter id="captionGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="0" flood-color="#000" flood-opacity="0.92"/>
+      <feDropShadow dx="0" dy="0" stdDeviation="7" flood-color="#000" flood-opacity="0.72"/>
+    </filter>
+  </defs>
+
+  <rect x="0" y="0" width="1080" height="550" fill="#fff"/>
+  <g font-family="AppleMyungjo, Hiragino Mincho ProN, serif" text-anchor="middle" fill="#050505" font-weight="900" letter-spacing="-6">
+    <text x="540" y="292" font-size="88">요즘 MZ들의</text>
+    <text x="540" y="410" font-size="88">신박한 플러팅 방식</text>
+	  </g>
+	  <g opacity="0.8">
+	    <rect x="322" y="252" width="436" height="58" rx="29" fill="#111" opacity="0.68"/>
+	    <text x="540" y="290" font-family="Apple SD Gothic Neo, sans-serif" font-size="27" font-weight="800" fill="#fff" text-anchor="middle">처음 본 사람한테 이렇게 말했다고?</text>
+	  </g>
+
+  <g opacity="0.444">
+    <rect x="0" y="550" width="1080" height="620" fill="#fff" opacity="0.216"/>
+    <path d="M-180 550 L120 550 L-80 1170 L-380 1170 Z" fill="#ffe21f" opacity="0.236"/>
+    <path d="M810 550 L1150 550 L950 1170 L610 1170 Z" fill="#ff174b" opacity="0.236"/>
+  </g>
+
+  <g font-family="Apple SD Gothic Neo, sans-serif" text-anchor="middle" font-weight="950" letter-spacing="-2.4" filter="url(#captionGlow)">
+    <text x="540" y="1034" font-size="58" fill="#ffe21f">요즘 제일 신박했던</text><text x="540" y="1102" font-size="58" fill="#ffe21f">플러팅은?</text>
+  </g>
+
+	  <rect x="0" y="1170" width="1080" height="750" fill="url(#pageBg)"/>
+	  <g font-family="Apple SD Gothic Neo, sans-serif">
+	    <rect x="118" y="1716" width="844" height="34" rx="17" fill="#9e9e9e"/>
+	    <rect x="118" y="1716" width="131.875" height="34" rx="17" fill="#ff174b"/>
+	  </g>
+</svg>

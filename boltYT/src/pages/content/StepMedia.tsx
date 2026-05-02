@@ -15,6 +15,19 @@ import {
 	generateContinuousNarration,
 } from "../../lib/ai";
 import {
+	applyAnimationContinuityToShots,
+	buildAnimationAssetManifest,
+	buildAnimationCharacterReferencePrompt,
+	enrichAnimationPromptWithContinuity,
+	isAnimationProductionFamily,
+	repairAnimationScenesForQuality,
+	scoreAnimationProductionQuality,
+	type AnimationAssetManifest,
+	type AnimationBible,
+	type AnimationProductionFamily,
+	type AnimationProductionQualityReport,
+} from "../../lib/animation-production";
+import {
 	planSceneDirectives,
 	planSceneVisuals,
 	type ResearchBrief,
@@ -22,7 +35,7 @@ import {
 	verifySceneQuality,
 } from "../../lib/ai-agents";
 import { autoPickBgm, inferAutoBgmPreset } from "../../lib/bgm";
-import { ensureBlobUrls } from "../../lib/local-db";
+import { ensureBlobUrls, storeLocalFile } from "../../lib/local-db";
 import {
 	downloadImageToLocal,
 	downloadImageToPath,
@@ -36,8 +49,9 @@ import {
 	searchAndDownloadImageToPath,
 	searchAndDownloadVideo,
 	searchAndDownloadVideoToPath,
+	type MediaSearchOptions,
 } from "../../lib/media-download";
-import { referenceToPreset } from "../../lib/reference-bridge";
+import { referenceToPreset, type ReferencePreset } from "../../lib/reference-bridge";
 import {
 	buildSceneImagePrompt,
 	buildSceneSearchQueries,
@@ -47,8 +61,14 @@ import {
 	isDirectVideoUrl,
 } from "../../lib/scene-media";
 import type { SceneShot } from "../../lib/scene-shot-types";
+import {
+	canUseSourceCard,
+	generateSourceCardToPath,
+} from "../../lib/source-card";
 import { supabase } from "../../lib/supabase";
 import {
+	composeNarrationTtsOptions,
+	getDefaultVoice,
 	hasStoredTtsSettings,
 	inferNarrationTtsOptions,
 	type TtsOptions,
@@ -101,8 +121,358 @@ type SceneWithMedia = Scene & {
 	locale?: "ko" | "en";
 };
 
+type ProductionType = "standard" | "documentary" | "animation";
+
+const MAX_MANUAL_VIDEO_BYTES = 250 * 1024 * 1024;
+const VIDEO_CROP_OPTIONS: Array<{
+	value: NonNullable<SceneShot["crop"]>;
+	label: string;
+	description: string;
+}> = [
+	{ value: "full", label: "전체", description: "원본 비율 유지" },
+	{ value: "wide", label: "와이드", description: "살짝 채움" },
+	{ value: "medium", label: "미디엄", description: "기본 쇼츠 크롭" },
+	{ value: "close", label: "클로즈", description: "인물/반응 강조" },
+	{ value: "detail", label: "디테일", description: "강한 확대" },
+];
+
 function isLocalMediaPath(value?: string): boolean {
 	return Boolean(value?.startsWith("scenes/"));
+}
+
+function isYouTubeVideoUrl(value?: string): boolean {
+	return /youtu\.be|youtube\.com/i.test(value ?? "");
+}
+
+function getShotVideoDurationSeconds(shot: SceneShot): number {
+	const rawDuration = Number(shot.duration_seconds);
+	const duration = Number.isFinite(rawDuration) && rawDuration > 0 ? rawDuration : 8;
+	return Math.min(30, Math.max(8, Math.ceil(duration) + 4));
+}
+
+function getShotClipStartSeconds(shot: SceneShot, shotIndex: number): number {
+	const normalized =
+		typeof shot.trim_start === "number" && Number.isFinite(shot.trim_start)
+			? shot.trim_start
+			: (shotIndex % 4) * 0.18;
+	return Math.round(Math.max(0, Math.min(0.8, normalized)) * 60);
+}
+
+function getVideoReuseKey(
+	sourceUrl: string,
+	shot: SceneShot,
+	shotIndex: number,
+): string {
+	if (!isYouTubeVideoUrl(sourceUrl)) return sourceUrl;
+	const start = getShotClipStartSeconds(shot, shotIndex);
+	const duration = getShotVideoDurationSeconds(shot);
+	return `${sourceUrl}#clip=${start}-${duration}`;
+}
+
+function sanitizeFileStem(value: string): string {
+	return (
+		value
+			.toLowerCase()
+			.replace(/\.[a-z0-9]+$/i, "")
+			.replace(/[^a-z0-9가-힣_-]+/g, "-")
+			.replace(/^-+|-+$/g, "")
+			.slice(0, 54) || "manual-video"
+	);
+}
+
+function videoExtensionFromFile(file: File): "mp4" | "webm" | "mov" {
+	const lowerName = file.name.toLowerCase();
+	if (lowerName.endsWith(".webm") || file.type === "video/webm") return "webm";
+	if (lowerName.endsWith(".mov") || file.type === "video/quicktime") return "mov";
+	return "mp4";
+}
+
+function isSupportedManualVideo(file: File): boolean {
+	if (file.type.startsWith("video/")) return true;
+	return /\.(mp4|webm|mov)$/i.test(file.name);
+}
+
+function sanitizeClipSeconds(value: number, fallback: number, min: number, max: number) {
+	if (!Number.isFinite(value)) return fallback;
+	return Math.max(min, Math.min(max, Number(value.toFixed(2))));
+}
+
+function qualityScoreToConfidence(
+	qualityScore: number | undefined,
+	fallback = 58,
+): number {
+	if (typeof qualityScore !== "number" || !Number.isFinite(qualityScore)) {
+		return fallback;
+	}
+	return Math.min(96, Math.max(35, Math.round(qualityScore + 48)));
+}
+
+function strictImageMinScore(shot: SceneShot): number | undefined {
+	if (shot.visual_role === "evidence" || shot.visual_role === "document") {
+		return 32;
+	}
+	if (
+		shot.visual_role === "archive" ||
+		shot.visual_role === "map" ||
+		shot.visual_role === "data"
+	) {
+		return 28;
+	}
+	return undefined;
+}
+
+function strictVideoMinScore(shot: SceneShot): number | undefined {
+	if (shot.visual_role === "evidence" || shot.visual_role === "archive") {
+		return 40;
+	}
+	return undefined;
+}
+
+function strictMinRelevance(shot: SceneShot): number | undefined {
+	if (
+		shot.visual_role === "evidence" ||
+		shot.visual_role === "document" ||
+		shot.visual_role === "archive" ||
+		shot.visual_role === "map" ||
+		shot.visual_role === "data"
+	) {
+		return 7;
+	}
+	if (shot.visual_role === "context" || shot.visual_role === "transition") {
+		return 3;
+	}
+	return 4;
+}
+
+function maxDefined(...values: Array<number | undefined>): number | undefined {
+	const finite = values.filter(
+		(value): value is number =>
+			typeof value === "number" && Number.isFinite(value),
+	);
+	return finite.length > 0 ? Math.max(...finite) : undefined;
+}
+
+function uniqueTerms(values: Array<string | undefined>): string[] {
+	return [...new Set(values.filter((value): value is string => Boolean(value)))];
+}
+
+function nestedReferenceRecord(
+	preset: ReferencePreset | undefined,
+	key: string,
+): Record<string, unknown> | undefined {
+	const dna = preset?.productionDna;
+	if (!dna || typeof dna !== "object") return undefined;
+	const value = dna[key];
+	return value && typeof value === "object" && !Array.isArray(value)
+		? (value as Record<string, unknown>)
+		: undefined;
+}
+
+function referenceNumber(
+	preset: ReferencePreset | undefined,
+	section: string,
+	key: string,
+): number | undefined {
+	const value = nestedReferenceRecord(preset, section)?.[key];
+	return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function referenceString(
+	preset: ReferencePreset | undefined,
+	section: string,
+	key: string,
+): string {
+	const value = nestedReferenceRecord(preset, section)?.[key];
+	return typeof value === "string" ? value : "";
+}
+
+function referenceMediaSearchOptions(
+	referencePreset: ReferencePreset | undefined,
+	shot: SceneShot,
+	media: "image" | "video",
+	base: MediaSearchOptions = {},
+): MediaSearchOptions {
+	const cameraMode = referenceString(referencePreset, "camera", "mode");
+	const cutDensity = referenceNumber(
+		referencePreset,
+		"camera",
+		"cutDensityPerMinute",
+	);
+	const first3Motion = referenceNumber(referencePreset, "camera", "first3Motion");
+	const pixelPrecision =
+		referencePreset?.productionDna?.analysisDepth === "pixel_frame_audio_edit";
+	const evidenceLike =
+		shot.visual_role === "evidence" ||
+		shot.visual_role === "document" ||
+		shot.visual_role === "archive";
+	const needsDynamicVideo =
+		media === "video" &&
+		(cameraMode === "cut_driven" ||
+			(cutDensity ?? 0) >= 12 ||
+			(first3Motion ?? 0) >= 0.38);
+	const referenceMinScore =
+		media === "video"
+			? needsDynamicVideo
+				? evidenceLike
+					? 48
+					: 44
+				: evidenceLike
+					? 42
+					: pixelPrecision
+						? 34
+						: undefined
+			: evidenceLike
+				? pixelPrecision
+					? 38
+					: 34
+				: pixelPrecision
+					? 28
+					: undefined;
+	return {
+		...base,
+		rejectTerms: uniqueTerms([
+			...(base.rejectTerms ?? []),
+			"logo",
+			"template",
+			"meme",
+			"poster",
+			"lyrics",
+			"reaction",
+			"gameplay",
+			"로고",
+			"템플릿",
+			"리액션",
+			"게임",
+		]),
+		minScore: maxDefined(base.minScore, referenceMinScore),
+		minDynamicScore:
+			media === "video"
+				? maxDefined(
+						base.minDynamicScore,
+						needsDynamicVideo ? 34 : evidenceLike ? 28 : undefined,
+					)
+				: base.minDynamicScore,
+	};
+}
+
+function requiredShotConfidence(shot: SceneShot): number {
+	if (shot.visual_role === "reconstruction") return 0;
+	if (
+		shot.visual_role === "evidence" ||
+		shot.visual_role === "document" ||
+		shot.visual_role === "archive" ||
+		shot.visual_role === "map" ||
+		shot.visual_role === "data"
+	) {
+		return 66;
+	}
+	if (shot.visual_role === "context" || shot.visual_role === "transition") {
+		return 52;
+	}
+	return 58;
+}
+
+function requiredShotQuality(shot: SceneShot): number {
+	if (
+		shot.visual_role === "evidence" ||
+		shot.visual_role === "document" ||
+		shot.visual_role === "archive" ||
+		shot.visual_role === "map" ||
+		shot.visual_role === "data"
+	) {
+		return 22;
+	}
+	if (shot.visual_role === "context" || shot.visual_role === "transition") {
+		return 10;
+	}
+	return 14;
+}
+
+function isGenericStockShot(shot: SceneShot): boolean {
+	return (
+		(shot.selection_provider === "pexels" ||
+			shot.selection_provider === "pixabay") &&
+		shot.visual_role !== "context" &&
+		shot.visual_role !== "transition"
+	);
+}
+
+function shouldRepairSelectedShot(shot: SceneShot): boolean {
+	if (shot.selection_provider === "animation") return false;
+	if (shot.selection_provider === "ai" || shot.visual_role === "reconstruction") {
+		return false;
+	}
+	if (!shot.source_url) return true;
+	if (shot.rejection_reason) return true;
+	if (isGenericStockShot(shot)) return true;
+	if (
+		typeof shot.source_confidence === "number" &&
+		shot.source_confidence < requiredShotConfidence(shot)
+	) {
+		return true;
+	}
+	if (
+		typeof shot.quality_score === "number" &&
+		shot.quality_score < requiredShotQuality(shot)
+	) {
+		return true;
+	}
+	if (
+		(shot.media_type ?? "video") === "video" &&
+		(typeof shot.dynamic_score === "number" &&
+			shot.dynamic_score < 22 ||
+			(shot.dynamic_issues ?? []).includes("low_motion_video"))
+	) {
+		return true;
+	}
+	return false;
+}
+
+function sourceCardInput(scene: SceneWithMedia, shot: SceneShot) {
+	return {
+		title: shot.source_title || scene.news_title || scene.visual_prompt,
+		source: scene.news_source,
+		date: scene.news_date,
+		caption: shot.caption || shot.visual_prompt,
+		narration: scene.narration_text,
+		visualRole: shot.visual_role,
+		locale: scene.locale,
+	};
+}
+
+function markShotSelected(
+	shot: SceneShot,
+	meta: {
+		provider?: string;
+		qualityScore?: number;
+		dynamicScore?: number;
+		dynamicIssues?: string[];
+		sourceConfidence?: number;
+		sourceTitle?: string;
+		rejectionReason?: string;
+	},
+) {
+	shot.selection_provider = meta.provider ?? shot.selection_provider;
+	shot.quality_score = meta.qualityScore ?? shot.quality_score;
+	shot.dynamic_score = meta.dynamicScore ?? shot.dynamic_score;
+	shot.dynamic_issues = meta.dynamicIssues ?? shot.dynamic_issues;
+	shot.source_title = meta.sourceTitle ?? shot.source_title;
+	shot.source_confidence =
+		meta.sourceConfidence ??
+		qualityScoreToConfidence(meta.qualityScore, shot.source_confidence ?? 58);
+	shot.rejection_reason = meta.rejectionReason;
+}
+
+function markShotGeneratedFallback(shot: SceneShot, reason: string) {
+	shot.selection_provider = "ai";
+	shot.quality_score = undefined;
+	shot.source_confidence = Math.min(45, shot.source_confidence ?? 45);
+	shot.visual_role = shot.visual_role ?? "reconstruction";
+	shot.rejection_reason = reason;
+}
+
+function isAnimationShot(shot: SceneShot): boolean {
+	return shot.selection_provider === "animation";
 }
 
 function getSceneShots(
@@ -113,18 +483,101 @@ function getSceneShots(
 	).map((shot) => ({ ...shot }));
 }
 
-function getImageShots(
-	scene: Pick<Scene, "shots"> | Record<string, unknown>,
-): SceneShot[] {
-	return getSceneShots(scene).filter((shot) => shot.media_type === "image");
-}
-
 function getVideoShots(
 	scene: Pick<Scene, "shots"> | Record<string, unknown>,
 ): SceneShot[] {
 	return getSceneShots(scene).filter(
 		(shot) => (shot.media_type ?? "video") === "video",
 	);
+}
+
+function buildSocialClipVideoShot(
+	scene: Scene & { searchQueryKo?: string; searchQueryEn?: string },
+): SceneShot {
+	const duration = Math.max(2.2, Math.min(4.2, Number(scene.duration_seconds) || 3));
+	const caption =
+		(scene.narration_text ?? "").replace(/\s+/g, " ").trim() ||
+		scene.news_title ||
+		scene.visual_prompt ||
+		"인터뷰 클립";
+	const baseKo = [
+		scene.searchQueryKo,
+		scene.news_title,
+		scene.visual_prompt,
+		scene.narration_text,
+		"길거리 인터뷰 반응 술집 사람 대화",
+	]
+		.filter(Boolean)
+		.join(" ");
+	const baseEn = [
+		scene.searchQueryEn,
+		"street interview people talking nightlife reaction",
+		scene.visual_prompt,
+		scene.news_title,
+	]
+		.filter(Boolean)
+		.join(" ");
+
+	return {
+		id: `social-video-${scene.id}`,
+		kind: "context",
+		duration_seconds: duration,
+		media_type: "video",
+		visual_prompt:
+			scene.visual_prompt ||
+			"street interview clip, people talking in a busy nightlife setting",
+		caption,
+		motion: "slow_zoom_in",
+		crop: "medium",
+		overlay: "none",
+		visual_role: "context",
+		search_terms: [
+			baseKo,
+			baseEn,
+			"street interview",
+			"nightlife conversation",
+		].filter(Boolean),
+		reject_terms: ["static", "slideshow", "podcast", "logo only", "screen recording"],
+		source_confidence: 0,
+	};
+}
+
+function buildManualVideoShot(scene: SceneWithMedia): SceneShot {
+	const duration = Math.max(2.2, Math.min(8, Number(scene.duration_seconds) || 4));
+	return {
+		id: `manual-video-${scene.id}`,
+		kind: "context",
+		duration_seconds: duration,
+		media_type: "video",
+		visual_prompt:
+			scene.visual_prompt || scene.news_title || "manual inserted video clip",
+		caption:
+			(scene.narration_text ?? "").replace(/\s+/g, " ").trim() ||
+			scene.news_title ||
+			"직접 삽입한 영상",
+		motion: "push_in",
+		crop: "medium",
+		overlay: "none",
+		visual_role: "context",
+		source_confidence: 0,
+	};
+}
+
+function ensureSocialClipVideoSlot(
+	scene: Scene & { searchQueryKo?: string; searchQueryEn?: string },
+): {
+	shots: SceneShot[];
+	changed: boolean;
+} {
+	const shots = getSceneShots(scene);
+	const hasVideoShot = shots.some(
+		(shot) => (shot.media_type ?? "video") === "video",
+	);
+	if (hasVideoShot) return { shots, changed: false };
+	return {
+		shots: [buildSocialClipVideoShot(scene), ...shots],
+		changed: true,
+	};
 }
 
 function resolveShotUrl(
@@ -147,6 +600,38 @@ function getShotStoragePaths(scene: Scene): string[] {
 		);
 }
 
+function parseAnimationBible(value: unknown): AnimationBible | undefined {
+	const bible = value as AnimationBible | undefined;
+	return bible && Array.isArray(bible.characters) ? bible : undefined;
+}
+
+function parseAnimationQualityReport(
+	value: unknown,
+): AnimationProductionQualityReport | null {
+	const report = value as AnimationProductionQualityReport | undefined;
+	return typeof report?.score === "number" && typeof report.passed === "boolean"
+		? report
+		: null;
+}
+
+function animationImageOptions(
+	manifest: AnimationAssetManifest,
+	options?: { useReferenceImage?: boolean },
+) {
+	return {
+		styleMode: "animation" as const,
+		seed: manifest.styleSeed,
+		negativePrompt:
+			"photorealistic, live action, real person, realistic skin, documentary photo, news photo, CCTV, screenshot, watermark, logo, text, blurry, low quality, inconsistent face, different outfit, different color palette",
+		...(options?.useReferenceImage === false
+			? {}
+			: {
+					referenceImagePath: manifest.referenceSheetPath,
+					referenceStrength: 0.42,
+				}),
+	};
+}
+
 export default function StepMedia({
 	scriptId,
 	mode: _mode = "ai",
@@ -155,32 +640,51 @@ export default function StepMedia({
 	onNext,
 	onBack,
 }: StepMediaProps) {
-	const referencePreset = referenceTemplate
-		? referenceToPreset(referenceTemplate, "shorts")
-		: undefined;
-	const ttsOptions = useMemo<TtsOptions | undefined>(
+	const [scriptFormat, setScriptFormat] = useState<ScriptFormat>("shorts");
+	const referencePreset = useMemo(
 		() =>
-			referencePreset
-				? {
-						voice: referencePreset.tts.voice,
-						provider: referencePreset.tts.provider,
-						speed: referencePreset.tts.speed,
-					}
+			referenceTemplate
+				? referenceToPreset(
+						referenceTemplate,
+						scriptFormat === "longform" ? "longform" : "shorts",
+					)
 				: undefined,
+		[referenceTemplate, scriptFormat],
+	);
+	const requiresRealClipVideo =
+		referencePreset?.composition.sceneLayout === "social_clip_card";
+	const ttsOptions = useMemo<TtsOptions | undefined>(
+		() => (referencePreset ? { ...referencePreset.tts } : undefined),
 		[referencePreset],
 	);
 	const [scenes, setScenes] = useState<SceneWithMedia[]>([]);
-	const effectiveTtsOptions = useMemo<TtsOptions | undefined>(() => {
-		if (ttsOptions) return ttsOptions;
-		if (hasStoredTtsSettings()) return undefined;
-		return inferNarrationTtsOptions(
+	const scriptContentJsonRef = useRef<Record<string, unknown>>({});
+	const animationAssetManifestRef = useRef<AnimationAssetManifest | null>(null);
+	const [animationReferenceSheetPath, setAnimationReferenceSheetPath] =
+		useState("");
+	const [animationQcReport, setAnimationQcReport] =
+		useState<AnimationProductionQualityReport | null>(null);
+	const ttsSignals = useMemo(
+		() =>
 			scenes.map((scene) => ({
 				narration: scene.narration_text,
 				mood: scene.mood,
 				type: scene.scene_type,
 			})),
+		[scenes],
+	);
+	const effectiveTtsOptions = useMemo<TtsOptions | undefined>(() => {
+		if (ttsOptions) {
+			return composeNarrationTtsOptions(ttsSignals, ttsOptions);
+		}
+		if (hasStoredTtsSettings()) {
+			return composeNarrationTtsOptions(ttsSignals, getDefaultVoice());
+		}
+		return composeNarrationTtsOptions(
+			ttsSignals,
+			inferNarrationTtsOptions(ttsSignals),
 		);
-	}, [scenes, ttsOptions]);
+	}, [ttsOptions, ttsSignals]);
 	const [bgmAutoPicked, setBgmAutoPicked] = useState<string>("");
 	const scenesRef = useRef<SceneWithMedia[]>([]);
 	useEffect(() => {
@@ -196,11 +700,23 @@ export default function StepMedia({
 	const [aiVideoProvider, setAiVideoProvider] = useState<VideoGenProvider>(
 		getActiveVideoProvider(),
 	);
-	const [scriptFormat, setScriptFormat] = useState<ScriptFormat>("shorts");
+	const [productionType, setProductionType] = useState<ProductionType>(
+		_mode === "animation"
+			? "animation"
+			: _mode === "research"
+				? "documentary"
+				: "standard",
+	);
 	const [aiVideoBatch, setAiVideoBatch] = useState<{
 		current: number;
 		total: number;
 	} | null>(null);
+	const [manualVideoUrls, setManualVideoUrls] = useState<Record<string, string>>(
+		{},
+	);
+	const [manualVideoBusy, setManualVideoBusy] = useState<Record<string, boolean>>(
+		{},
+	);
 	useEffect(() => {
 		detectVideoGen()
 			.then((s) => setAiVideoAvailable(s.available))
@@ -211,11 +727,30 @@ export default function StepMedia({
 			try {
 				const { data } = await supabase
 					.from("scripts")
-					.select("format")
+					.select("format, content_json")
 					.eq("id", scriptId)
 					.maybeSingle();
-				const fmt = (data as { format?: string } | null)?.format;
+				const script = data as
+					| { format?: string; content_json?: Record<string, unknown> }
+					| null;
+				scriptContentJsonRef.current = script?.content_json ?? {};
+				const fmt = script?.format;
 				if (fmt === "longform" || fmt === "shorts") setScriptFormat(fmt);
+				const rawProductionType = script?.content_json?.production_type;
+				if (rawProductionType === "animation") {
+					setProductionType("animation");
+				} else if (rawProductionType === "documentary") {
+					setProductionType("documentary");
+				}
+				const animationAssets = script?.content_json?.animation_assets as
+					| Partial<AnimationAssetManifest>
+					| undefined;
+				if (typeof animationAssets?.referenceSheetPath === "string") {
+					setAnimationReferenceSheetPath(animationAssets.referenceSheetPath);
+				}
+				setAnimationQcReport(
+					parseAnimationQualityReport(script?.content_json?.animation_qc),
+				);
 			} catch {
 				// ignore — 기본 shorts 유지
 			}
@@ -260,15 +795,32 @@ export default function StepMedia({
 			else if (a.type === "image") imageMap.set(a.scene_id, a);
 		}
 
+		const socialClipShotUpdates: Array<{ sceneId: string; shots: SceneShot[] }> =
+			[];
 		const mapped: SceneWithMedia[] = scenesRaw.map((s) => {
+			const normalizedScene = s as Scene & {
+				searchQueryKo?: string;
+				searchQueryEn?: string;
+			};
+			const socialSlot = requiresRealClipVideo
+				? ensureSocialClipVideoSlot(normalizedScene)
+				: { shots: getSceneShots(normalizedScene), changed: false };
+			if (socialSlot.changed) {
+				socialClipShotUpdates.push({
+					sceneId: String(s.id),
+					shots: socialSlot.shots,
+				});
+			}
 			const imgAsset = imageMap.get(s.id as string);
 			const vidAsset = videoMap.get(s.id as string);
 			const ttsAsset = ttsMap.get(s.id as string);
 			const sceneType = s.scene_type as string;
 			const sourceUrl = s.source_url as string | undefined;
-			const shots = getSceneShots(s as Scene);
-			const imageShots = getImageShots(s as Scene);
-			const videoShots = getVideoShots(s as Scene);
+			const shots = socialSlot.shots;
+			const imageShots = shots.filter((shot) => shot.media_type === "image");
+			const videoShots = shots.filter(
+				(shot) => (shot.media_type ?? "video") === "video",
+			);
 			const firstShotUrl = shots
 				.map((shot) => resolveShotUrl(shot, blobUrls))
 				.find(Boolean);
@@ -380,6 +932,14 @@ export default function StepMedia({
 			};
 		});
 
+		if (socialClipShotUpdates.length > 0) {
+			await Promise.all(
+				socialClipShotUpdates.map(({ sceneId, shots }) =>
+					persistSceneShots(sceneId, shots),
+				),
+			);
+		}
+
 		setScenes(mapped);
 
 		// 연속 나레이션 존재 여부 확인
@@ -387,10 +947,9 @@ export default function StepMedia({
 		if (narPath) setNarrationStatus("complete");
 
 		setLoading(false);
-	}, [scriptId]);
+	}, [scriptId, requiresRealClipVideo]);
 
 	useEffect(() => {
-		// eslint-disable-next-line react-hooks/set-state-in-effect
 		void loadScenes();
 	}, [loadScenes]);
 
@@ -451,12 +1010,333 @@ export default function StepMedia({
 		});
 	}
 
+	async function persistScriptContentPatch(patch: Record<string, unknown>) {
+		const nextContent = {
+			...scriptContentJsonRef.current,
+			...patch,
+		};
+		scriptContentJsonRef.current = nextContent;
+		const { error } = await supabase
+			.from("scripts")
+			.update({ content_json: nextContent })
+			.eq("id", scriptId);
+		if (error) throw error;
+	}
+
+	function resolveAnimationFamilyFromContent(
+		contentJson: Record<string, unknown>,
+	): AnimationProductionFamily | undefined {
+		return isAnimationProductionFamily(contentJson.production_family)
+			? contentJson.production_family
+			: undefined;
+	}
+
+	async function ensureAnimationAssetManifest(
+		contentJson: Record<string, unknown>,
+	): Promise<AnimationAssetManifest | null> {
+		const rawProductionType = contentJson.production_type;
+		if (rawProductionType !== "animation" && productionType !== "animation") {
+			return null;
+		}
+		const manifest = buildAnimationAssetManifest({
+			scriptId,
+			bible: parseAnimationBible(contentJson.animation_bible),
+			productionFamily: resolveAnimationFamilyFromContent(contentJson),
+			scenes: scenesRef.current.map((scene) => ({
+				id: scene.id,
+				order_index: scene.order_index,
+				narration_text: scene.narration_text,
+				scene_type: scene.scene_type,
+				visual_prompt: scene.visual_prompt,
+				duration_seconds: Number(scene.duration_seconds),
+				shots: getSceneShots(scene),
+			})),
+		});
+		animationAssetManifestRef.current = manifest;
+
+		const existing = await ensureBlobUrls([manifest.referenceSheetPath]);
+		let referenceSheetUrl = existing.get(manifest.referenceSheetPath) ?? "";
+		if (!referenceSheetUrl) {
+			referenceSheetUrl = await aiGenerateImageToPath(
+				manifest.referenceSheetPath,
+				buildAnimationCharacterReferencePrompt(manifest),
+				referencePreset,
+				animationImageOptions(manifest, { useReferenceImage: false }),
+			);
+		}
+		setAnimationReferenceSheetPath(manifest.referenceSheetPath);
+		await persistScriptContentPatch({
+			animation_assets: manifest,
+			animation_reference_sheet_path: manifest.referenceSheetPath,
+		});
+
+		return manifest;
+	}
+
+	async function applyAnimationContinuityToAllScenes(
+		manifest: AnimationAssetManifest,
+	) {
+		const nextScenes = repairAnimationScenesForQuality(
+			scenesRef.current.map((scene) => ({
+				...scene,
+				shots: applyAnimationContinuityToShots(getSceneShots(scene), manifest),
+			})),
+			manifest,
+		) as SceneWithMedia[];
+		scenesRef.current = nextScenes;
+		setScenes(nextScenes);
+		await Promise.all(
+			nextScenes.map((scene) => persistSceneShots(scene.id, getSceneShots(scene))),
+		);
+	}
+
+	async function persistAnimationQualityReport(
+		contentJson: Record<string, unknown>,
+		manifest: AnimationAssetManifest | null,
+	) {
+		if (!manifest && contentJson.production_type !== "animation") return;
+		if (manifest) {
+			const repairedScenes = repairAnimationScenesForQuality(
+				scenesRef.current,
+				manifest,
+			) as SceneWithMedia[];
+			scenesRef.current = repairedScenes;
+			setScenes(repairedScenes);
+			await Promise.all(
+				repairedScenes.map((scene) =>
+					persistSceneShots(scene.id, getSceneShots(scene)),
+				),
+			);
+		}
+		const report = scoreAnimationProductionQuality({
+			scenes: scenesRef.current.map((scene) => ({
+				id: scene.id,
+				order_index: scene.order_index,
+				narration_text: scene.narration_text,
+				scene_type: scene.scene_type,
+				visual_prompt: scene.visual_prompt,
+				duration_seconds: Number(scene.duration_seconds),
+				shots: getSceneShots(scene),
+			})),
+			bible: parseAnimationBible(contentJson.animation_bible),
+			productionFamily: manifest?.productionFamily,
+			referenceSheetPath: manifest?.referenceSheetPath,
+		});
+		setAnimationQcReport(report);
+		await persistScriptContentPatch({ animation_qc: report });
+		setScenes((latest) => {
+			const next = latest.map((scene) => ({ ...scene }));
+			if (!report.passed) {
+				for (const issue of report.issues.filter(
+					(item) => item.severity === "critical",
+				)) {
+					if (next[0] && !next[0].errorMsg) next[0].errorMsg = issue.message;
+				}
+			}
+			scenesRef.current = next;
+			return next;
+		});
+	}
+
 	async function persistSceneShots(sceneId: string, shots: SceneShot[]) {
 		const { error } = await supabase
 			.from("scenes")
 			.update({ shots })
 			.eq("id", sceneId);
 		if (error) throw error;
+	}
+
+	async function applyManualVideoToScene(
+		sceneIndex: number,
+		input: {
+			storagePath: string;
+			url: string;
+			title: string;
+			provider: "manual_upload" | "manual_url";
+		},
+	) {
+		const scene = scenesRef.current[sceneIndex];
+		const shots = getSceneShots(scene);
+		const videoShotIndex = shots.findIndex(
+			(shot) => (shot.media_type ?? "video") === "video",
+		);
+		const targetShot =
+			videoShotIndex >= 0 ? shots[videoShotIndex] : buildManualVideoShot(scene);
+		const nextShot: SceneShot = {
+			...targetShot,
+			media_type: "video",
+			source_url: input.storagePath,
+			source_title: input.title,
+			trim_start: undefined,
+			trim_end: undefined,
+			rejection_reason: undefined,
+		};
+		markShotSelected(nextShot, {
+			provider: input.provider,
+			sourceConfidence: 98,
+			qualityScore: 70,
+			sourceTitle: input.title,
+		});
+
+		const nextShots =
+			videoShotIndex >= 0
+				? shots.map((shot, index) => (index === videoShotIndex ? nextShot : shot))
+				: [nextShot, ...shots];
+		await persistSceneShots(scene.id, nextShots);
+
+		const allVideoShotsReady = nextShots
+			.filter((shot) => (shot.media_type ?? "video") === "video")
+			.every((shot) => Boolean(shot.source_url));
+		updateScene(sceneIndex, {
+			shots: nextShots,
+			videoStatus: allVideoShotsReady ? "complete" : "pending",
+			videoUrl: input.url,
+			errorMsg: undefined,
+		});
+	}
+
+	async function updatePrimaryVideoShot(
+		sceneIndex: number,
+		patch: Partial<Pick<SceneShot, "trim_start" | "trim_end" | "duration_seconds" | "crop">>,
+	) {
+		const scene = scenesRef.current[sceneIndex];
+		const shots = getSceneShots(scene);
+		const videoShotIndex = shots.findIndex(
+			(shot) => (shot.media_type ?? "video") === "video",
+		);
+		const targetShot =
+			videoShotIndex >= 0 ? shots[videoShotIndex] : buildManualVideoShot(scene);
+		const nextShot: SceneShot = {
+			...targetShot,
+			...patch,
+			media_type: "video",
+		};
+		const nextShots =
+			videoShotIndex >= 0
+				? shots.map((shot, index) => (index === videoShotIndex ? nextShot : shot))
+				: [nextShot, ...shots];
+		const sceneDuration =
+			typeof patch.duration_seconds === "number" &&
+			Number.isFinite(patch.duration_seconds)
+				? patch.duration_seconds
+				: undefined;
+		const updatePayload: Record<string, unknown> = { shots: nextShots };
+		if (sceneDuration !== undefined) {
+			updatePayload.duration_seconds = sceneDuration;
+		}
+		const { error } = await supabase
+			.from("scenes")
+			.update(updatePayload)
+			.eq("id", scene.id);
+		if (error) throw error;
+		updateScene(sceneIndex, {
+			shots: nextShots,
+			...(sceneDuration !== undefined
+				? { duration_seconds: sceneDuration }
+				: {}),
+			videoStatus: nextShot.source_url ? "complete" : "pending",
+			errorMsg: undefined,
+		});
+	}
+
+	function primaryVideoShot(scene: SceneWithMedia): SceneShot | undefined {
+		return getVideoShots(scene)[0];
+	}
+
+	async function handleInsertVideoFile(sceneIndex: number, file?: File) {
+		if (!file) return;
+		const scene = scenesRef.current[sceneIndex];
+		if (!isSupportedManualVideo(file)) {
+			updateScene(sceneIndex, {
+				videoStatus: "error",
+				errorMsg: "mp4, webm, mov 형식의 영상 파일만 삽입할 수 있습니다.",
+			});
+			return;
+		}
+		if (file.size > MAX_MANUAL_VIDEO_BYTES) {
+			updateScene(sceneIndex, {
+				videoStatus: "error",
+				errorMsg: "영상 파일이 250MB를 초과합니다. 짧은 클립으로 잘라 넣으세요.",
+			});
+			return;
+		}
+
+		setManualVideoBusy((prev) => ({ ...prev, [scene.id]: true }));
+		updateScene(sceneIndex, { videoStatus: "generating", errorMsg: undefined });
+		try {
+			const extension = videoExtensionFromFile(file);
+			const stem = sanitizeFileStem(file.name);
+			const storagePath = `scenes/${scene.id}/manual/${Date.now()}-${stem}.${extension}`;
+			const buffer = await file.arrayBuffer();
+			const url = await storeLocalFile(
+				storagePath,
+				new Uint8Array(buffer),
+				file.type || `video/${extension}`,
+			);
+			await applyManualVideoToScene(sceneIndex, {
+				storagePath,
+				url,
+				title: file.name,
+				provider: "manual_upload",
+			});
+		} catch (err) {
+			updateScene(sceneIndex, {
+				videoStatus: "error",
+				errorMsg:
+					err instanceof Error ? err.message : "영상 파일 삽입에 실패했습니다.",
+			});
+		} finally {
+			setManualVideoBusy((prev) => ({ ...prev, [scene.id]: false }));
+		}
+	}
+
+	async function handleInsertVideoUrl(sceneIndex: number) {
+		const scene = scenesRef.current[sceneIndex];
+		const inputUrl = (manualVideoUrls[scene.id] ?? "").trim();
+		if (!inputUrl) {
+			updateScene(sceneIndex, {
+				videoStatus: "error",
+				errorMsg: "삽입할 영상 URL을 입력하세요.",
+			});
+			return;
+		}
+		if (!isDirectVideoUrl(inputUrl)) {
+			updateScene(sceneIndex, {
+				videoStatus: "error",
+				errorMsg: "YouTube URL 또는 mp4/webm/mov 직접 URL만 지원합니다.",
+			});
+			return;
+		}
+
+		setManualVideoBusy((prev) => ({ ...prev, [scene.id]: true }));
+		updateScene(sceneIndex, { videoStatus: "generating", errorMsg: undefined });
+		try {
+			const shot = getVideoShots(scene)[0] ?? buildManualVideoShot(scene);
+			const storagePath = `scenes/${scene.id}/manual/${Date.now()}-${shot.id}.mp4`;
+			const downloaded = isYouTubeVideoUrl(inputUrl)
+				? await downloadYouTubeVideoToPath(
+						storagePath,
+						inputUrl,
+						getShotVideoDurationSeconds(shot),
+						getShotClipStartSeconds(shot, 0),
+					)
+				: await downloadVideoToPath(storagePath, inputUrl);
+			await applyManualVideoToScene(sceneIndex, {
+				storagePath: downloaded.storagePath,
+				url: downloaded.url,
+				title: inputUrl,
+				provider: "manual_url",
+			});
+			setManualVideoUrls((prev) => ({ ...prev, [scene.id]: "" }));
+		} catch (err) {
+			updateScene(sceneIndex, {
+				videoStatus: "error",
+				errorMsg:
+					err instanceof Error ? err.message : "영상 URL 삽입에 실패했습니다.",
+			});
+		} finally {
+			setManualVideoBusy((prev) => ({ ...prev, [scene.id]: false }));
+		}
 	}
 
 	async function generateShotImages(sceneIndex: number) {
@@ -470,6 +1350,10 @@ export default function StepMedia({
 
 		let previewImageUrl = scene.imageUrl;
 		let changed = false;
+		const sharedImageSources = new Map<
+			string,
+			{ storagePath: string; url: string }
+		>();
 
 		for (const shot of shots) {
 			if (shot.media_type === "video") continue;
@@ -488,23 +1372,88 @@ export default function StepMedia({
 			}
 
 			let url = "";
-			if (isDirectImageUrl(shot.source_url)) {
-				const downloaded = await downloadImageToPath(
+			if (productionType === "animation" || isAnimationShot(shot)) {
+				const manifest = animationAssetManifestRef.current;
+				const animationPrompt = manifest
+					? enrichAnimationPromptWithContinuity(imagePrompt, manifest, shot)
+					: imagePrompt;
+				url = await aiGenerateImageToPath(
 					storagePath,
-					shot.source_url!,
+					animationPrompt,
+					referencePreset,
+					manifest ? animationImageOptions(manifest) : undefined,
 				);
-				url = downloaded.url;
-				shot.source_url = downloaded.storagePath;
+				shot.source_url = storagePath;
+				shot.media_type = "image";
+				if (manifest) {
+					shot.reference_image_path = manifest.referenceSheetPath;
+					shot.animation_family = manifest.productionFamily;
+					shot.continuity_key =
+						shot.continuity_key ?? `${manifest.productionFamily}-${shot.id}`;
+					shot.source_title = shot.source_title ?? manifest.productionFamilyLabel;
+				}
+				markShotSelected(shot, {
+					provider: "animation",
+					qualityScore: 58,
+					sourceConfidence: Math.max(shot.source_confidence ?? 0, 84),
+				});
+			} else if (isDirectImageUrl(shot.source_url)) {
+				const sharedKey = shot.source_url!;
+				const reused = sharedImageSources.get(sharedKey);
+				if (reused) {
+					url = reused.url;
+					shot.source_url = reused.storagePath;
+					markShotSelected(shot, {
+						provider: "direct",
+						sourceConfidence: Math.max(shot.source_confidence ?? 0, 88),
+					});
+				} else {
+					const downloaded = await downloadImageToPath(
+						storagePath,
+						shot.source_url!,
+					);
+					url = downloaded.url;
+					shot.source_url = downloaded.storagePath;
+					markShotSelected(shot, {
+						provider: "direct",
+						sourceConfidence: Math.max(shot.source_confidence ?? 0, 88),
+					});
+					sharedImageSources.set(sharedKey, downloaded);
+				}
 			} else {
 				const searched = await searchAndDownloadImageToPath(
 					storagePath,
 					queries.queryEn,
 					queries.queryKo,
 					queries.locale,
+					referenceMediaSearchOptions(referencePreset, shot, "image", {
+						rejectTerms: shot.reject_terms,
+						minScore: strictImageMinScore(shot),
+						minRelevance: strictMinRelevance(shot),
+					}),
 				);
 				if (searched) {
 					url = searched.url;
 					shot.source_url = searched.storagePath;
+					markShotSelected(shot, {
+						provider: searched.provider,
+						qualityScore: searched.qualityScore,
+						sourceTitle: searched.sourceTitle,
+					});
+				} else if (canUseSourceCard(shot)) {
+					const cardPath = storagePath.replace(/\.[a-z0-9]+$/i, ".svg");
+					url = await generateSourceCardToPath(
+						cardPath,
+						sourceCardInput(scene, shot),
+					);
+					shot.source_url = cardPath;
+					shot.media_type = "image";
+						markShotSelected(shot, {
+							provider: "source_card",
+							qualityScore: 72,
+							sourceConfidence: Math.max(shot.source_confidence ?? 0, 72),
+							sourceTitle: shot.source_title || scene.news_title,
+						});
 				} else {
 					url = await aiGenerateImageToPath(
 						storagePath,
@@ -512,6 +1461,10 @@ export default function StepMedia({
 						referencePreset,
 					);
 					shot.source_url = storagePath;
+					markShotGeneratedFallback(
+						shot,
+						"검색 후보가 샷 의도 품질 게이트를 통과하지 못해 AI 재구성으로 대체됨",
+					);
 				}
 			}
 
@@ -537,6 +1490,28 @@ export default function StepMedia({
 			imageUrl: previewImageUrl,
 		});
 		return true;
+	}
+
+	async function generateFallbackSceneImage(
+		scene: SceneWithMedia,
+		imagePrompt: string,
+	): Promise<string> {
+		const isAnimationScene =
+			productionType === "animation" ||
+			scriptContentJsonRef.current.production_type === "animation";
+		const manifest = isAnimationScene
+			? (animationAssetManifestRef.current ??
+				(await ensureAnimationAssetManifest(scriptContentJsonRef.current)))
+			: null;
+		const prompt = manifest
+			? enrichAnimationPromptWithContinuity(imagePrompt, manifest)
+			: imagePrompt;
+		return aiGenerateImage(
+			scene.id,
+			prompt,
+			referencePreset,
+			manifest ? animationImageOptions(manifest) : undefined,
+		);
 	}
 
 	async function fallbackVideoShotsToImages(sceneIndex: number) {
@@ -565,13 +1540,44 @@ export default function StepMedia({
 				queries.queryEn,
 				queries.queryKo,
 				queries.locale,
+				referenceMediaSearchOptions(referencePreset, shot, "image", {
+					rejectTerms: shot.reject_terms,
+					minScore: strictImageMinScore(shot),
+					minRelevance: strictMinRelevance(shot),
+				}),
 			);
 			if (searched) {
 				shot.media_type = "image";
 				shot.source_url = searched.storagePath;
 				shot.trim_start = undefined;
 				shot.trim_end = undefined;
+				markShotSelected(shot, {
+					provider: searched.provider,
+					qualityScore: searched.qualityScore,
+					sourceTitle: searched.sourceTitle,
+				});
 				if (!previewImageUrl) previewImageUrl = searched.url;
+				changed = true;
+				continue;
+			}
+
+			if (canUseSourceCard(shot)) {
+				const cardPath = storagePath.replace(/\.[a-z0-9]+$/i, ".svg");
+				const cardUrl = await generateSourceCardToPath(
+					cardPath,
+					sourceCardInput(scene, shot),
+				);
+				shot.media_type = "image";
+				shot.source_url = cardPath;
+				shot.trim_start = undefined;
+				shot.trim_end = undefined;
+					markShotSelected(shot, {
+						provider: "source_card",
+						qualityScore: 72,
+						sourceConfidence: Math.max(shot.source_confidence ?? 0, 72),
+						sourceTitle: shot.source_title || scene.news_title,
+					});
+				if (!previewImageUrl) previewImageUrl = cardUrl;
 				changed = true;
 				continue;
 			}
@@ -585,6 +1591,10 @@ export default function StepMedia({
 			shot.source_url = storagePath;
 			shot.trim_start = undefined;
 			shot.trim_end = undefined;
+			markShotGeneratedFallback(
+				shot,
+				"영상 후보가 없어 이미지 AI 재구성으로 폴백됨",
+			);
 			if (!previewImageUrl) previewImageUrl = generatedUrl;
 			changed = true;
 		}
@@ -600,6 +1610,142 @@ export default function StepMedia({
 		return true;
 	}
 
+	async function repairWeakSceneShots(sceneIndex: number) {
+		const scene = scenesRef.current[sceneIndex];
+		if (!scene || scene.scene_type === "text_emphasis") return false;
+		const shots = getSceneShots(scene);
+		if (shots.length === 0) return false;
+
+		let previewImageUrl = scene.imageUrl;
+		let previewVideoUrl = scene.videoUrl;
+		let changed = false;
+
+		for (const [shotIndex, shot] of shots.entries()) {
+			if (!shouldRepairSelectedShot(shot)) continue;
+
+			const queries = buildShotSearchQueries(scene, shot);
+			const imagePrompt = buildShotImagePrompt(scene, shot);
+			const mediaType = shot.media_type ?? "video";
+
+			if (mediaType === "video") {
+				const searchedVideo = await searchAndDownloadVideoToPath(
+					`scenes/${scene.id}/shots/${shot.id}-repair.mp4`,
+					queries.queryEn,
+					queries.queryKo,
+					getShotVideoDurationSeconds(shot),
+					queries.locale,
+					referenceMediaSearchOptions(referencePreset, shot, "video", {
+						rejectTerms: shot.reject_terms,
+						minScore: Math.max(strictVideoMinScore(shot) ?? 0, 42),
+						minRelevance: strictMinRelevance(shot),
+					}),
+				);
+				if (searchedVideo) {
+					shot.source_url = searchedVideo.storagePath;
+					shot.media_type = "video";
+					markShotSelected(shot, {
+						provider: searchedVideo.provider,
+						qualityScore: searchedVideo.qualityScore,
+						dynamicScore: searchedVideo.dynamicScore,
+						dynamicIssues: searchedVideo.dynamicIssues,
+						sourceTitle: searchedVideo.sourceTitle,
+					});
+					if (!previewVideoUrl) previewVideoUrl = searchedVideo.videoUrl;
+					changed = true;
+					continue;
+				}
+				shot.media_type = "image";
+				shot.trim_start = undefined;
+				shot.trim_end = undefined;
+			}
+
+			const searchedImage = await searchAndDownloadImageToPath(
+				`scenes/${scene.id}/shots/${shot.id}-repair.png`,
+				queries.queryEn,
+				queries.queryKo,
+				queries.locale,
+				referenceMediaSearchOptions(referencePreset, shot, "image", {
+					rejectTerms: shot.reject_terms,
+					minScore: Math.max(strictImageMinScore(shot) ?? 0, 34),
+					minRelevance: strictMinRelevance(shot),
+				}),
+			);
+			if (searchedImage) {
+				shot.media_type = "image";
+				shot.source_url = searchedImage.storagePath;
+				shot.trim_start = undefined;
+				shot.trim_end = undefined;
+				markShotSelected(shot, {
+					provider: searchedImage.provider,
+					qualityScore: searchedImage.qualityScore,
+					sourceTitle: searchedImage.sourceTitle,
+				});
+				if (!previewImageUrl) previewImageUrl = searchedImage.url;
+				changed = true;
+				continue;
+			}
+
+			if (canUseSourceCard(shot)) {
+				const cardPath = `scenes/${scene.id}/shots/${shot.id}-repair.svg`;
+				const cardUrl = await generateSourceCardToPath(
+					cardPath,
+					sourceCardInput(scene, shot),
+				);
+				shot.media_type = "image";
+				shot.source_url = cardPath;
+				shot.trim_start = undefined;
+				shot.trim_end = undefined;
+					markShotSelected(shot, {
+						provider: "source_card",
+						qualityScore: 72,
+						sourceConfidence: Math.max(shot.source_confidence ?? 0, 72),
+						sourceTitle: shot.source_title || scene.news_title,
+					});
+				if (!previewImageUrl) previewImageUrl = cardUrl;
+				changed = true;
+				continue;
+			}
+
+			const generatedUrl = await aiGenerateImageToPath(
+				`scenes/${scene.id}/shots/${shot.id}-repair.png`,
+				imagePrompt,
+				referencePreset,
+			);
+			shot.media_type = "image";
+			shot.source_url = `scenes/${scene.id}/shots/${shot.id}-repair.png`;
+			shot.trim_start = undefined;
+			shot.trim_end = undefined;
+			markShotGeneratedFallback(
+				shot,
+				"검색/영상 후보가 품질 기준을 통과하지 못해 샷 의도 기반 AI 재구성으로 대체됨",
+			);
+			if (!previewImageUrl) previewImageUrl = generatedUrl;
+			changed = true;
+
+			if (shotIndex > 0 && previewImageUrl && !scene.imageUrl) {
+				previewImageUrl = generatedUrl;
+			}
+		}
+
+		if (!changed) return false;
+		await persistSceneShots(scene.id, shots);
+		const remainingVideoShots = getVideoShots({ shots });
+		updateScene(sceneIndex, {
+			shots,
+			imageStatus: previewImageUrl ? "complete" : scene.imageStatus,
+			videoStatus:
+				remainingVideoShots.length === 0
+					? "not_needed"
+					: remainingVideoShots.every((shot) => shot.source_url)
+						? "complete"
+						: "pending",
+			imageUrl: previewImageUrl,
+			videoUrl: previewVideoUrl,
+			errorMsg: undefined,
+		});
+		return true;
+	}
+
 	async function generateShotVideos(sceneIndex: number) {
 		const scene = scenesRef.current[sceneIndex];
 		const shots = getSceneShots(scene);
@@ -610,8 +1756,12 @@ export default function StepMedia({
 
 		let previewVideoUrl = scene.videoUrl;
 		let changed = false;
+		const sharedVideoSources = new Map<
+			string,
+			{ storagePath: string; url: string }
+		>();
 
-		for (const shot of videoShots) {
+		for (const [shotIndex, shot] of videoShots.entries()) {
 			if (isLocalMediaPath(shot.source_url)) {
 				const localPath = shot.source_url!;
 				if (!previewVideoUrl) {
@@ -621,18 +1771,46 @@ export default function StepMedia({
 				continue;
 			}
 			if (isDirectVideoUrl(shot.source_url)) {
+				const isYouTube = isYouTubeVideoUrl(shot.source_url);
+				const sharedKey = getVideoReuseKey(
+					shot.source_url!,
+					shot,
+					shotIndex,
+				);
+				const reused = sharedVideoSources.get(sharedKey);
+				if (reused) {
+					shot.source_url = reused.storagePath;
+					if (isYouTube) {
+						shot.trim_start = undefined;
+						shot.trim_end = undefined;
+					}
+					markShotSelected(shot, {
+						provider: isYouTube ? "youtube" : "direct",
+						sourceConfidence: Math.max(shot.source_confidence ?? 0, 90),
+					});
+					if (!previewVideoUrl) previewVideoUrl = reused.url;
+					changed = true;
+					continue;
+				}
 				const storagePath = `scenes/${scene.id}/shots/${shot.id}.mp4`;
-				const downloaded = /youtu\.be|youtube\.com/i.test(shot.source_url ?? "")
+				const downloaded = isYouTube
 					? await downloadYouTubeVideoToPath(
 							storagePath,
 							shot.source_url!,
-							Math.min(
-								30,
-								Math.max(8, Math.ceil(Number(shot.duration_seconds)) + 4),
-							),
+							getShotVideoDurationSeconds(shot),
+							getShotClipStartSeconds(shot, shotIndex),
 						)
 					: await downloadVideoToPath(storagePath, shot.source_url!);
 				shot.source_url = downloaded.storagePath;
+				if (isYouTube) {
+					shot.trim_start = undefined;
+					shot.trim_end = undefined;
+				}
+				markShotSelected(shot, {
+					provider: isYouTube ? "youtube" : "direct",
+					sourceConfidence: Math.max(shot.source_confidence ?? 0, 90),
+				});
+				sharedVideoSources.set(sharedKey, downloaded);
 				if (!previewVideoUrl) previewVideoUrl = downloaded.url;
 				changed = true;
 				continue;
@@ -643,18 +1821,42 @@ export default function StepMedia({
 					? sources[shot.source_index]
 					: undefined;
 			if (indexedSource?.url && isDirectVideoUrl(indexedSource.url)) {
+				const isYouTube = isYouTubeVideoUrl(indexedSource.url);
+				const sharedKey = getVideoReuseKey(indexedSource.url, shot, shotIndex);
+				const reused = sharedVideoSources.get(sharedKey);
+				if (reused) {
+					shot.source_url = reused.storagePath;
+					if (isYouTube) {
+						shot.trim_start = undefined;
+						shot.trim_end = undefined;
+					}
+					markShotSelected(shot, {
+						provider: isYouTube ? "youtube" : "direct",
+						sourceConfidence: Math.max(shot.source_confidence ?? 0, 90),
+					});
+					if (!previewVideoUrl) previewVideoUrl = reused.url;
+					changed = true;
+					continue;
+				}
 				const storagePath = `scenes/${scene.id}/shots/${shot.id}.mp4`;
-				const downloaded = /youtu\.be|youtube\.com/i.test(indexedSource.url)
+				const downloaded = isYouTube
 					? await downloadYouTubeVideoToPath(
 							storagePath,
 							indexedSource.url,
-							Math.min(
-								30,
-								Math.max(8, Math.ceil(Number(shot.duration_seconds)) + 4),
-							),
+							getShotVideoDurationSeconds(shot),
+							getShotClipStartSeconds(shot, shotIndex),
 						)
 					: await downloadVideoToPath(storagePath, indexedSource.url);
 				shot.source_url = downloaded.storagePath;
+				if (isYouTube) {
+					shot.trim_start = undefined;
+					shot.trim_end = undefined;
+				}
+				markShotSelected(shot, {
+					provider: isYouTube ? "youtube" : "direct",
+					sourceConfidence: Math.max(shot.source_confidence ?? 0, 90),
+				});
+				sharedVideoSources.set(sharedKey, downloaded);
 				if (!previewVideoUrl) previewVideoUrl = downloaded.url;
 				changed = true;
 				continue;
@@ -665,11 +1867,23 @@ export default function StepMedia({
 				`scenes/${scene.id}/shots/${shot.id}.mp4`,
 				queries.queryEn,
 				queries.queryKo,
-				Math.min(30, Math.max(8, Math.ceil(Number(shot.duration_seconds)) + 4)),
+				getShotVideoDurationSeconds(shot),
 				queries.locale,
+				referenceMediaSearchOptions(referencePreset, shot, "video", {
+					rejectTerms: shot.reject_terms,
+					minScore: strictVideoMinScore(shot),
+					minRelevance: strictMinRelevance(shot),
+				}),
 			);
 			if (searched) {
 				shot.source_url = searched.storagePath;
+				markShotSelected(shot, {
+					provider: searched.provider,
+					qualityScore: searched.qualityScore,
+					dynamicScore: searched.dynamicScore,
+					dynamicIssues: searched.dynamicIssues,
+					sourceTitle: searched.sourceTitle,
+				});
 				if (!previewVideoUrl) previewVideoUrl = searched.videoUrl;
 				changed = true;
 			}
@@ -710,7 +1924,7 @@ export default function StepMedia({
 
 				// 2순위: AI 이미지 생성
 				if (!url) {
-					url = await aiGenerateImage(scene.id, imagePrompt, referencePreset);
+					url = await generateFallbackSceneImage(scene, imagePrompt);
 				}
 			}
 			updateScene(sceneIndex, { imageStatus: "complete", imageUrl: url });
@@ -768,9 +1982,7 @@ export default function StepMedia({
 			);
 
 			if (isDirectVideoUrl(latestScene.sourceUrl)) {
-				const isYouTube = /youtu\.be|youtube\.com/i.test(
-					latestScene.sourceUrl ?? "",
-				);
+				const isYouTube = isYouTubeVideoUrl(latestScene.sourceUrl);
 				const url = isYouTube
 					? await downloadYouTubeVideo(
 							latestScene.id,
@@ -822,6 +2034,15 @@ export default function StepMedia({
 				return;
 			}
 
+			if (requiresRealClipVideo) {
+				updateScene(sceneIndex, {
+					videoStatus: "error",
+					errorMsg:
+						"이 레퍼런스는 실제 클립 영상이 필수입니다. 사용 가능한 영상 후보가 없어서 이미지 폴백을 막았습니다. 직접 영상 소스를 추가하거나 검색어를 더 구체화하세요.",
+				});
+				return;
+			}
+
 			const converted = await fallbackVideoShotsToImages(sceneIndex);
 			if (converted) return;
 
@@ -832,7 +2053,7 @@ export default function StepMedia({
 					queryKo,
 					locale,
 				)) ||
-				(await aiGenerateImage(latestScene.id, imagePrompt, referencePreset));
+				(await generateFallbackSceneImage(latestScene, imagePrompt));
 			updateScene(sceneIndex, {
 				videoStatus: "not_needed",
 				imageStatus: "complete",
@@ -899,11 +2120,7 @@ export default function StepMedia({
 			let imageUrl = scene.imageUrl;
 			if (!imageUrl) {
 				const imagePrompt = buildSceneImagePrompt(scene);
-				imageUrl = await aiGenerateImage(
-					scene.id,
-					imagePrompt,
-					referencePreset,
-				);
+				imageUrl = await generateFallbackSceneImage(scene, imagePrompt);
 				updateScene(sceneIndex, {
 					imageStatus: "complete",
 					imageUrl,
@@ -1117,6 +2334,8 @@ export default function StepMedia({
 		let researchKeywords: string[] = [];
 		let visualPlan: Awaited<ReturnType<typeof planSceneVisuals>> | null = null;
 		let directivePlan: SceneDirective[] | null = null;
+		let contentJson: Record<string, unknown> = scriptContentJsonRef.current;
+		let animationManifest: AnimationAssetManifest | null = null;
 		try {
 			const { data: scriptData } = await supabase
 				.from("scripts")
@@ -1129,14 +2348,31 @@ export default function StepMedia({
 			const channels = topics?.channels as Record<string, string> | undefined;
 			const topicTitle = (topics?.title as string) ?? "";
 			locale = channels?.language === "en" ? "en" : "ko";
-			const contentJson = sd?.content_json as
-				| Record<string, unknown>
-				| undefined;
+			contentJson =
+				(sd?.content_json as Record<string, unknown> | undefined) ??
+				scriptContentJsonRef.current;
+			scriptContentJsonRef.current = contentJson;
+			const rawProductionType = contentJson?.production_type;
+			const currentProductionType: ProductionType =
+				rawProductionType === "animation"
+					? "animation"
+					: rawProductionType === "documentary"
+						? "documentary"
+						: productionType;
+			setProductionType(currentProductionType);
 			researchKeywords = Array.isArray(contentJson?.search_keywords)
 				? (contentJson.search_keywords as string[])
 				: [];
 
-			if (topicTitle) {
+			if (currentProductionType === "animation") {
+				animationManifest = await ensureAnimationAssetManifest(contentJson);
+				if (animationManifest) {
+					await applyAnimationContinuityToAllScenes(animationManifest);
+					contentJson = scriptContentJsonRef.current;
+				}
+			}
+
+			if (topicTitle && currentProductionType !== "animation") {
 				// Scene Director: 씬별 최적 검색쿼리 생성
 				visualPlan = await planSceneVisuals(
 					scenesRef.current.map((s) => ({
@@ -1222,8 +2458,11 @@ export default function StepMedia({
 			}
 		}
 		// state + ref를 한 번에 동기 반영
-		setScenes((prev) => {
-			const next = prev.map((s, i) => ({ ...s, ...(patchMap.get(i) ?? {}) }));
+		setScenes(() => {
+			const next = scenesRef.current.map((s, i) => ({
+				...s,
+				...(patchMap.get(i) ?? {}),
+			}));
 			scenesRef.current = next;
 			return next;
 		});
@@ -1270,6 +2509,15 @@ export default function StepMedia({
 			await Promise.all(batch.flatMap((b) => b.tasks));
 		}
 
+		for (let i = 0; i < scenesRef.current.length; i++) {
+			await repairWeakSceneShots(i);
+		}
+
+		await persistAnimationQualityReport(
+			scriptContentJsonRef.current,
+			animationManifest ?? animationAssetManifestRef.current,
+		);
+
 		// 연속 나레이션 생성
 		if (narrationStatus !== "complete") {
 			await handleGenerateNarration();
@@ -1292,6 +2540,24 @@ export default function StepMedia({
 		});
 	}
 
+	async function handleRunAnimationQc() {
+		setGenerating(true);
+		try {
+			const manifest = await ensureAnimationAssetManifest(
+				scriptContentJsonRef.current,
+			);
+			if (manifest) {
+				await applyAnimationContinuityToAllScenes(manifest);
+			}
+			await persistAnimationQualityReport(
+				scriptContentJsonRef.current,
+				manifest ?? animationAssetManifestRef.current,
+			);
+		} finally {
+			setGenerating(false);
+		}
+	}
+
 	if (loading) {
 		return (
 			<div className="bg-surface rounded-[8px] p-static-lg text-center py-fluid-lg">
@@ -1304,8 +2570,18 @@ export default function StepMedia({
 	const allComplete =
 		narrationStatus === "complete" &&
 		scenes.every((s) => isDone(s.imageStatus) && isDone(s.videoStatus));
+	const animationQcReady =
+		productionType !== "animation" || animationQcReport?.passed === true;
+	const canProceed = allComplete && animationQcReady;
 	const imageCount = scenes.filter((s) => isDone(s.imageStatus)).length;
-	const videoCount = scenes.filter((s) => isDone(s.videoStatus)).length;
+	const videoRequiredCount = scenes.filter(
+		(s) => s.scene_type === "video" || getVideoShots(s).length > 0,
+	).length;
+	const videoCount = scenes.filter(
+		(s) =>
+			(s.scene_type === "video" || getVideoShots(s).length > 0) &&
+			isDone(s.videoStatus),
+	).length;
 	const totalDuration = scenes.reduce(
 		(sum, s) => sum + Number(s.duration_seconds),
 		0,
@@ -1328,9 +2604,9 @@ export default function StepMedia({
 				<PText size="small" color="contrast-medium">
 					이미지 {imageCount}/{scenes.length}
 				</PText>
-				{scenes.some((s) => s.scene_type === "video") && (
+				{videoRequiredCount > 0 && (
 					<PText size="small" color="contrast-medium">
-						영상 {videoCount}/{scenes.length}
+						영상 {videoCount}/{videoRequiredCount}
 					</PText>
 				)}
 				{narrationStatus === "complete" ? (
@@ -1348,6 +2624,14 @@ export default function StepMedia({
 					</PButton>
 				)}
 				{!generating &&
+					allComplete &&
+					productionType === "animation" &&
+					!animationQcReady && (
+						<PButton compact variant="secondary" onClick={handleRunAnimationQc}>
+							애니 QC 실행
+						</PButton>
+					)}
+				{!generating &&
 					narrationStatus !== "complete" &&
 					narrationStatus !== "generating" && (
 						<PButton
@@ -1361,12 +2645,36 @@ export default function StepMedia({
 				{allComplete && (
 					<PTag color="notification-success-soft">모든 미디어 생성 완료</PTag>
 				)}
+				{productionType === "animation" && animationReferenceSheetPath && (
+					<PTag color="notification-info-soft">캐릭터 시트 연결</PTag>
+				)}
+				{productionType === "animation" && animationQcReport && (
+					<PTag
+						color={
+							animationQcReport.passed
+								? "notification-success-soft"
+								: "notification-warning-soft"
+						}
+					>
+						애니 QC {animationQcReport.score}/100
+					</PTag>
+				)}
+			</div>
+
+			<div className="flex items-center gap-static-sm mb-static-md flex-wrap p-static-sm bg-canvas rounded-[4px] border border-[var(--p-color-state-base)]">
+				<PText size="small" color="contrast-high">
+					✂️ 편집 우선 제작
+				</PText>
+				<PText size="x-small" color="contrast-medium">
+					외부 영상/뉴스/이미지/문서 자료를 샷 단위로 재구성하고, 컷 리듬·줌·자막·SFX·BGM으로 완성합니다.
+					AI 영상 모델은 필요할 때만 쓰는 선택 보강입니다.
+				</PText>
 			</div>
 
 			{aiVideoAvailable && (
 				<div className="flex items-center gap-static-sm mb-static-md flex-wrap p-static-sm bg-canvas rounded-[4px]">
 					<PText size="small" color="contrast-high">
-						🎬 AI 영상 생성
+						🎬 선택 보강: AI 영상 모델
 					</PText>
 					<select
 						className="bg-surface text-[12px] rounded-[4px] px-static-xs py-[4px] border border-[var(--p-color-state-base)]"
@@ -1377,8 +2685,8 @@ export default function StepMedia({
 							setActiveVideoProvider(next);
 						}}
 					>
-						<option value="wan26">Wan 2.6 (가성비)</option>
 						<option value="kling3">Kling 3.0 (고품질)</option>
+						<option value="wan26">Wan 2.6 (가성비)</option>
 						<option value="ltx2">LTX-2 (빠름)</option>
 						<option value="hailuo">Hailuo (T2V + 카메라)</option>
 						<option value="klingO1">Kling O1 (보간)</option>
@@ -1390,10 +2698,10 @@ export default function StepMedia({
 					{!generating && (
 						<PButton
 							compact
-							variant="primary"
+							variant="secondary"
 							onClick={handleGenerateAllAiVideos}
 						>
-							🎬 모든 씬 일괄 (체이닝)
+							🎬 선택: 모든 씬 AI 영상화
 						</PButton>
 					)}
 					{aiVideoBatch && (
@@ -1402,7 +2710,8 @@ export default function StepMedia({
 						</PTag>
 					)}
 					<PText size="x-small" color="contrast-low">
-						{scriptFormat === "shorts" ? "9:16 세로" : "16:9 가로"} · 시드 잠금
+						{scriptFormat === "shorts" ? "9:16 세로" : "16:9 가로"} · 시드 잠금 ·
+						마지막 프레임 체이닝
 					</PText>
 				</div>
 			)}
@@ -1427,6 +2736,55 @@ export default function StepMedia({
 				</PInlineNotification>
 			)}
 
+			{productionType === "animation" && animationQcReport && (
+				<div className="mb-static-md bg-canvas rounded-[4px] p-static-sm">
+					<div className="flex items-center gap-static-xs flex-wrap mb-static-xs">
+						<PTag
+							color={
+								animationQcReport.passed
+									? "notification-success-soft"
+									: "notification-warning-soft"
+							}
+						>
+							애니메이션 QC {animationQcReport.score}/100
+						</PTag>
+						<PTag color="background-surface">
+							연속성{" "}
+							{Math.round(
+								animationQcReport.metrics.continuityTaggedRatio * 100,
+							)}
+							%
+						</PTag>
+						<PTag color="background-surface">
+							모션{" "}
+							{Math.round(animationQcReport.metrics.motionCoverageRatio * 100)}
+							%
+						</PTag>
+						<PTag color="background-surface">
+							에셋{" "}
+							{Math.round(animationQcReport.metrics.sourceResolvedRatio * 100)}
+							%
+						</PTag>
+						<PTag color="background-surface">
+							리깅{" "}
+							{Math.round(animationQcReport.metrics.rigCoverageRatio * 100)}%
+						</PTag>
+						<PTag color="background-surface">
+							SFX{" "}
+							{Math.round(animationQcReport.metrics.sfxCueCoverageRatio * 100)}
+							%
+						</PTag>
+					</div>
+					{!animationQcReport.passed && (
+						<ul className="list-disc pl-4 text-[12px] text-contrast-medium">
+							{animationQcReport.requiredActions.slice(0, 3).map((action) => (
+								<li key={action}>{action}</li>
+							))}
+						</ul>
+					)}
+				</div>
+			)}
+
 			<div className="flex flex-col gap-static-sm">
 				{scenes.map((scene, i) => (
 					<div
@@ -1438,13 +2796,23 @@ export default function StepMedia({
 								{i + 1}
 							</div>
 
-							{scene.imageUrl && (
+							{(scene.videoUrl || scene.imageUrl) && (
 								<div className="w-32 h-20 rounded-[4px] overflow-hidden shrink-0">
-									<img
-										src={scene.imageUrl}
-										alt={`씬 ${i + 1}`}
-										className="w-full h-full object-cover"
-									/>
+									{scene.videoUrl ? (
+										<video
+											src={scene.videoUrl}
+											className="w-full h-full object-cover"
+											muted
+											playsInline
+											controls
+										/>
+									) : (
+										<img
+											src={scene.imageUrl}
+											alt={`씬 ${i + 1}`}
+											className="w-full h-full object-cover"
+										/>
+									)}
 								</div>
 							)}
 
@@ -1510,6 +2878,166 @@ export default function StepMedia({
 										{scene.errorMsg}
 									</PText>
 								)}
+								<div className="mt-static-sm rounded-[4px] border border-[var(--p-color-state-base)] bg-surface p-static-sm">
+									<div className="flex items-center gap-static-xs flex-wrap">
+										<PText size="x-small" color="contrast-high">
+											실제 영상 삽입
+										</PText>
+										<PTag color="background-surface">
+											{getVideoShots(scene).length > 0
+												? "비디오 샷 연결"
+												: "새 비디오 샷 생성"}
+										</PTag>
+										{scene.videoUrl && (
+											<PTag color="notification-success-soft">적용됨</PTag>
+										)}
+									</div>
+									<div className="mt-static-xs flex gap-static-xs flex-wrap items-center">
+										<input
+											type="file"
+											accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov"
+											disabled={manualVideoBusy[scene.id] || generating}
+											className="max-w-[260px] text-[12px] text-contrast-medium file:mr-static-xs file:rounded-[4px] file:border-0 file:bg-canvas file:px-static-sm file:py-[6px] file:text-[12px] file:font-semibold"
+											onChange={(event) => {
+												const file = event.currentTarget.files?.[0];
+												event.currentTarget.value = "";
+												void handleInsertVideoFile(i, file);
+											}}
+										/>
+										<input
+											type="url"
+											placeholder="YouTube 또는 mp4/webm/mov URL"
+											value={manualVideoUrls[scene.id] ?? ""}
+											disabled={manualVideoBusy[scene.id] || generating}
+											className="min-w-[220px] flex-1 rounded-[4px] border border-[var(--p-color-state-base)] bg-canvas px-static-sm py-[7px] text-[12px] text-contrast-high outline-none"
+											onChange={(event) =>
+												setManualVideoUrls((prev) => ({
+													...prev,
+													[scene.id]: event.currentTarget.value,
+												}))
+											}
+										/>
+										<PButton
+											compact
+											variant="secondary"
+											disabled={
+												manualVideoBusy[scene.id] ||
+												generating ||
+												!(manualVideoUrls[scene.id] ?? "").trim()
+											}
+											onClick={() => {
+												void handleInsertVideoUrl(i);
+											}}
+										>
+											URL 적용
+										</PButton>
+										{manualVideoBusy[scene.id] && <PSpinner size="small" />}
+									</div>
+									<PText
+										size="x-small"
+										color="contrast-medium"
+										className="mt-static-xs"
+									>
+										삽입된 영상은 이 씬의 중앙 클립 슬롯에 우선 사용됩니다. 렌더 전에는
+										렌더 서버 자산으로 자동 미러링됩니다.
+									</PText>
+								</div>
+								{(() => {
+									const videoShot = primaryVideoShot(scene);
+									if (!videoShot && !scene.videoUrl) return null;
+									const trimStart = sanitizeClipSeconds(
+										videoShot?.trim_start ?? 0,
+										0,
+										0,
+										3600,
+									);
+									const clipDuration = sanitizeClipSeconds(
+										videoShot?.duration_seconds ??
+											Number(scene.duration_seconds || 4),
+										4,
+										0.8,
+										120,
+									);
+									const selectedCrop = videoShot?.crop ?? "medium";
+									return (
+										<div className="mt-static-xs rounded-[4px] border border-[var(--p-color-state-base)] bg-surface p-static-sm">
+											<div className="flex items-center gap-static-xs flex-wrap mb-static-xs">
+												<PText size="x-small" color="contrast-high">
+													클립 조절
+												</PText>
+												<PText size="x-small" color="contrast-medium">
+													시작 위치, 사용 길이, 화면 크기
+												</PText>
+											</div>
+											<div className="grid grid-cols-1 md:grid-cols-3 gap-static-xs">
+												<label className="text-[11px] text-contrast-medium">
+													시작 초
+													<input
+														type="number"
+														min={0}
+														step={0.1}
+														value={trimStart}
+														className="mt-[4px] w-full rounded-[4px] border border-[var(--p-color-state-base)] bg-canvas px-static-sm py-[7px] text-[12px] text-contrast-high"
+														onChange={(event) => {
+															const nextStart = sanitizeClipSeconds(
+																event.currentTarget.valueAsNumber,
+																trimStart,
+																0,
+																3600,
+															);
+															void updatePrimaryVideoShot(i, {
+																trim_start: nextStart,
+																trim_end: nextStart + clipDuration,
+															});
+														}}
+													/>
+												</label>
+												<label className="text-[11px] text-contrast-medium">
+													사용 길이 초
+													<input
+														type="number"
+														min={0.8}
+														max={120}
+														step={0.1}
+														value={clipDuration}
+														className="mt-[4px] w-full rounded-[4px] border border-[var(--p-color-state-base)] bg-canvas px-static-sm py-[7px] text-[12px] text-contrast-high"
+														onChange={(event) => {
+															const nextDuration = sanitizeClipSeconds(
+																event.currentTarget.valueAsNumber,
+																clipDuration,
+																0.8,
+																120,
+															);
+															void updatePrimaryVideoShot(i, {
+																duration_seconds: nextDuration,
+																trim_end: trimStart + nextDuration,
+															});
+														}}
+													/>
+												</label>
+												<label className="text-[11px] text-contrast-medium">
+													화면 크기
+													<select
+														value={selectedCrop}
+														className="mt-[4px] w-full rounded-[4px] border border-[var(--p-color-state-base)] bg-canvas px-static-sm py-[7px] text-[12px] text-contrast-high"
+														onChange={(event) => {
+															void updatePrimaryVideoShot(i, {
+																crop: event.currentTarget
+																	.value as NonNullable<SceneShot["crop"]>,
+															});
+														}}
+													>
+														{VIDEO_CROP_OPTIONS.map((option) => (
+															<option key={option.value} value={option.value}>
+																{option.label} · {option.description}
+															</option>
+														))}
+													</select>
+												</label>
+											</div>
+										</div>
+									);
+								})()}
 							</div>
 
 							<div className="shrink-0 flex items-center gap-static-xs">
@@ -1579,7 +3107,7 @@ export default function StepMedia({
 				<PButton variant="secondary" onClick={onBack}>
 					이전
 				</PButton>
-				<PButton disabled={!allComplete} onClick={onNext}>
+				<PButton disabled={!canProceed} onClick={onNext}>
 					다음: 미리보기
 				</PButton>
 			</div>

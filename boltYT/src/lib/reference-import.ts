@@ -7,7 +7,14 @@
 
 import type { ReferenceTemplate } from "../types/database";
 import { getReferenceAnalyzerUrl } from "./proxy";
+import {
+	getBuiltInReferenceTemplate,
+	isBuiltInReferenceTemplate,
+	listBuiltInReferenceTemplates,
+} from "./reference-template-presets";
 import { supabase } from "./supabase";
+
+export type ReferenceAnalysisMode = "auto" | "shortform" | "longform" | "deep";
 
 export interface AnalysisJobResult {
 	source_type: "youtube" | "file";
@@ -54,7 +61,12 @@ export interface AnalysisJob {
 		| "complete"
 		| "failed";
 	progress: number;
-	input: { type: "youtube" | "file"; url?: string; filePath?: string };
+	input: {
+		type: "youtube" | "file";
+		url?: string;
+		filePath?: string;
+		mode?: ReferenceAnalysisMode;
+	};
 	result?: AnalysisJobResult;
 	error?: string;
 	createdAt: string;
@@ -62,12 +74,15 @@ export interface AnalysisJob {
 }
 
 /** 분석 시작 (YouTube URL) */
-export async function startYouTubeAnalysis(url: string): Promise<AnalysisJob> {
+export async function startYouTubeAnalysis(
+	url: string,
+	opts: { mode?: ReferenceAnalysisMode } = {},
+): Promise<AnalysisJob> {
 	const base = getReferenceAnalyzerUrl();
 	const res = await fetch(`${base}/api/reference/analyze`, {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({ type: "youtube", url }),
+		body: JSON.stringify({ type: "youtube", url, mode: opts.mode ?? "auto" }),
 	});
 	if (!res.ok) {
 		const text = await res.text();
@@ -199,18 +214,22 @@ export async function saveReferenceTemplate(
 export async function listReferenceTemplates(
 	channelId: string,
 ): Promise<ReferenceTemplate[]> {
+	const builtIns = listBuiltInReferenceTemplates(channelId);
 	const { data, error } = await supabase
 		.from("reference_templates")
 		.select("*")
 		.eq("channel_id", channelId)
 		.order("created_at", { ascending: false });
 	if (error) throw new Error(error.message);
-	return (data ?? []) as ReferenceTemplate[];
+	return [...builtIns, ...((data ?? []) as ReferenceTemplate[])];
 }
 
 export async function getReferenceTemplate(
 	id: string,
 ): Promise<ReferenceTemplate | null> {
+	const builtIn = getBuiltInReferenceTemplate(id);
+	if (builtIn) return builtIn;
+
 	const { data, error } = await supabase
 		.from("reference_templates")
 		.select("*")
@@ -224,6 +243,9 @@ export async function updateReferenceTemplate(
 	id: string,
 	patch: Partial<ReferenceTemplate>,
 ): Promise<void> {
+	if (isBuiltInReferenceTemplate(id)) {
+		throw new Error("내장 레퍼런스 템플릿은 수정할 수 없습니다.");
+	}
 	const { error } = await supabase
 		.from("reference_templates")
 		.update({ ...patch, updated_at: new Date().toISOString() })
@@ -232,6 +254,9 @@ export async function updateReferenceTemplate(
 }
 
 export async function deleteReferenceTemplate(id: string): Promise<void> {
+	if (isBuiltInReferenceTemplate(id)) {
+		throw new Error("내장 레퍼런스 템플릿은 삭제할 수 없습니다.");
+	}
 	const { error } = await supabase
 		.from("reference_templates")
 		.delete()

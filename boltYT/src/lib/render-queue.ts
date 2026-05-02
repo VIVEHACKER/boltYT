@@ -11,7 +11,7 @@ export function getRenderServer() {
 	return "http://localhost:3458";
 }
 
-interface RenderJob {
+export interface RenderJob {
 	id: string;
 	scriptId: string;
 	format: "shorts" | "longform";
@@ -19,9 +19,31 @@ interface RenderJob {
 	progress: number;
 	outputPath: string;
 	error?: string;
+	errorCategory?: "timeout" | "oom" | "file_not_found" | "quality_gate" | "unknown";
+	qcResult?: Record<string, unknown>;
 	createdAt: string;
 	startedAt?: string;
 	completedAt?: string;
+}
+
+export class RenderJobError extends Error {
+	job: RenderJob;
+
+	constructor(job: RenderJob) {
+		super(job.error ?? `Render ${job.status}`);
+		this.name = "RenderJobError";
+		this.job = job;
+	}
+}
+
+export function isRenderJobError(error: unknown): error is RenderJobError {
+	if (!error || typeof error !== "object") return false;
+	return (
+		error instanceof RenderJobError ||
+		("name" in error &&
+			(error as { name?: string }).name === "RenderJobError" &&
+			"job" in error)
+	);
 }
 
 interface QueueHealth {
@@ -115,7 +137,7 @@ export function pollRenderProgress(
 				} else if (job.status === "failed" || job.status === "cancelled") {
 					clearTimeout(timeout);
 					clearInterval(poll);
-					reject(new Error(job.error ?? `Render ${job.status}`));
+					reject(new RenderJobError(job));
 				}
 			} catch (e) {
 				clearTimeout(timeout);

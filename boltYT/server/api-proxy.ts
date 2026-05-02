@@ -5,7 +5,11 @@
  */
 
 import { createServer } from "node:http";
+import { execFile } from "node:child_process";
+import { existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
+import { join } from "node:path";
 import { Readable } from "node:stream";
+import { promisify } from "node:util";
 import { actorFromReq, recordAudit } from "./lib/audit.ts";
 import { createTtlCache } from "./lib/cache.ts";
 import {
@@ -15,7 +19,13 @@ import {
 	runCommand,
 } from "./lib/diag.ts";
 import { runAgent } from "./lib/diag-agent.ts";
-import { loadEnv, validateEnv, watchEnv } from "./lib/env.ts";
+import {
+	loadEnv,
+	reloadEnv,
+	saveEnvValues,
+	validateEnv,
+	watchEnv,
+} from "./lib/env.ts";
 import {
 	clearErrors as clearErrorsBuffer,
 	listErrors as listErrorsBuffer,
@@ -43,6 +53,7 @@ import { sanitizeInt, sanitizeString } from "./lib/validate.ts";
 
 const SERVICE = "api-proxy";
 const log = createLogger(SERVICE);
+const execFileP = promisify(execFile);
 
 loadEnv();
 
@@ -51,6 +62,8 @@ const PORT = Number(process.env.API_PROXY_PORT ?? 3459);
 validateEnv(["OPENAI_API_KEY"], SERVICE);
 
 const DIAG_TOKEN = process.env.DIAG_TOKEN ?? "";
+const FORMAT_WORK_DIR = join(import.meta.dirname ?? ".", ".tmp/format");
+if (!existsSync(FORMAT_WORK_DIR)) mkdirSync(FORMAT_WORK_DIR, { recursive: true });
 
 // ─── 환경변수에서 키 로드 (in-place mutation으로 .env 변경 시 재적용) ───
 
@@ -66,6 +79,7 @@ const KEYS = {
 };
 
 function reloadKeys() {
+	reloadEnv();
 	KEYS.openai = process.env.OPENAI_API_KEY ?? "";
 	KEYS.elevenlabs = process.env.ELEVENLABS_API_KEY ?? "";
 	KEYS.pexels = process.env.PEXELS_API_KEY ?? "";
@@ -74,6 +88,19 @@ function reloadKeys() {
 	KEYS.naverClientId = process.env.NAVER_CLIENT_ID ?? "";
 	KEYS.naverClientSecret = process.env.NAVER_CLIENT_SECRET ?? "";
 	KEYS.fal = process.env.FAL_KEY ?? "";
+}
+
+function keyStatusPayload() {
+	return {
+		openai: Boolean(KEYS.openai),
+		elevenlabs: Boolean(KEYS.elevenlabs),
+		pexels: Boolean(KEYS.pexels),
+		pixabay: Boolean(KEYS.pixabay),
+		youtube: Boolean(KEYS.youtube),
+		naver: Boolean(KEYS.naverClientId && KEYS.naverClientSecret),
+		fal: Boolean(KEYS.fal),
+		google: Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
+	};
 }
 
 reloadKeys();
@@ -86,7 +113,11 @@ const ALLOWED_ORIGINS = new Set([
 	"http://localhost:5173",
 	"http://localhost:5174",
 	"http://localhost:4173",
+	"http://127.0.0.1:5173",
+	"http://127.0.0.1:5174",
+	"http://127.0.0.1:4173",
 	`http://localhost:${PORT}`,
+	`http://127.0.0.1:${PORT}`,
 ]);
 
 // fetch-article은 임의 외부 URL로 GET — 크기 제한으로 SSRF·폭주 방지
@@ -121,18 +152,32 @@ function isSafeFetchUrl(rawUrl: string): boolean {
 	}
 }
 
+function isLocalRequest(req: import("node:http").IncomingMessage): boolean {
+	const address = req.socket.remoteAddress ?? "";
+	return (
+		address === "127.0.0.1" ||
+		address === "::1" ||
+		address === "::ffff:127.0.0.1" ||
+		address === "localhost" ||
+		address === ""
+	);
+}
+
 function cors(
 	req: import("node:http").IncomingMessage,
 	headers: Record<string, string> = {},
 ) {
 	const origin = req.headers.origin ?? "";
-	const allowedOrigin = ALLOWED_ORIGINS.has(origin) ? origin : "";
-	return {
+	const baseHeaders = {
 		...headers,
-		"Access-Control-Allow-Origin": allowedOrigin,
 		"Access-Control-Allow-Methods": "GET, POST, OPTIONS",
 		"Access-Control-Allow-Headers": "Content-Type",
 		Vary: "Origin",
+	};
+	if (!ALLOWED_ORIGINS.has(origin)) return baseHeaders;
+	return {
+		...baseHeaders,
+		"Access-Control-Allow-Origin": origin,
 	};
 }
 
@@ -205,6 +250,810 @@ function requireKey(
 	return true;
 }
 
+interface YouTubeSearchItem {
+	id?: { videoId?: string };
+}
+
+interface YouTubeSearchResponse {
+	items?: YouTubeSearchItem[];
+}
+
+interface YouTubeVideoItem {
+	id: string;
+	snippet?: {
+		title?: string;
+		description?: string;
+		channelId?: string;
+		channelTitle?: string;
+		publishedAt?: string;
+		thumbnails?: Record<string, { url?: string }>;
+	};
+	statistics?: {
+		viewCount?: string;
+		likeCount?: string;
+		commentCount?: string;
+	};
+	contentDetails?: {
+		duration?: string;
+	};
+}
+
+interface YouTubeVideosResponse {
+	items?: YouTubeVideoItem[];
+}
+
+interface YouTubeChannelItem {
+	id: string;
+	snippet?: {
+		title?: string;
+		thumbnails?: Record<string, { url?: string }>;
+	};
+	statistics?: {
+		viewCount?: string;
+		subscriberCount?: string;
+		hiddenSubscriberCount?: boolean;
+		videoCount?: string;
+	};
+}
+
+interface YouTubeChannelsResponse {
+	items?: YouTubeChannelItem[];
+}
+
+interface FormatAnalysisInputVideo {
+	videoId: string;
+	title?: string;
+	durationSeconds?: number;
+	viewCount?: number;
+}
+
+interface CaptionSegment {
+	start: number;
+	end: number;
+	text: string;
+}
+
+interface YouTubeCaptionTrack {
+	ext?: string;
+	name?: string;
+	url?: string;
+}
+
+interface YouTubeFormatMetadata {
+	id?: string;
+	title?: string;
+	duration?: number;
+	automatic_captions?: Record<string, YouTubeCaptionTrack[]>;
+	subtitles?: Record<string, YouTubeCaptionTrack[]>;
+}
+
+interface FormatVideoAnalysis {
+	videoId: string;
+	title: string;
+	url: string;
+	durationSeconds: number;
+	sampleSeconds: number;
+	hookPattern: "question" | "shock" | "claim" | "story" | "unknown";
+	hookDurationSeconds: number | null;
+	firstCutSeconds: number | null;
+	cutsFirst10: number;
+	cutsFirst30: number;
+	avgCutIntervalSeconds: number | null;
+	titleOpeningOverlap: number;
+	openingText: string;
+	transcriptAvailable: boolean;
+	cutDetectionAvailable: boolean;
+	rules: string[];
+	warnings: string[];
+}
+
+interface FormatAnalysisResponse {
+	query: string;
+	sampleSeconds: number;
+	analyzedAt: string;
+	videos: FormatVideoAnalysis[];
+	summary: {
+		medianHookSeconds: number | null;
+		medianFirstCutSeconds: number | null;
+		medianCutsFirst10: number;
+		medianCutsFirst30: number;
+		medianTitleOpeningOverlap: number;
+		commonHookPattern: FormatVideoAnalysis["hookPattern"];
+		rules: string[];
+		warnings: string[];
+	};
+}
+
+async function fetchYouTubeJson<T>(
+	resource: string,
+	params: URLSearchParams,
+): Promise<T> {
+	params.set("key", KEYS.youtube);
+	const upstream = await fetchWithRetry(
+		`https://www.googleapis.com/youtube/v3/${resource}?${params.toString()}`,
+	);
+	if (!upstream.ok) {
+		throw new Error(`YouTube error: ${upstream.status}`);
+	}
+	return upstream.json() as Promise<T>;
+}
+
+async function buildYouTubeFormatAnalysis(input: {
+	query: string;
+	videos: FormatAnalysisInputVideo[];
+	sampleSeconds: number;
+}): Promise<FormatAnalysisResponse> {
+	const videos: FormatVideoAnalysis[] = [];
+	for (const video of input.videos.slice(0, 3)) {
+		try {
+			videos.push(await analyzeYouTubeFormatVideo(video, input.sampleSeconds));
+		} catch (e) {
+			videos.push(
+				buildFailedFormatVideoAnalysis(
+					video,
+					input.sampleSeconds,
+					e instanceof Error ? e.message : "format analysis failed",
+				),
+			);
+		}
+	}
+	return {
+		query: input.query,
+		sampleSeconds: input.sampleSeconds,
+		analyzedAt: new Date().toISOString(),
+		videos,
+		summary: summarizeFormatAnalysis(videos),
+	};
+}
+
+function buildFailedFormatVideoAnalysis(
+	video: FormatAnalysisInputVideo,
+	sampleSeconds: number,
+	error: string,
+): FormatVideoAnalysis {
+	return {
+		videoId: video.videoId,
+		title: video.title ?? "",
+		url: `https://www.youtube.com/watch?v=${video.videoId}`,
+		durationSeconds: Number(video.durationSeconds ?? 0),
+		sampleSeconds,
+		hookPattern: "unknown",
+		hookDurationSeconds: null,
+		firstCutSeconds: null,
+		cutsFirst10: 0,
+		cutsFirst30: 0,
+		avgCutIntervalSeconds: null,
+		titleOpeningOverlap: 0,
+		openingText: "",
+		transcriptAvailable: false,
+		cutDetectionAvailable: false,
+		rules: [],
+		warnings: [`분석 실패: ${maskSecrets(error).slice(0, 120)}`],
+	};
+}
+
+async function analyzeYouTubeFormatVideo(
+	video: FormatAnalysisInputVideo,
+	sampleSeconds: number,
+): Promise<FormatVideoAnalysis> {
+	const url = `https://www.youtube.com/watch?v=${video.videoId}`;
+	const workDir = join(
+		FORMAT_WORK_DIR,
+		`${video.videoId}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+	);
+	mkdirSync(workDir, { recursive: true });
+
+	try {
+		const metadata = await fetchFormatMetadata(url);
+		const title = metadata.title || video.title || "";
+		const durationSeconds = Number(metadata.duration ?? video.durationSeconds ?? 0);
+		const captions = await fetchCaptionSegments(metadata, sampleSeconds);
+		const clipPath = await downloadOpeningClip(url, workDir, sampleSeconds);
+		const cutTimes = clipPath
+			? await detectSceneCutTimes(clipPath, sampleSeconds)
+			: [];
+		const openingText = buildOpeningText(captions, 12);
+		const hookPattern = detectFormatHookPattern(openingText || title);
+		const hookDurationSeconds = captions.length
+			? estimateHookDuration(captions, sampleSeconds)
+			: null;
+		const firstCutSeconds = cutTimes[0] ?? null;
+		const cutsFirst10 = cutTimes.filter((t) => t <= 10).length;
+		const cutsFirst30 = cutTimes.filter((t) => t <= 30).length;
+		const avgCutIntervalSeconds = cutTimes.length
+			? sampleSeconds / (cutTimes.length + 1)
+			: null;
+		const titleOpeningOverlap = openingText
+			? overlapRatio(title, openingText)
+			: 0;
+		const rules = buildFormatVideoRules({
+			hookPattern,
+			hookDurationSeconds,
+			firstCutSeconds,
+			cutsFirst10,
+			cutsFirst30,
+			titleOpeningOverlap,
+			captions,
+		});
+		const warnings = buildFormatVideoWarnings({
+			hookDurationSeconds,
+			firstCutSeconds,
+			cutsFirst10,
+			titleOpeningOverlap,
+			transcriptAvailable: captions.length > 0,
+			cutDetectionAvailable: cutTimes.length > 0,
+		});
+
+		return {
+			videoId: video.videoId,
+			title,
+			url,
+			durationSeconds,
+			sampleSeconds,
+			hookPattern,
+			hookDurationSeconds,
+			firstCutSeconds,
+			cutsFirst10,
+			cutsFirst30,
+			avgCutIntervalSeconds,
+			titleOpeningOverlap,
+			openingText,
+			transcriptAvailable: captions.length > 0,
+			cutDetectionAvailable: cutTimes.length > 0,
+			rules,
+			warnings,
+		};
+	} finally {
+		rmSync(workDir, { recursive: true, force: true });
+	}
+}
+
+async function fetchFormatMetadata(url: string): Promise<YouTubeFormatMetadata> {
+	const { stdout } = await execFileP(
+		"yt-dlp",
+		[
+			"--no-playlist",
+			"--skip-download",
+			"--dump-single-json",
+			"--no-warnings",
+			url,
+		],
+		{ timeout: 35_000, maxBuffer: 40 * 1024 * 1024 },
+	);
+	return JSON.parse(stdout) as YouTubeFormatMetadata;
+}
+
+async function fetchCaptionSegments(
+	metadata: YouTubeFormatMetadata,
+	sampleSeconds: number,
+): Promise<CaptionSegment[]> {
+	const track = selectCaptionTrack(metadata.subtitles) ?? selectCaptionTrack(metadata.automatic_captions);
+	if (!track?.url) return [];
+	try {
+		const res = await fetchWithRetry(track.url);
+		if (!res.ok) return [];
+		if (track.ext === "json3" || track.url.includes("fmt=json3")) {
+			return parseJson3Captions(await res.json(), sampleSeconds);
+		}
+		return parseVttCaptions(await res.text(), sampleSeconds);
+	} catch {
+		return [];
+	}
+}
+
+function selectCaptionTrack(
+	groups?: Record<string, YouTubeCaptionTrack[]>,
+): YouTubeCaptionTrack | null {
+	if (!groups) return null;
+	const languages = [
+		"ko-orig",
+		"ko",
+		"en-orig",
+		"en",
+		...Object.keys(groups),
+	];
+	for (const lang of languages) {
+		const tracks = groups[lang] ?? [];
+		const json3 = tracks.find((track) => track.ext === "json3" && track.url);
+		if (json3) return json3;
+		const vtt = tracks.find((track) => track.ext === "vtt" && track.url);
+		if (vtt) return vtt;
+	}
+	return null;
+}
+
+function parseJson3Captions(raw: unknown, sampleSeconds: number): CaptionSegment[] {
+	const events = (raw as { events?: unknown[] }).events ?? [];
+	return events
+		.map((event) => {
+			const e = event as {
+				tStartMs?: number;
+				dDurationMs?: number;
+				segs?: Array<{ utf8?: string }>;
+			};
+			const text = (e.segs ?? [])
+				.map((seg) => seg.utf8 ?? "")
+				.join("")
+				.replace(/\s+/g, " ")
+				.trim();
+			const start = Number(e.tStartMs ?? 0) / 1000;
+			const end = start + Number(e.dDurationMs ?? 0) / 1000;
+			return { start, end, text };
+		})
+		.filter((segment) => segment.text && segment.start <= sampleSeconds)
+		.slice(0, 80);
+}
+
+function parseVttCaptions(raw: string, sampleSeconds: number): CaptionSegment[] {
+	const segments: CaptionSegment[] = [];
+	const blocks = raw.split(/\n\s*\n/);
+	for (const block of blocks) {
+		const lines = block.split("\n").map((line) => line.trim());
+		const timing = lines.find((line) => line.includes("-->"));
+		if (!timing) continue;
+		const [startRaw, endRaw] = timing.split("-->").map((part) => part.trim());
+		const start = parseVttTimestamp(startRaw ?? "");
+		const end = parseVttTimestamp((endRaw ?? "").split(/\s+/)[0] ?? "");
+		if (start > sampleSeconds) continue;
+		const text = lines
+			.filter((line) => line && !line.includes("-->") && !/^WEBVTT|Kind:|Language:/i.test(line))
+			.join(" ")
+			.replace(/<[^>]+>/g, "")
+			.replace(/\s+/g, " ")
+			.trim();
+		if (text) segments.push({ start, end, text });
+		if (segments.length >= 80) break;
+	}
+	return segments;
+}
+
+function parseVttTimestamp(raw: string): number {
+	const parts = raw.replace(",", ".").split(":").map(Number);
+	if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+	if (parts.length === 2) return parts[0] * 60 + parts[1];
+	return Number(raw) || 0;
+}
+
+async function downloadOpeningClip(
+	url: string,
+	workDir: string,
+	sampleSeconds: number,
+): Promise<string | null> {
+	const outputTemplate = join(workDir, "clip.%(ext)s");
+	try {
+		await execFileP(
+			"yt-dlp",
+			[
+				"-f",
+				"best[height<=480][ext=mp4]/best[height<=480]/best",
+				"--no-playlist",
+				"--download-sections",
+				`*0-${sampleSeconds}`,
+				"--force-keyframes-at-cuts",
+				"--output",
+				outputTemplate,
+				"--quiet",
+				"--no-warnings",
+				url,
+			],
+			{ timeout: 180_000, maxBuffer: 10 * 1024 * 1024 },
+		);
+		const file = readdirSync(workDir).find((name) =>
+			/^clip\.(mp4|webm|mkv)$/i.test(name),
+		);
+		return file ? join(workDir, file) : null;
+	} catch {
+		return null;
+	}
+}
+
+async function detectSceneCutTimes(
+	clipPath: string,
+	sampleSeconds: number,
+): Promise<number[]> {
+	try {
+		const { stderr } = await execFileP(
+			"ffmpeg",
+			[
+				"-i",
+				clipPath,
+				"-filter:v",
+				"select='gt(scene,0.32)',showinfo",
+				"-f",
+				"null",
+				"-",
+			],
+			{ timeout: 90_000, maxBuffer: 20 * 1024 * 1024 },
+		);
+		return [...stderr.matchAll(/pts_time:([0-9.]+)/g)]
+			.map((match) => Number(match[1]))
+			.filter((time) => Number.isFinite(time) && time > 0 && time <= sampleSeconds)
+			.filter((time, index, arr) => index === 0 || time - arr[index - 1] > 0.45)
+			.slice(0, 80);
+	} catch {
+		return [];
+	}
+}
+
+function buildOpeningText(segments: CaptionSegment[], seconds: number): string {
+	return segments
+		.filter((segment) => segment.start <= seconds)
+		.map((segment) => segment.text)
+		.join(" ")
+		.replace(/\s+/g, " ")
+		.trim()
+		.slice(0, 420);
+}
+
+function estimateHookDuration(
+	segments: CaptionSegment[],
+	sampleSeconds: number,
+): number {
+	const maxHook = Math.min(18, sampleSeconds);
+	let text = "";
+	for (const segment of segments) {
+		if (segment.start > maxHook) break;
+		text = `${text} ${segment.text}`.trim();
+		const enough = segment.end >= 2.5;
+		const sentenceEnded = /[.?!。？！]|(다|요|죠|까|습니다)$/.test(text.trim());
+		const transition = /(그런데|하지만|문제는|이유는|왜냐하면|그리고|이제|먼저|바로)/.test(
+			segment.text,
+		);
+		if (enough && (sentenceEnded || transition)) {
+			return round1(Math.min(segment.end, maxHook));
+		}
+	}
+	const fallback = segments.find((segment) => segment.end >= 6)?.end ?? 6;
+	return round1(Math.min(fallback, maxHook));
+}
+
+function detectFormatHookPattern(
+	text: string,
+): FormatVideoAnalysis["hookPattern"] {
+	const value = text.trim();
+	if (!value) return "unknown";
+	if (/[?？]|^(왜|어떻게|무엇|언제|누가|어디서|정말|혹시)/.test(value)) {
+		return "question";
+	}
+	if (
+		/(충격|소름|불가능|풀리지 않는|미스터리|반전|숨겨진|실화|최초|경악|믿기지)/.test(
+			value,
+		)
+	) {
+		return "shock";
+	}
+	if (
+		/(사실|진실|이유|핵심|절대|반드시|단 하나|전부|모든|방법|법칙)/.test(
+			value,
+		)
+	) {
+		return "claim";
+	}
+	if (/(그날|어느 날|한때|이야기|사건은|시작됐)/.test(value)) {
+		return "story";
+	}
+	return "unknown";
+}
+
+function overlapRatio(a: string, b: string): number {
+	const aTokens = new Set(tokenizeForFormat(a));
+	const bTokens = new Set(tokenizeForFormat(b));
+	if (aTokens.size === 0 || bTokens.size === 0) return 0;
+	let overlap = 0;
+	for (const token of aTokens) {
+		if (bTokens.has(token)) overlap += 1;
+	}
+	return round2(overlap / aTokens.size);
+}
+
+function tokenizeForFormat(value: string): string[] {
+	const stopwords = new Set([
+		"그리고",
+		"하지만",
+		"영상",
+		"오늘",
+		"입니다",
+		"합니다",
+		"있는",
+		"없는",
+		"the",
+		"and",
+		"for",
+		"with",
+		"this",
+		"that",
+	]);
+	return value
+		.toLowerCase()
+		.replace(/[^\p{L}\p{N}\s]/gu, " ")
+		.split(/\s+/)
+		.map((token) => token.trim())
+		.filter((token) => token.length >= 2 && !stopwords.has(token));
+}
+
+function buildFormatVideoRules(input: {
+	hookPattern: FormatVideoAnalysis["hookPattern"];
+	hookDurationSeconds: number | null;
+	firstCutSeconds: number | null;
+	cutsFirst10: number;
+	cutsFirst30: number;
+	titleOpeningOverlap: number;
+	captions: CaptionSegment[];
+}): string[] {
+	const rules: string[] = [];
+	if (input.hookPattern !== "unknown") {
+		rules.push(`오프닝 훅은 ${hookPatternLabel(input.hookPattern)} 패턴`);
+	}
+	if (input.hookDurationSeconds !== null) {
+		rules.push(`첫 훅은 약 ${input.hookDurationSeconds.toFixed(1)}초 안에 닫힘`);
+	}
+	if (input.firstCutSeconds !== null) {
+		rules.push(`첫 화면 전환은 ${input.firstCutSeconds.toFixed(1)}초 부근`);
+	}
+	if (input.cutsFirst10 >= 2) {
+		rules.push(`첫 10초 안에 컷 ${input.cutsFirst10}개로 초반 밀도 높음`);
+	}
+	if (input.cutsFirst30 >= 6) {
+		rules.push(`첫 30초 컷 ${input.cutsFirst30}개로 반복 전환 사용`);
+	}
+	if (input.titleOpeningOverlap >= 0.24) {
+		rules.push("제목 핵심어를 오프닝에서 바로 회수");
+	}
+	if (input.captions.length === 0) {
+		rules.push("자막/전사 없음: 시각 컷 패턴 중심으로만 판단");
+	}
+	return rules.slice(0, 5);
+}
+
+function buildFormatVideoWarnings(input: {
+	hookDurationSeconds: number | null;
+	firstCutSeconds: number | null;
+	cutsFirst10: number;
+	titleOpeningOverlap: number;
+	transcriptAvailable: boolean;
+	cutDetectionAvailable: boolean;
+}): string[] {
+	const warnings: string[] = [];
+	if (!input.transcriptAvailable) warnings.push("자막을 찾지 못해 훅 문장 추정 제한");
+	if (!input.cutDetectionAvailable) warnings.push("장면 전환 감지가 약하거나 다운로드 실패");
+	if (input.hookDurationSeconds !== null && input.hookDurationSeconds > 10) {
+		warnings.push("훅이 10초를 넘어 느린 편");
+	}
+	if (input.firstCutSeconds !== null && input.firstCutSeconds > 8) {
+		warnings.push("첫 컷 전환이 8초 이후라 초반 시각 변화가 느림");
+	}
+	if (input.cutsFirst10 === 0) warnings.push("첫 10초 컷 변화가 거의 없음");
+	if (input.titleOpeningOverlap < 0.12) {
+		warnings.push("제목과 오프닝 문장의 핵심어 연결이 약함");
+	}
+	return warnings.slice(0, 4);
+}
+
+function summarizeFormatAnalysis(
+	videos: FormatVideoAnalysis[],
+): FormatAnalysisResponse["summary"] {
+	const hookValues = videos
+		.map((video) => video.hookDurationSeconds)
+		.filter((v): v is number => typeof v === "number");
+	const firstCuts = videos
+		.map((video) => video.firstCutSeconds)
+		.filter((v): v is number => typeof v === "number");
+	const commonHookPattern = mostCommonHookPattern(
+		videos.map((video) => video.hookPattern),
+	);
+	const medianHookSeconds = nullableMedian(hookValues);
+	const medianFirstCutSeconds = nullableMedian(firstCuts);
+	const medianCutsFirst10 = medianNumber(videos.map((video) => video.cutsFirst10));
+	const medianCutsFirst30 = medianNumber(videos.map((video) => video.cutsFirst30));
+	const medianTitleOpeningOverlap = round2(
+		medianNumber(videos.map((video) => video.titleOpeningOverlap)),
+	);
+	const warnings = [
+		...new Set(videos.flatMap((video) => video.warnings)),
+	].slice(0, 5);
+	const rules: string[] = [];
+	if (medianHookSeconds !== null) {
+		rules.push(`대표 훅 길이: ${medianHookSeconds.toFixed(1)}초`);
+	}
+	if (medianFirstCutSeconds !== null) {
+		rules.push(`대표 첫 컷: ${medianFirstCutSeconds.toFixed(1)}초`);
+	}
+	if (medianCutsFirst10 >= 2) {
+		rules.push(`첫 10초 컷 밀도: 중앙 ${medianCutsFirst10}개`);
+	}
+	if (medianCutsFirst30 >= 5) {
+		rules.push(`첫 30초 전환: 중앙 ${medianCutsFirst30}개`);
+	}
+	if (commonHookPattern !== "unknown") {
+		rules.push(`반복 훅 패턴: ${hookPatternLabel(commonHookPattern)}`);
+	}
+	if (medianTitleOpeningOverlap >= 0.2) {
+		rules.push("제목 핵심어를 오프닝에서 빠르게 회수");
+	}
+	return {
+		medianHookSeconds,
+		medianFirstCutSeconds,
+		medianCutsFirst10,
+		medianCutsFirst30,
+		medianTitleOpeningOverlap,
+		commonHookPattern,
+		rules: rules.slice(0, 6),
+		warnings,
+	};
+}
+
+function mostCommonHookPattern(
+	patterns: FormatVideoAnalysis["hookPattern"][],
+): FormatVideoAnalysis["hookPattern"] {
+	const counts = new Map<FormatVideoAnalysis["hookPattern"], number>();
+	for (const pattern of patterns) {
+		counts.set(pattern, (counts.get(pattern) ?? 0) + 1);
+	}
+	return [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "unknown";
+}
+
+function hookPatternLabel(pattern: FormatVideoAnalysis["hookPattern"]): string {
+	const labels: Record<FormatVideoAnalysis["hookPattern"], string> = {
+		question: "질문형",
+		shock: "충격/미스터리형",
+		claim: "주장/법칙형",
+		story: "스토리형",
+		unknown: "미확인",
+	};
+	return labels[pattern];
+}
+
+function nullableMedian(values: number[]): number | null {
+	if (values.length === 0) return null;
+	return round1(medianNumber(values));
+}
+
+function medianNumber(values: number[]): number {
+	if (values.length === 0) return 0;
+	const sorted = [...values].sort((a, b) => a - b);
+	const middle = Math.floor(sorted.length / 2);
+	if (sorted.length % 2 === 1) return sorted[middle] ?? 0;
+	return ((sorted[middle - 1] ?? 0) + (sorted[middle] ?? 0)) / 2;
+}
+
+function round1(value: number): number {
+	return Math.round(value * 10) / 10;
+}
+
+function round2(value: number): number {
+	return Math.round(value * 100) / 100;
+}
+
+async function buildYouTubeNicheResearch(input: {
+	query: string;
+	maxResults: number;
+	daysBack: number;
+	order: "viewCount" | "date" | "relevance";
+}) {
+	const publishedAfter = new Date(
+		Date.now() - input.daysBack * 86_400_000,
+	).toISOString();
+	const search = await fetchYouTubeJson<YouTubeSearchResponse>(
+		"search",
+		new URLSearchParams({
+			part: "snippet",
+			type: "video",
+			q: input.query,
+			maxResults: String(input.maxResults),
+			regionCode: "KR",
+			relevanceLanguage: "ko",
+			order: input.order,
+			publishedAfter,
+		}),
+	);
+	const videoIds = [
+		...new Set(
+			(search.items ?? [])
+				.map((item) => item.id?.videoId)
+				.filter((id): id is string => Boolean(id)),
+		),
+	];
+	if (videoIds.length === 0) {
+		return {
+			query: input.query,
+			fetchedAt: new Date().toISOString(),
+			order: input.order,
+			daysBack: input.daysBack,
+			videos: [],
+		};
+	}
+
+	const videoDetails = await fetchYouTubeJson<YouTubeVideosResponse>(
+		"videos",
+		new URLSearchParams({
+			part: "snippet,statistics,contentDetails",
+			id: videoIds.join(","),
+			maxResults: String(videoIds.length),
+		}),
+	);
+	const videos = videoDetails.items ?? [];
+	const channelIds = [
+		...new Set(
+			videos
+				.map((item) => item.snippet?.channelId)
+				.filter((id): id is string => Boolean(id)),
+		),
+	];
+	const channelDetails =
+		channelIds.length > 0
+			? await fetchYouTubeJson<YouTubeChannelsResponse>(
+					"channels",
+					new URLSearchParams({
+						part: "snippet,statistics",
+						id: channelIds.join(","),
+						maxResults: String(channelIds.length),
+					}),
+				)
+			: { items: [] };
+	const channels = new Map(
+		(channelDetails.items ?? []).map((channel) => [channel.id, channel]),
+	);
+
+	return {
+		query: input.query,
+		fetchedAt: new Date().toISOString(),
+		order: input.order,
+		daysBack: input.daysBack,
+		videos: videos.map((video) => {
+			const channelId = video.snippet?.channelId ?? "";
+			const channel = channels.get(channelId);
+			const hiddenSubscriberCount = Boolean(
+				channel?.statistics?.hiddenSubscriberCount,
+			);
+			return {
+				videoId: video.id,
+				title: video.snippet?.title ?? "",
+				description: video.snippet?.description ?? "",
+				thumbnail:
+					video.snippet?.thumbnails?.maxres?.url ??
+					video.snippet?.thumbnails?.high?.url ??
+					video.snippet?.thumbnails?.medium?.url ??
+					"",
+				channelId,
+				channelTitle:
+					video.snippet?.channelTitle ?? channel?.snippet?.title ?? "",
+				publishedAt: video.snippet?.publishedAt ?? "",
+				durationSeconds: parseYouTubeDuration(
+					video.contentDetails?.duration ?? "",
+				),
+				viewCount: numberFromStat(video.statistics?.viewCount),
+				likeCount: numberFromStat(video.statistics?.likeCount),
+				commentCount: numberFromStat(video.statistics?.commentCount),
+				channelSubscriberCount: hiddenSubscriberCount
+					? null
+					: numberFromStat(channel?.statistics?.subscriberCount),
+				channelVideoCount: numberFromStat(channel?.statistics?.videoCount),
+				channelViewCount: numberFromStat(channel?.statistics?.viewCount),
+				hiddenSubscriberCount,
+			};
+		}),
+	};
+}
+
+function numberFromStat(value: string | undefined): number {
+	const n = Number(value ?? 0);
+	return Number.isFinite(n) ? n : 0;
+}
+
+function parseYouTubeDuration(duration: string): number {
+	const match = duration.match(
+		/^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$/,
+	);
+	if (!match) return 0;
+	const [, days = "0", hours = "0", minutes = "0", seconds = "0"] = match;
+	return (
+		Number(days) * 86_400 +
+		Number(hours) * 3_600 +
+		Number(minutes) * 60 +
+		Number(seconds)
+	);
+}
+
 // ─── 검색 API 캐시 (5분 TTL) ───
 const searchCache = createTtlCache<string>(300_000);
 
@@ -213,6 +1062,8 @@ const articleCache = createTtlCache<{
 	title: string;
 	body: string;
 	publisher: string;
+	thumbnail?: string;
+	images?: string[];
 }>(1_800_000);
 
 /**
@@ -279,6 +1130,49 @@ function extractReadableText(html: string): { title: string; body: string } {
 	if (body.length > 12000) body = `${body.slice(0, 12000)}…`;
 
 	return { title, body };
+}
+
+function extractArticleMedia(
+	html: string,
+	baseUrl: string,
+): { thumbnail?: string; images: string[] } {
+	function absolutize(raw?: string): string {
+		if (!raw) return "";
+		try {
+			const resolved = new URL(raw, baseUrl).href;
+			return isSafeFetchUrl(resolved) ? resolved : "";
+		} catch {
+			return "";
+		}
+	}
+
+	const ogImage =
+		html.match(
+			/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i,
+		)?.[1] ??
+		html.match(
+			/<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i,
+		)?.[1] ??
+		"";
+
+	const imageUrls: string[] = [];
+	const imgRegex = /<img[^>]+src=["']([^"']+)["'][^>]*>/gi;
+	let match: RegExpExecArray | null;
+	while ((match = imgRegex.exec(html)) !== null) {
+		const abs = absolutize(match[1]);
+		if (!abs) continue;
+		if (!/\.(png|jpe?g|webp)(\?|#|$)/i.test(abs) && !/\/image|\/img/i.test(abs)) {
+			continue;
+		}
+		imageUrls.push(abs);
+		if (imageUrls.length >= 8) break;
+	}
+
+	const deduped = [...new Set([absolutize(ogImage), ...imageUrls].filter(Boolean))];
+	return {
+		thumbnail: deduped[0],
+		images: deduped.slice(0, 6),
+	};
 }
 
 function extractPublisher(rawUrl: string): string {
@@ -376,15 +1270,54 @@ const server = createServer(async (req, res) => {
 
 	// ─── 키 상태 확인 (키 자체는 노출하지 않음) ───
 	if (url.pathname === "/api/keys/status" && req.method === "GET") {
-		json(req, res, 200, {
-			openai: Boolean(KEYS.openai),
-			elevenlabs: Boolean(KEYS.elevenlabs),
-			pexels: Boolean(KEYS.pexels),
-			pixabay: Boolean(KEYS.pixabay),
-			youtube: Boolean(KEYS.youtube),
-			naver: Boolean(KEYS.naverClientId && KEYS.naverClientSecret),
-			fal: Boolean(KEYS.fal),
-		});
+		json(req, res, 200, keyStatusPayload());
+		return;
+	}
+
+	// ─── .env 강제 재로드 후 키 상태 반환 (키 자체는 노출하지 않음) ───
+	if (url.pathname === "/api/keys/reload" && req.method === "POST") {
+		reloadKeys();
+		json(req, res, 200, keyStatusPayload());
+		return;
+	}
+
+	// ─── .env 키 저장 (값은 응답/로그에 절대 노출하지 않음) ───
+	if (url.pathname === "/api/keys/save" && req.method === "POST") {
+		if (!isLocalRequest(req)) {
+			json(req, res, 403, { error: "local requests only" });
+			return;
+		}
+		const body = await parseBody(req);
+		if (body === null) {
+			json(req, res, 413, { error: "요청 본문이 너무 큽니다 (최대 1MB)" });
+			return;
+		}
+		const keys = body.keys;
+		if (!keys || typeof keys !== "object" || Array.isArray(keys)) {
+			json(req, res, 400, { error: "keys object가 필요합니다." });
+			return;
+		}
+		try {
+			const saved = saveEnvValues(keys as Record<string, unknown>);
+			reloadKeys();
+			log.info("API keys saved via settings", {
+				updated: saved.updated,
+				ignored: saved.ignored,
+			});
+			json(req, res, 200, {
+				ok: true,
+				updated: saved.updated,
+				ignored: saved.ignored,
+				status: keyStatusPayload(),
+			});
+		} catch (error) {
+			json(req, res, 400, {
+				error:
+					error instanceof Error
+						? error.message
+						: "키 저장 중 오류가 발생했습니다.",
+			});
+		}
 		return;
 	}
 
@@ -768,6 +1701,59 @@ const server = createServer(async (req, res) => {
 		return;
 	}
 
+	// ─── Pixabay 이미지 검색 ───
+	if (url.pathname === "/api/pixabay/images" && req.method === "GET") {
+		if (!requireKey(req, res, KEYS.pixabay, "Pixabay")) return;
+		const query = sanitizeString(url.searchParams.get("q"), 200);
+		const perPage = sanitizeInt(url.searchParams.get("per_page"), 1, 50, 8);
+		const key = `pixabay-i:${query}:${perPage}`;
+
+		await cachedSearch(
+			key,
+			() =>
+				fetchWithRetry(
+					`https://pixabay.com/api/?key=${KEYS.pixabay}&q=${encodeURIComponent(query)}&per_page=${perPage}&image_type=photo&safesearch=true`,
+				),
+			"Pixabay",
+		);
+		return;
+	}
+
+	// ─── Wikimedia Commons 이미지 검색 ───
+	if (url.pathname === "/api/wikimedia/images" && req.method === "GET") {
+		const query = sanitizeString(url.searchParams.get("query"), 200);
+		const limit = sanitizeInt(url.searchParams.get("limit"), 1, 30, 8);
+		const key = `wikimedia-i:${query}:${limit}`;
+		const params = new URLSearchParams({
+			action: "query",
+			format: "json",
+			generator: "search",
+			gsrnamespace: "6",
+			gsrlimit: String(limit),
+			gsrsearch: `${query} filetype:bitmap`,
+			prop: "imageinfo",
+			iiprop: "url|size|mime|extmetadata",
+			iiurlwidth: "1400",
+			origin: "*",
+		});
+
+		await cachedSearch(
+			key,
+			() =>
+				fetchWithRetry(
+					`https://commons.wikimedia.org/w/api.php?${params.toString()}`,
+					{
+						headers: {
+							"User-Agent":
+								"boltYT-local-video-generator/0.1 (local personal use)",
+						},
+					},
+				),
+			"Wikimedia",
+		);
+		return;
+	}
+
 	// ─── Pixabay 영상 검색 ───
 	if (url.pathname === "/api/pixabay/videos" && req.method === "GET") {
 		if (!requireKey(req, res, KEYS.pixabay, "Pixabay")) return;
@@ -851,6 +1837,111 @@ const server = createServer(async (req, res) => {
 				),
 			"YouTube",
 		);
+		return;
+	}
+
+	// ─── YouTube 니치 리서치: 검색 결과 + 공개 성과 지표 병합 ───
+	if (url.pathname === "/api/youtube/niche-research" && req.method === "GET") {
+		if (!requireKey(req, res, KEYS.youtube, "YouTube")) return;
+		const query = sanitizeString(url.searchParams.get("q"), 200);
+		if (!query) {
+			json(req, res, 400, { error: "q 파라미터가 필요합니다." });
+			return;
+		}
+		const maxResults = sanitizeInt(
+			url.searchParams.get("maxResults"),
+			1,
+			25,
+			12,
+		);
+		const daysBack = sanitizeInt(url.searchParams.get("daysBack"), 7, 3650, 365);
+		const orderRaw = sanitizeString(url.searchParams.get("order"), 20);
+		const order =
+			orderRaw === "date" || orderRaw === "relevance" ? orderRaw : "viewCount";
+		const key = `yt-niche:${query}:${maxResults}:${daysBack}:${order}`;
+		const cached = searchCache.get(key);
+		if (cached) {
+			res.writeHead(
+				200,
+				cors(req, {
+					"Content-Type": "application/json",
+					"Cache-Control": "public, max-age=300",
+					"X-Cache": "HIT",
+				}),
+			);
+			res.end(cached);
+			return;
+		}
+
+		try {
+			const payload = await buildYouTubeNicheResearch({
+				query,
+				maxResults,
+				daysBack,
+				order,
+			});
+			const text = JSON.stringify(payload);
+			searchCache.set(key, text);
+			res.writeHead(
+				200,
+				cors(req, {
+					"Content-Type": "application/json",
+					"Cache-Control": "public, max-age=300",
+					"X-Cache": "MISS",
+				}),
+			);
+			res.end(text);
+		} catch (e) {
+			json(req, res, 500, {
+				error: e instanceof Error ? e.message : "YouTube niche proxy error",
+			});
+		}
+		return;
+	}
+
+	// ─── YouTube 포맷 법칙 분석: 상위 영상 앞부분의 훅/컷/오프닝 패턴 추정 ───
+	if (url.pathname === "/api/youtube/format-analysis" && req.method === "POST") {
+		const body = await parseBody(req);
+		if (!body) {
+			json(req, res, 413, { error: "요청 본문이 너무 큽니다 (최대 1MB)" });
+			return;
+		}
+		const query = sanitizeString(String(body.query ?? ""), 200);
+		const sampleSeconds = sanitizeInt(
+			String(body.sampleSeconds ?? ""),
+			30,
+			120,
+			90,
+		);
+		const rawVideos = Array.isArray(body.videos) ? body.videos : [];
+		const videos = rawVideos
+			.slice(0, 3)
+			.map((item) => item as Record<string, unknown>)
+			.map((item) => ({
+				videoId: sanitizeString(String(item.videoId ?? ""), 20),
+				title: sanitizeString(String(item.title ?? ""), 200),
+				durationSeconds: Number(item.durationSeconds ?? 0),
+				viewCount: Number(item.viewCount ?? 0),
+			}))
+			.filter((item) => /^[A-Za-z0-9_-]{11}$/.test(item.videoId));
+
+		if (videos.length === 0) {
+			json(req, res, 400, { error: "분석할 videoId가 필요합니다." });
+			return;
+		}
+
+		try {
+			const payload = await buildYouTubeFormatAnalysis({
+				query,
+				videos,
+				sampleSeconds,
+			});
+			json(req, res, 200, payload);
+		} catch (e) {
+			json(req, res, 500, {
+				error: e instanceof Error ? e.message : "YouTube format analysis error",
+			});
+		}
 		return;
 	}
 
@@ -1215,10 +2306,13 @@ const server = createServer(async (req, res) => {
 				}
 				const rHtml = await redirected.text();
 				const rResult = extractReadableText(rHtml);
+				const rMedia = extractArticleMedia(rHtml, resolvedUrl);
 				const rPayload = {
 					title: rResult.title,
 					body: rResult.body,
 					publisher: extractPublisher(resolvedUrl),
+					thumbnail: rMedia.thumbnail,
+					images: rMedia.images,
 				};
 				articleCache.set(cacheKey, rPayload);
 				json(req, res, 200, rPayload);
@@ -1248,8 +2342,15 @@ const server = createServer(async (req, res) => {
 
 			const html = await upstream.text();
 			const { title, body } = extractReadableText(html);
+			const media = extractArticleMedia(html, targetUrl);
 			const publisher = extractPublisher(targetUrl);
-			const payload = { title, body, publisher };
+			const payload = {
+				title,
+				body,
+				publisher,
+				thumbnail: media.thumbnail,
+				images: media.images,
+			};
 			articleCache.set(cacheKey, payload);
 			json(req, res, 200, payload);
 		} catch (err) {

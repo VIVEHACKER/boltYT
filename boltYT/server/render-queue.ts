@@ -197,7 +197,9 @@ const server = createServer(async (req, res) => {
 		return;
 	}
 
-	if (url.pathname !== "/health") {
+	const isRenderAssetRead =
+		req.method === "GET" && url.pathname.startsWith("/assets/");
+	if (url.pathname !== "/health" && !isRenderAssetRead) {
 		const rl = rateLimit(req);
 		if (!rl.allowed) {
 			log.warn("Rate limit exceeded", { ip: req.socket.remoteAddress });

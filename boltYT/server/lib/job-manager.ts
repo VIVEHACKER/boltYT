@@ -9,6 +9,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { RenderOptionsInput } from "../../src/lib/render-options.js";
+import type { RenderOutputQcReport } from "./render-output-qc.js";
 
 // ─── 타입 ────────────────────────────────────────────────────────────────────
 
@@ -22,7 +23,8 @@ export interface RenderJob {
 	progress: number;
 	outputPath: string;
 	error?: string;
-	errorCategory?: "timeout" | "oom" | "file_not_found" | "unknown";
+	errorCategory?: "timeout" | "oom" | "file_not_found" | "quality_gate" | "unknown";
+	qcResult?: RenderOutputQcReport;
 	retryCount?: number;
 	createdAt: string;
 	startedAt?: string;

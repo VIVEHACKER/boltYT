@@ -30,8 +30,18 @@ vi.mock("./supabase", () => {
 	};
 });
 vi.mock("./proxy", () => ({ getApiProxyUrl: () => "http://localhost:3456" }));
+vi.mock("./voice-dsp", () => ({
+	processVoice: vi.fn().mockResolvedValue({
+		buffer: new ArrayBuffer(100),
+		mimeType: "audio/wav",
+		processed: true,
+	}),
+	getAudioContext: vi.fn(),
+	encodeWav: vi.fn(() => new ArrayBuffer(100)),
+}));
 
 import {
+	composeNarrationTtsOptions,
 	ELEVENLABS_DEFAULT_VOICES,
 	findVoice,
 	generateContinuousNarration,
@@ -40,6 +50,7 @@ import {
 	getAvailableVoices,
 	getDefaultVoice,
 	hasStoredTtsSettings,
+	inferNarrationEndingHoldSeconds,
 	inferNarrationPauseSeconds,
 	inferNarrationTtsOptions,
 	type NarrationTtsSignal,
@@ -174,6 +185,47 @@ describe("inferNarrationTtsOptions", () => {
 	});
 });
 
+describe("composeNarrationTtsOptions", () => {
+	it("openai 기본 경로에도 방향 지시와 gpt-4o-mini-tts 모델을 붙인다", () => {
+		const result = composeNarrationTtsOptions([
+			{
+				narration: "실종 사건의 마지막 행적을 다시 추적했습니다.",
+				mood: "mystery",
+				type: "video",
+			},
+		]);
+
+		expect(result.provider).toBe("openai");
+		expect(result.openAiModel).toBe("gpt-4o-mini-tts");
+		expect(result.direction).toContain("사건 다큐");
+		expect(result.toneKeywords).toContain("긴장감");
+	});
+
+	it("reference toneKeywords 를 유지하면서 provider별 옵션을 합친다", () => {
+		const result = composeNarrationTtsOptions(
+			[
+				{
+					narration: "브리핑에서 확보된 사실만 정리합니다.",
+					mood: "news",
+					type: "image",
+				},
+			],
+			{
+				provider: "elevenlabs",
+				voice: "EXAVITQu4vr4xnSDxMaL",
+				speed: 0.98,
+				toneKeywords: ["냉정함", "정확함"],
+			},
+		);
+
+		expect(result.provider).toBe("elevenlabs");
+		expect(result.voice).toBe("EXAVITQu4vr4xnSDxMaL");
+		expect(result.toneKeywords).toContain("정확함");
+		expect(result.direction).toContain("브리핑");
+		expect(result.openAiModel).toBeUndefined();
+	});
+});
+
 // ─── inferNarrationPauseSeconds ───────────────────────────────────────────────
 
 describe("inferNarrationPauseSeconds", () => {
@@ -229,6 +281,25 @@ describe("inferNarrationPauseSeconds", () => {
 	it("반환값이 소수점 2자리로 정밀", () => {
 		const r = inferNarrationPauseSeconds("테스트입니다.");
 		expect(r).toBe(Number(r.toFixed(2)));
+	});
+});
+
+describe("inferNarrationEndingHoldSeconds", () => {
+	it("기본 엔딩 홀드보다 말줄임표/긴 문장에서 더 길어진다", () => {
+		const neutral = inferNarrationEndingHoldSeconds("사건은 여기서 멈췄다.");
+		const longer = inferNarrationEndingHoldSeconds(
+			"하지만 마지막 CCTV 장면은 아무도 설명하지 못했다...",
+			{ endingHoldSeconds: 0.4 },
+		);
+		expect(longer).toBeGreaterThan(neutral);
+	});
+
+	it("최대값 0.52를 넘지 않는다", () => {
+		const hold = inferNarrationEndingHoldSeconds(
+			"충격적인 마지막 장면이었다...".repeat(8),
+			{ endingHoldSeconds: 0.5 },
+		);
+		expect(hold).toBeLessThanOrEqual(0.52);
 	});
 });
 
@@ -356,6 +427,29 @@ describe("generateTtsChunk", () => {
 			(vi.mocked(fetch).mock.calls[0][1] as RequestInit).body as string,
 		);
 		expect(body.voice).toBe("nova");
+	});
+
+	it("direction 이 있으면 OpenAI 요청에 instructions 와 gpt-4o-mini-tts를 넣는다", async () => {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn().mockResolvedValue({
+				ok: true,
+				arrayBuffer: () => Promise.resolve(new ArrayBuffer(10)),
+			}),
+		);
+
+		await generateTtsChunk("사건은 아직 끝나지 않았습니다.", {
+			provider: "openai",
+			voice: "sage",
+			speed: 0.95,
+			direction: "차분한 사건 다큐 나레이션으로 읽을 것.",
+		});
+
+		const body = JSON.parse(
+			(vi.mocked(fetch).mock.calls[0][1] as RequestInit).body as string,
+		);
+		expect(body.model).toBe("gpt-4o-mini-tts");
+		expect(body.instructions).toContain("사건 다큐");
 	});
 });
 
@@ -575,19 +669,6 @@ describe("generateSceneTts", () => {
 	});
 
 	it("generateSceneTts mimeType=audio/wav → ext=wav", async () => {
-		// voice-dsp processVoice returns wav
-		vi.mock("./voice-dsp", async () => ({
-			processVoice: vi.fn().mockResolvedValue({
-				buffer: new ArrayBuffer(100),
-				mimeType: "audio/wav",
-				processed: true,
-			}),
-			getAudioContext: vi.fn(() => ({
-				decodeAudioData: vi.fn().mockResolvedValue({ duration: 1.0 }),
-			})),
-			encodeWav: vi.fn(() => new ArrayBuffer(100)),
-		}));
-
 		vi.stubGlobal(
 			"fetch",
 			vi

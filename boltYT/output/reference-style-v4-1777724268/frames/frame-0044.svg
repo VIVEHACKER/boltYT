@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1920" viewBox="0 0 1080 1920">
+
+  <defs>
+    <linearGradient id="paper" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#fffdf8"/>
+      <stop offset="1" stop-color="#f3f0e8"/>
+    </linearGradient>
+    <linearGradient id="sea" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#062836"/>
+      <stop offset="0.58" stop-color="#0e3c4b"/>
+      <stop offset="1" stop-color="#dceff3"/>
+    </linearGradient>
+    <linearGradient id="nightSea" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#061a29"/>
+      <stop offset="0.65" stop-color="#0a3443"/>
+      <stop offset="1" stop-color="#164f5f"/>
+    </linearGradient>
+    <linearGradient id="oldMap" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#f5daa1"/>
+      <stop offset="1" stop-color="#d4b66f"/>
+    </linearGradient>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="14" stdDeviation="14" flood-color="#000" flood-opacity="0.25"/>
+    </filter>
+    <filter id="inkShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="6" stdDeviation="0" flood-color="#111" flood-opacity="0.16"/>
+    </filter>
+    <clipPath id="artClip">
+      <rect x="20" y="334" width="1040" height="948" rx="20"/>
+    </clipPath>
+  </defs>
+  <rect width="1080" height="1920" fill="#f7f5ee"/>
+
+  <rect x="0" y="0" width="1080" height="338" fill="url(#paper)"/>
+  <path d="M0 326 C165 344 298 318 455 333 C626 349 777 318 1080 330 L1080 356 L0 356 Z" fill="#07313d"/>
+  <g transform="translate(58 55.54295140832456)">
+    <circle cx="0" cy="0" r="24" fill="#071821"/>
+    <circle cx="0" cy="0" r="14" fill="#00a6d6"/>
+    <circle cx="0" cy="0" r="7" fill="#fff"/>
+    <text x="42" y="-5" font-family="Apple SD Gothic Neo, sans-serif" font-size="25" font-weight="900" fill="#111" letter-spacing="-1">내 채널</text>
+    <text x="42" y="18" font-family="Apple SD Gothic Neo, sans-serif" font-size="17" font-weight="800" fill="#656565">@mychannel</text>
+  </g>
+  <g font-family="Apple SD Gothic Neo, sans-serif" text-anchor="middle" fill="#070707" font-weight="900" letter-spacing="-2.4">
+    <text x="540" y="128" font-size="50">바다 한가운데 잠든 왕릉</text>
+    <text x="540" y="191" font-size="50">사람들이 가장 궁금해한</text>
+    <text x="540" y="254" font-size="56">3가지</text>
+  </g>
+
+  <g clip-path="url(#artClip)">
+    <rect x="20" y="334" width="1040" height="948" fill="url(#sea)"/>
+    <rect x="20" y="334" width="1040" height="948" fill="#001824" opacity="0.309954092195864"/>
+    <path d="M20 450 C160 426.12238468814866, 252 472, 390 450 S636 428, 794 450 S960 478, 1060 448" stroke="#a6d4db" stroke-width="4" fill="none" opacity="0.38"/><path d="M20 485 C160 462.7939764388975, 252 507, 390 485 S636 463, 794 485 S960 513, 1060 483" stroke="#a6d4db" stroke-width="4" fill="none" opacity="0.46"/><path d="M20 520 C160 494.7905016122087, 252 542, 390 520 S636 498, 794 520 S960 548, 1060 518" stroke="#a6d4db" stroke-width="4" fill="none" opacity="0.54"/><path d="M20 555 C160 533.4990340253676, 252 577, 390 555 S636 533, 794 555 S960 583, 1060 553" stroke="#a6d4db" stroke-width="4" fill="none" opacity="0.38"/><path d="M20 590 C160 566.8842731676278, 252 612, 390 590 S636 568, 794 590 S960 618, 1060 588" stroke="#a6d4db" stroke-width="4" fill="none" opacity="0.46"/><path d="M20 625 C160 605.0565156376057, 252 647, 390 625 S636 603, 794 625 S960 653, 1060 623" stroke="#a6d4db" stroke-width="4" fill="none" opacity="0.54"/><path d="M20 660 C160 636.4735234250877, 252 682, 390 660 S636 638, 794 660 S960 688, 1060 658" stroke="#a6d4db" stroke-width="4" fill="none" opacity="0.38"/><path d="M20 695 C160 673.0551759593092, 252 717, 390 695 S636 673, 794 695 S960 723, 1060 693" stroke="#a6d4db" stroke-width="4" fill="none" opacity="0.46"/><path d="M20 730 C160 704.7216162816098, 252 752, 390 730 S636 708, 794 730 S960 758, 1060 728" stroke="#a6d4db" stroke-width="4" fill="none" opacity="0.54"/><path d="M20 765 C160 743.1633966990298, 252 787, 390 765 S636 743, 794 765 S960 793, 1060 763" stroke="#a6d4db" stroke-width="4" fill="none" opacity="0.38"/><path d="M20 800 C160 776.5904672555153, 252 822, 390 800 S636 778, 794 800 S960 828, 1060 798" stroke="#a6d4db" stroke-width="4" fill="none" opacity="0.46"/><path d="M20 835 C160 815.0746649403593, 252 857, 390 835 S636 813, 794 835 S960 863, 1060 833" stroke="#a6d4db" stroke-width="4" fill="none" opacity="0.54"/><path d="M20 870 C160 846.7869415574555, 252 892, 390 870 S636 848, 794 870 S960 898, 1060 868" stroke="#a6d4db" stroke-width="4" fill="none" opacity="0.38"/><path d="M20 905 C160 883.3757077357941, 252 927, 390 905 S636 883, 794 905 S960 933, 1060 903" stroke="#a6d4db" stroke-width="4" fill="none" opacity="0.46"/><path d="M20 940 C160 914.7545662651196, 252 962, 390 940 S636 918, 794 940 S960 968, 1060 938" stroke="#a6d4db" stroke-width="4" fill="none" opacity="0.54"/><path d="M20 975 C160 952.8784708266821, 252 997, 390 975 S636 953, 794 975 S960 1003, 1060 973" stroke="#a6d4db" stroke-width="4" fill="none" opacity="0.38"/><path d="M20 1010 C160 986.2496250603436, 252 1032, 390 1010 S636 988, 794 1010 S960 1038, 1060 1008" stroke="#a6d4db" stroke-width="4" fill="none" opacity="0.46"/><path d="M20 1045 C160 1024.99127516473, 252 1067, 390 1045 S636 1023, 794 1045 S960 1073, 1060 1043" stroke="#a6d4db" stroke-width="4" fill="none" opacity="0.54"/>
+    <g transform="translate(561.4761904761905 828) scale(1.3085034013605443)" filter="url(#inkShadow)">
+      <path d="M-260 45 C-146 -62 -14 -108 119 -62 C216 -28 285 32 318 91 C166 154 -29 168 -184 102 Z" fill="#111914" stroke="#e2b942" stroke-width="15"/>
+      <path d="M-176 55 C-96 -18 10 -40 102 15" stroke="#ffdf75" stroke-width="11" fill="none" stroke-linecap="round"/>
+      <path d="M-236 107 C-110 184 95 191 274 118" stroke="#0c302f" stroke-width="18" fill="none"/>
+    </g>
+    <path d="M20 1118 C210 1072 337 1160 520 1106 C689 1056 845 1108 1060 1068 L1060 1282 L20 1282 Z" fill="#e4f2f5" opacity="0.96"/>
+
+  <g transform="translate(154 1108) scale(1.28)" stroke="#050505" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <circle cx="0" cy="-102" r="38" fill="#050505" stroke="none"/>
+    <path d="M0 -62 L0 55"/>
+    <path d="M0 -26 L-70 -29.812411674571774"/>
+    <path d="M0 -26 L78 -18.187588325428226"/>
+    <path d="M0 55 L-52 150"/>
+    <path d="M0 55 L52 150"/>
+  </g>
+    <circle cx="824.2952380952381" cy="669.5798903850167" r="56" fill="none" stroke="#ffd45a" stroke-width="5" opacity="0.45"/>
+  </g>
+
+  <g font-family="Apple SD Gothic Neo, sans-serif" fill="#090909" text-anchor="middle" font-weight="900" letter-spacing="-2.2">
+    <text x="540" y="1376" font-size="64">병합된 암초가 아니라</text>
+    <text x="540" y="1454" font-size="64">왕릉처럼 솟은 지형이 발견됨</text>
+  </g>
+
+  <g transform="translate(0 0)" font-family="Apple SD Gothic Neo, sans-serif">
+    <rect x="70" y="1620" width="62" height="62" rx="31" fill="#080808"/>
+    <text x="150" y="1658" font-size="22" font-weight="900" fill="#111">@mychannel</text>
+    <rect x="292" y="1623" width="85" height="44" rx="22" fill="#f2f2f2" stroke="#d7d7d7"/>
+    <text x="334" y="1653" font-size="20" font-weight="900" fill="#111" text-anchor="middle">구독</text>
+    <rect x="70" y="1705" width="940" height="44" rx="12" fill="#a1a1a1"/>
+    <rect x="70" y="1705" width="108.65591397849464" height="44" rx="12" fill="#111"/>
+    <text x="94" y="1734" font-size="18" font-weight="800" fill="#fff">original edit with mystery beat</text>
+  </g>
+</svg>

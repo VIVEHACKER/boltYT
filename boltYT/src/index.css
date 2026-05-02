@@ -1,2 +1,13 @@
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.min.css");
 @import "tailwindcss";
 @import "@porsche-design-system/components-react/tailwindcss";
+
+:root {
+	font-family: "Pretendard", "Geist", -apple-system, BlinkMacSystemFont,
+		system-ui, sans-serif;
+}
+
+body {
+	font-family: "Pretendard", "Geist", -apple-system, BlinkMacSystemFont,
+		system-ui, sans-serif;
+}

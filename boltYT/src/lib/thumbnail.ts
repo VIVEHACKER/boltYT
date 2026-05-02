@@ -137,6 +137,28 @@ function wrapText(
 	return lines;
 }
 
+function fitTitleText(
+	ctx: CanvasRenderingContext2D,
+	title: string,
+	baseSize: number,
+	maxWidth: number,
+	maxLines = 3,
+): { lines: string[]; fontSize: number } {
+	for (let fontSize = baseSize; fontSize >= 48; fontSize -= 4) {
+		ctx.font = `900 ${fontSize}px 'Noto Sans KR', sans-serif`;
+		const lines = wrapText(ctx, title, maxWidth);
+		if (lines.length <= maxLines) {
+			return { lines, fontSize };
+		}
+	}
+
+	ctx.font = "900 48px 'Noto Sans KR', sans-serif";
+	const lines = wrapText(ctx, title, maxWidth).slice(0, maxLines);
+	const last = lines[maxLines - 1] ?? "";
+	lines[maxLines - 1] = last.length > 1 ? `${last.slice(0, -1)}…` : last;
+	return { lines, fontSize: 48 };
+}
+
 /** 썸네일 생성 → data URL 반환 */
 export async function generateThumbnail(
 	options: ThumbnailOptions,
@@ -203,13 +225,19 @@ export async function generateThumbnail(
 	}
 
 	// ─── 6. 메인 타이틀 ───
-	ctx.font = `900 ${preset.titleSize}px 'Noto Sans KR', sans-serif`;
 	ctx.textAlign = "center";
 	ctx.textBaseline = "middle";
 
 	const maxTextWidth = THUMB_WIDTH - 160;
-	const lines = wrapText(ctx, options.title, maxTextWidth);
-	const lineHeight = preset.titleSize * 1.2;
+	const { lines, fontSize } = fitTitleText(
+		ctx,
+		options.title,
+		preset.titleSize,
+		maxTextWidth,
+		3,
+	);
+	ctx.font = `900 ${fontSize}px 'Noto Sans KR', sans-serif`;
+	const lineHeight = fontSize * 1.16;
 	const totalHeight = lines.length * lineHeight;
 	const startY =
 		(THUMB_HEIGHT - totalHeight) / 2 + (options.subtitle ? -20 : 0);

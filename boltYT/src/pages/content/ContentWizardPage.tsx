@@ -8,6 +8,10 @@ import {
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { DEMO_CHANNELS } from "../../lib/demo-data";
+import {
+	loadNicheResearchHandoff,
+	type NicheResearchHandoff,
+} from "../../lib/niche-research";
 import { getReferenceTemplate } from "../../lib/reference-import";
 import { DEMO_MODE, supabase } from "../../lib/supabase";
 import type { Channel, ReferenceTemplate } from "../../types/database";
@@ -19,7 +23,7 @@ import StepResearch from "./StepResearch";
 import StepScript from "./StepScript";
 import StepTopic from "./StepTopic";
 
-export type ContentMode = "ai" | "research";
+export type ContentMode = "ai" | "research" | "animation";
 
 export interface CollectedSource {
 	id: string;
@@ -55,11 +59,30 @@ const RESEARCH_STEPS = [
 	"미디어 생성",
 	"미리보기",
 ];
+const ANIMATION_STEPS = [
+	"주제 입력",
+	"스토리 브리프",
+	"스토리보드",
+	"애니메이션 생성",
+	"미리보기",
+];
+
+function parseMode(value: string | null): ContentMode | null {
+	return value === "ai" || value === "research" || value === "animation"
+		? value
+		: null;
+}
 
 export default function ContentWizardPage() {
 	const navigate = useNavigate();
 	const [searchParams] = useSearchParams();
-	const [mode, setMode] = useState<ContentMode | null>(null);
+	const initialMode = parseMode(searchParams.get("mode"));
+	const initialTitle = searchParams.get("title") ?? "";
+	const initialSource = searchParams.get("source") ?? "manual";
+	const [nicheHandoff] = useState<NicheResearchHandoff | null>(() =>
+		loadNicheResearchHandoff(searchParams.get("nicheHandoff")),
+	);
+	const [mode, setMode] = useState<ContentMode | null>(initialMode);
 	const [step, setStep] = useState(0);
 	const [channels, setChannels] = useState<Channel[]>(
 		DEMO_MODE ? (DEMO_CHANNELS as Channel[]) : [],
@@ -139,7 +162,7 @@ export default function ContentWizardPage() {
 					어떤 방식으로 영상을 만들까요?
 				</PText>
 
-				<div className="grid grid-cols-1 md:grid-cols-2 gap-static-md">
+				<div className="grid grid-cols-1 md:grid-cols-3 gap-static-md">
 					<button
 						type="button"
 						className="bg-surface rounded-[8px] p-static-lg text-left border-2 border-transparent hover:border-primary transition-colors cursor-pointer"
@@ -169,12 +192,32 @@ export default function ContentWizardPage() {
 							구성합니다. 다큐/미스테리/정보 영상에 적합합니다.
 						</PText>
 					</button>
+
+					<button
+						type="button"
+						className="bg-surface rounded-[8px] p-static-lg text-left border-2 border-transparent hover:border-primary transition-colors cursor-pointer"
+						onClick={() => setMode("animation")}
+					>
+						<div className="text-[32px] mb-static-sm">🎬</div>
+						<PHeading size="small" tag="h3" className="mb-static-xs">
+							애니메이션 제작
+						</PHeading>
+						<PText size="small" color="contrast-medium">
+							캐릭터 상황극, 스토리타임, 설명형, 인포그래픽, 호러,
+							슬랩스틱 등 포맷을 자동 판별해 쇼츠/롱폼을 만듭니다.
+						</PText>
+					</button>
 				</div>
 			</div>
 		);
 	}
 
-	const stepLabels = mode === "ai" ? AI_STEPS : RESEARCH_STEPS;
+	const stepLabels =
+		mode === "research"
+			? RESEARCH_STEPS
+			: mode === "animation"
+				? ANIMATION_STEPS
+				: AI_STEPS;
 
 	return (
 		<div className="max-w-3xl">
@@ -196,7 +239,9 @@ export default function ContentWizardPage() {
 			<PText color="contrast-medium" className="mb-fluid-md">
 				{mode === "ai"
 					? "AI가 모든 콘텐츠를 자동 생성합니다."
-					: "자료를 수집하고 영상으로 구성합니다."}
+					: mode === "animation"
+						? "캐릭터와 스토리보드 중심으로 포맷별 애니메이션 영상을 구성합니다."
+						: "자료를 수집하고 영상으로 구성합니다."}
 			</PText>
 
 			{referenceTemplate && (
@@ -218,6 +263,9 @@ export default function ContentWizardPage() {
 						channels={channels}
 						selectedChannelId={selectedChannelId}
 						onChannelChange={setSelectedChannelId}
+						initialTitle={initialTitle}
+						source={initialSource}
+						nicheHandoff={nicheHandoff}
 						onNext={(id) => {
 							setTopicId(id);
 							setStep(1);
@@ -226,7 +274,7 @@ export default function ContentWizardPage() {
 				)}
 
 				{/* Step 1: AI → 브리프 / Research → 자료 수집 */}
-				{step === 1 && mode === "ai" && (
+				{step === 1 && (mode === "ai" || mode === "animation") && (
 					<StepBrief
 						topicId={topicId}
 						onNext={(id) => {
@@ -240,6 +288,7 @@ export default function ContentWizardPage() {
 					<StepResearch
 						topicId={topicId}
 						sources={sources}
+						referenceTemplate={referenceTemplate}
 						onSourcesChange={setSources}
 						onNext={() => setStep(2)}
 						onBack={() => setStep(0)}
@@ -249,10 +298,11 @@ export default function ContentWizardPage() {
 				{/* Step 2: 스크립트 (공통 — research 모드는 sources 전달) */}
 				{step === 2 && (
 					<StepScript
-						briefId={mode === "ai" ? briefId : topicId}
+						briefId={mode === "research" ? topicId : briefId}
 						mode={mode}
 						sources={sources}
 						referenceTemplate={referenceTemplate}
+						nicheHandoff={nicheHandoff}
 						onNext={(id) => {
 							setScriptId(id);
 							setStep(3);

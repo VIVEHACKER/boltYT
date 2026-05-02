@@ -249,6 +249,13 @@ interface SceneInfo {
 	index?: number;
 	isFirst?: boolean;
 	isLast?: boolean;
+	productionType?: string;
+	productionFamily?: string;
+	animationShotCount?: number;
+	animationEndingShot?: boolean;
+	needsActionSfx?: boolean;
+	preferredEnterSfxCategory?: SfxCategory;
+	preferredTransitionSfxCategory?: SfxCategory;
 }
 
 function pickVariant(category: SfxCategory, seed = 0): SfxEntry | undefined {
@@ -331,6 +338,69 @@ function snapCueToBeatFrame(
 	return clampFrame(shifted, 0, Math.max(0, duration - 1));
 }
 
+function isAnimationSfxScene(scene: SceneInfo): boolean {
+	return (
+		scene.productionType === "animation" ||
+		Boolean(scene.productionFamily) ||
+		(scene.animationShotCount ?? 0) > 0
+	);
+}
+
+function applyAnimationSfx(scene: SceneInfo, result: SceneSfx, seed: number) {
+	if (!isAnimationSfxScene(scene)) return;
+	const family = scene.productionFamily ?? "";
+	const actionHeavy = scene.needsActionSfx || (scene.animationShotCount ?? 0) >= 2;
+
+	if (!result.enterSfx) {
+		if (
+			scene.preferredEnterSfxCategory &&
+			scene.preferredEnterSfxCategory !== "none"
+		) {
+			result.enterSfx = pickVariant(scene.preferredEnterSfxCategory, seed + 4);
+		}
+		if (!result.enterSfx && family === "myth_horror_story") {
+			result.enterSfx = pickVariant("drone", seed + 4);
+		} else if (
+			!result.enterSfx &&
+			(family === "animated_explainer" ||
+				family === "infographic_motion" ||
+				family === "whiteboard_lesson")
+		) {
+			result.enterSfx = pickVariant("notification", seed + 4);
+		} else if (!result.enterSfx && actionHeavy) {
+			result.enterSfx = pickVariant("whoosh", seed + 4);
+		} else if (!result.enterSfx) {
+			result.enterSfx = pickVariant("reveal", seed + 4);
+		}
+	}
+
+	if (!result.transitionSfx && !scene.isLast) {
+		if (
+			scene.preferredTransitionSfxCategory &&
+			scene.preferredTransitionSfxCategory !== "none"
+		) {
+			result.transitionSfx = pickVariant(
+				scene.preferredTransitionSfxCategory,
+				seed + 5,
+			);
+		}
+		if (!result.transitionSfx && scene.animationEndingShot) {
+			result.transitionSfx = pickVariant("impact", seed + 5);
+		} else if (!result.transitionSfx && family === "myth_horror_story") {
+			result.transitionSfx = pickVariant("suspense_hit", seed + 5);
+		} else if (
+			!result.transitionSfx &&
+			(family === "animated_explainer" ||
+				family === "infographic_motion" ||
+				family === "whiteboard_lesson")
+		) {
+			result.transitionSfx = pickVariant("reveal", seed + 5);
+		} else if (!result.transitionSfx && actionHeavy) {
+			result.transitionSfx = pickVariant("impact", seed + 5);
+		}
+	}
+}
+
 /**
  * 씬 정보를 분석하여 효과음 자동 배정
  */
@@ -363,6 +433,8 @@ export function assignSfx(scene: SceneInfo): SceneSfx {
 			result.transitionSfx = pickVariant("impact", seed + 1);
 		}
 	}
+
+	applyAnimationSfx(scene, result, seed);
 
 	// ─── 씬 시작 SFX ───
 

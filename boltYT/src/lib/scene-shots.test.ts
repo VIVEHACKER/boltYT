@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+	applyLongformVideoRules,
 	applyShortsVideoRules,
 	buildSceneShots,
 	ensureSceneShots,
@@ -37,6 +38,43 @@ describe("scene-shots", () => {
 			shots.reduce((sum, shot) => sum + shot.duration_seconds, 0),
 		).toBeCloseTo(9, 1);
 		expect(shots[0].source_url).toBe("https://example.com/scene.jpg");
+	});
+
+	it("샷마다 시각 역할과 품질 검색 메타데이터를 만든다", () => {
+		const shots = buildSceneShots(
+			{
+				narration: "결정적 문서가 공개되며 사건의 흐름이 바뀌었다.",
+				type: "image",
+				visualPrompt: "official record close up",
+				duration: 6,
+				sourceIndex: 0,
+				newsTitle: "결정적 문서 공개",
+				newsDate: "1991-02-01",
+			},
+			[
+				{
+					type: "article",
+					title: "문서 공개 기사",
+					eventTitle: "결정적 문서 공개",
+					eventDate: "1991-02-01",
+					description: "공개된 문서가 수사의 핵심 단서가 됐다.",
+				},
+			],
+		);
+
+		expect(shots.every((shot) => shot.visual_role)).toBe(true);
+		expect(shots.every((shot) => shot.search_terms?.length)).toBe(true);
+		expect(shots.every((shot) => shot.reject_terms?.includes("logo"))).toBe(
+			true,
+		);
+		expect(
+			shots.some(
+				(shot) =>
+					shot.visual_role === "document" &&
+					typeof shot.source_confidence === "number" &&
+					shot.source_confidence >= 80,
+			),
+		).toBe(true);
 	});
 
 	it("video scenes keep video shots with trims", () => {
@@ -147,6 +185,137 @@ describe("scene-shots", () => {
 			shots
 				.filter((shot) => shot.media_type === "video")
 				.every((shot) => typeof shot.trim_start === "number"),
+		).toBe(true);
+	});
+
+	it("edit-first planner creates dense mixed cuts from video, image, and article sources", () => {
+		const shots = buildSceneShots(
+			{
+				narration:
+					"CCTV 공개 직후 기사 원문과 현장 사진이 교차 검증되며 사건 흐름이 바뀌었다.",
+				type: "image",
+				visualPrompt: "surveillance review with newspaper source and scene photo",
+				duration: 6.2,
+				sourceIndex: 0,
+				newsTitle: "CCTV 공개와 기사 원문 대조",
+				newsDate: "1991-02-08",
+			},
+			[
+				{
+					type: "video",
+					title: "CCTV 원본",
+					url: "https://example.com/cctv.mp4",
+					eventTitle: "CCTV 공개와 기사 원문 대조",
+					eventDate: "1991-02-08",
+				},
+				{
+					type: "image",
+					title: "현장 사진",
+					url: "https://example.com/scene.jpg",
+					eventTitle: "CCTV 공개와 기사 원문 대조",
+					eventDate: "1991-02-08",
+				},
+				{
+					type: "article",
+					title: "기사 원문",
+					eventTitle: "CCTV 공개와 기사 원문 대조",
+					eventDate: "1991-02-08",
+					description: "기사 원문과 현장 사진이 같은 시간대를 가리켰다.",
+				},
+			],
+		);
+
+		expect(shots.length).toBeGreaterThanOrEqual(5);
+		expect(shots.some((shot) => shot.media_type === "video")).toBe(true);
+		expect(shots.some((shot) => shot.media_type === "image")).toBe(true);
+		expect(
+			shots.some(
+				(shot) =>
+					shot.source_index === 2 &&
+					(shot.visual_role === "document" ||
+						shot.visual_role === "evidence"),
+			),
+		).toBe(true);
+		expect(
+			shots
+				.filter((shot) => shot.media_type === "video")
+				.every(
+					(shot) =>
+						typeof shot.trim_start === "number" &&
+						typeof shot.trim_end === "number",
+				),
+		).toBe(true);
+	});
+
+	it("고모션 이미지 씬은 정확히 맞는 영상 소스를 우선 사용한다", () => {
+		const shots = buildSceneShots(
+			{
+				narration:
+					"CCTV와 현장 영상이 공개되며 도주 경로와 추격 장면이 다시 분석됐다.",
+				type: "image",
+				visualPrompt: "surveillance reveal and pursuit reconstruction",
+				duration: 4.2,
+				sourceIndex: 0,
+				newsTitle: "도주 경로 CCTV 공개",
+				newsDate: "1991-02-06",
+			},
+			[
+				{
+					type: "video",
+					title: "도주 경로 CCTV",
+					url: "https://example.com/escape-cctv.mp4",
+					eventTitle: "도주 경로 CCTV 공개",
+					eventDate: "1991-02-06",
+				},
+				{
+					type: "article",
+					title: "수사 기사",
+					eventTitle: "도주 경로 CCTV 공개",
+					eventDate: "1991-02-06",
+				},
+			],
+		);
+
+		expect(shots[0]?.media_type).toBe("video");
+		expect(shots[0]?.source_url).toBe("https://example.com/escape-cctv.mp4");
+	});
+
+	it("CCTV 중심 컨텍스트 씬은 context/evidence 샷도 영상으로 유지할 수 있다", () => {
+		const shots = buildSceneShots(
+			{
+				narration:
+					"공개된 CCTV 영상 속 추적 장면과 현장 재구성 영상이 사건 순서를 다시 보여줬다.",
+				type: "image",
+				visualPrompt: "cctv pursuit timeline reconstruction",
+				duration: 5,
+				sourceIndex: 0,
+				newsTitle: "추적 장면 CCTV 공개",
+				newsDate: "1991-02-07",
+			},
+			[
+				{
+					type: "video",
+					title: "추적 장면 CCTV",
+					url: "https://example.com/chase-cctv.mp4",
+					eventTitle: "추적 장면 CCTV 공개",
+					eventDate: "1991-02-07",
+				},
+				{
+					type: "article",
+					title: "재구성 기사",
+					eventTitle: "추적 장면 CCTV 공개",
+					eventDate: "1991-02-07",
+					description: "영상 속 동선과 시간 순서가 다시 정리됐다.",
+				},
+			],
+		);
+
+		expect(
+			shots.some(
+				(shot) =>
+					(shot.kind === "context" || shot.kind === "evidence") &&
+					shot.media_type === "video",
+			),
 		).toBe(true);
 	});
 
@@ -521,7 +690,7 @@ describe("scene-shots", () => {
 		expect(adjusted[3].transition).toBe("glitch");
 	});
 
-	it("injects text emphasis interrupts when shorts pacing lacks a punch card", () => {
+	it("uses edit-first visual interrupts instead of standalone punch cards", () => {
 		const adjusted = applyShortsVideoRules(
 			[
 				{
@@ -579,14 +748,21 @@ describe("scene-shots", () => {
 			],
 		);
 
-		const emphasisScenes = adjusted.filter(
-			(scene) => (scene.type as string) === "text_emphasis",
+		const interruptScenes = adjusted.filter(
+			(scene) =>
+				scene.transition === "glitch" &&
+				(scene.type as string) !== "text_emphasis",
 		);
-		expect(emphasisScenes.length).toBeGreaterThanOrEqual(1);
-		expect(emphasisScenes.every((scene) => scene.transition === "glitch")).toBe(
-			true,
+		expect(adjusted.some((scene) => (scene.type as string) === "text_emphasis")).toBe(
+			false,
 		);
-		expect(emphasisScenes.every((scene) => scene.duration <= 2.2)).toBe(true);
+		expect(interruptScenes.length).toBeGreaterThanOrEqual(1);
+		expect(interruptScenes.every((scene) => scene.duration <= 2.2)).toBe(true);
+		expect(
+			interruptScenes.every((scene) =>
+				scene.visualPrompt.includes("subtitle-safe lower third area"),
+			),
+		).toBe(true);
 	});
 
 	it("applyShortsVideoRules 후 훅 10초 구간 video 비중이 60% 이상이다", () => {
@@ -759,7 +935,7 @@ describe("scene-shots 추가 분기", () => {
 		expect(result[0].duration).toBeLessThanOrEqual(3.2);
 	});
 
-	it("applyShortsVideoRules: video sources 있고 text_emphasis/news_overlay 씬은 video로 변환 안 함", () => {
+	it("applyShortsVideoRules: text_emphasis는 카드가 아닌 edit-first 이미지 씬으로 변환한다", () => {
 		const scenes = [
 			{
 				narration: "텍스트 강조",
@@ -791,8 +967,14 @@ describe("scene-shots 추가 분기", () => {
 			},
 		];
 		const result = applyShortsVideoRules(scenes, sources);
-		// text_emphasis와 news_overlay 씬은 type 변경 안 됨
-		expect(result[0].type).toBe("text_emphasis");
+		expect(result[0].type).not.toBe("text_emphasis");
+		expect(["image", "video"]).toContain(result[0].type);
+		const converted = result[0] as (typeof result)[number] & {
+			sourceIndex?: number;
+			visualPrompt: string;
+		};
+		expect(converted.sourceIndex).toBe(0);
+		expect(converted.visualPrompt).toContain("subtitle-safe lower third area");
 		expect(result[1].type).toBe("news_overlay");
 	});
 
@@ -829,5 +1011,117 @@ describe("scene-shots 추가 분기", () => {
 		const result = intensifyHookScenes(scenes);
 		const s = result[0] as (typeof scenes)[0];
 		expect(s.type).toBe("news_overlay");
+	});
+
+	it("applyLongformVideoRules: 롱폼은 쇼츠처럼 video 75%로 몰지 않는다", () => {
+		const scenes = Array.from({ length: 10 }, (_, index) => ({
+			narration: `롱폼 씬 ${index + 1} 나레이션`,
+			type: "image" as const,
+			visualPrompt:
+				index % 2 === 0
+					? "detective searches street footage"
+					: "official document evidence",
+			duration: 14,
+		}));
+		const sources = [
+			{ type: "video" as const, title: "현장 영상", url: "https://v.com/a" },
+			{ type: "video" as const, title: "수색 영상", url: "https://v.com/b" },
+			{ type: "article" as const, title: "기사", url: "https://n.com/a" },
+		];
+
+		const result = applyLongformVideoRules(scenes, sources);
+		const videoCount = result.filter(
+			(scene) => (scene as { type: string }).type === "video",
+		).length;
+
+		expect(videoCount).toBeGreaterThanOrEqual(4);
+		expect(videoCount).toBeLessThanOrEqual(6);
+		expect(result.every((scene) => scene.duration >= 10)).toBe(true);
+		expect(result.reduce((sum, scene) => sum + scene.duration, 0)).toBeGreaterThanOrEqual(359);
+	});
+
+	it("applyLongformVideoRules: 롱폼 전환은 crossfade/slide/zoom 중심이다", () => {
+		const scenes = Array.from({ length: 8 }, (_, index) => ({
+			narration: `롱폼 씬 ${index + 1}`,
+			type: index === 4 ? ("text_emphasis" as const) : ("image" as const),
+			visualPrompt: "documentary scene",
+			duration: index === 4 ? 4 : 18,
+			transition: "glitch",
+		}));
+
+		const result = applyLongformVideoRules(scenes, []);
+		const transitions = result.map((scene) => scene.transition);
+
+		expect(transitions.every((transition) => transition !== "whip_left")).toBe(
+			true,
+		);
+		expect(transitions.every((transition) => transition !== "whip_right")).toBe(
+			true,
+		);
+		expect(transitions.filter((transition) => transition === "crossfade").length)
+			.toBeGreaterThanOrEqual(4);
+	});
+
+	it("applyLongformVideoRules: 영상 소스가 없어도 기존 video 씬은 검색 기회를 보존한다", () => {
+		const scenes = [
+			{
+				narration: "현장 동선을 영상으로 보여준다.",
+				type: "video" as const,
+				visualPrompt: "street search operation footage",
+				duration: 16,
+			},
+			{
+				narration: "공식 문서를 근거로 정리한다.",
+				type: "image" as const,
+				visualPrompt: "official document close up",
+				duration: 16,
+			},
+			{
+				narration: "남은 의문을 차분히 정리한다.",
+				type: "image" as const,
+				visualPrompt: "quiet documentary ending",
+				duration: 16,
+			},
+			{
+				narration: "수사 흐름을 이어서 설명한다.",
+				type: "image" as const,
+				visualPrompt: "case timeline board",
+				duration: 16,
+			},
+			{
+				narration: "핵심 반전을 짚는다.",
+				type: "text_emphasis" as const,
+				visualPrompt: "key question text",
+				duration: 4,
+			},
+			{
+				narration: "현재 상황을 정리한다.",
+				type: "image" as const,
+				visualPrompt: "news archive desk",
+				duration: 16,
+			},
+		];
+
+		const result = applyLongformVideoRules(scenes, []);
+
+		expect((result[0] as { type: string }).type).toBe("video");
+	});
+
+	it("applyLongformVideoRules: 장편 레퍼런스 목표 길이면 6분 고정으로 줄이지 않는다", () => {
+		const scenes = Array.from({ length: 64 }, (_, index) => ({
+			narration: `장편 몰아보기 씬 ${index + 1}`,
+			type: index % 5 === 0 ? ("video" as const) : ("image" as const),
+			visualPrompt: "drama recap character relationship and plot turn",
+			duration: 24,
+		}));
+
+		const result = applyLongformVideoRules(scenes, [], {
+			targetTotalSeconds: 5160,
+		});
+		const total = result.reduce((sum, scene) => sum + scene.duration, 0);
+
+		expect(total).toBeGreaterThanOrEqual(5000);
+		expect(result.every((scene) => scene.duration <= 180)).toBe(true);
+		expect((result[0] as { transition?: string }).transition).toBe("none");
 	});
 });

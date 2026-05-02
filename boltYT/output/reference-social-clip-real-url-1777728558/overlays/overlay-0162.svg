@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1920" viewBox="0 0 1080 1920">
+
+  <defs>
+    <linearGradient id="pageBg" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.58" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#d7d7d7"/>
+    </linearGradient>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="13" stdDeviation="12" flood-color="#000" flood-opacity="0.32"/>
+    </filter>
+    <filter id="captionGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="0" flood-color="#000" flood-opacity="0.92"/>
+      <feDropShadow dx="0" dy="0" stdDeviation="7" flood-color="#000" flood-opacity="0.72"/>
+    </filter>
+  </defs>
+
+  <rect x="0" y="0" width="1080" height="550" fill="#fff"/>
+  <g font-family="AppleMyungjo, Hiragino Mincho ProN, serif" text-anchor="middle" fill="#050505" font-weight="900" letter-spacing="-6">
+    <text x="540" y="292" font-size="88">요즘 MZ들의</text>
+    <text x="540" y="410" font-size="88">신박한 플러팅 방식</text>
+  </g>
+  <g opacity="0.8040150956235477">
+    <rect x="322" y="252" width="436" height="58" rx="29" fill="#111" opacity="0.68"/>
+    <text x="540" y="290" font-family="Apple SD Gothic Neo, sans-serif" font-size="27" font-weight="800" fill="#fff" text-anchor="middle">실제 URL 영상으로 교체한 버전</text>
+  </g>
+
+  <g font-family="Apple SD Gothic Neo, sans-serif" text-anchor="middle" font-weight="950" letter-spacing="-2.4" filter="url(#captionGlow)">
+    <text x="540" y="1034" font-size="58" fill="#ff72df">말투보다 타이밍이 더</text><text x="540" y="1102" font-size="58" fill="#ff72df">중요함</text>
+  </g>
+
+  <rect x="0" y="1170" width="1080" height="750" fill="url(#pageBg)"/>
+  <g font-family="Apple SD Gothic Neo, sans-serif">
+    <g filter="url(#softShadow)">
+      <rect x="118" y="1342" width="844" height="78" rx="39" fill="#565656" opacity="0.82"/>
+      <circle cx="165" cy="1381" r="28" fill="#ffd8b7"/>
+      <path d="M145 1372 C150 1349 182 1348 188 1373 C174 1363 158 1363 145 1372 Z" fill="#3b201a"/>
+      <text x="215" y="1390" font-size="28" font-weight="850" fill="#fff">텍스트는 위아래 카드에 고정, 영상은 중앙에서만 움직임</text>
+    </g>
+    <circle cx="150" cy="1524" r="34" fill="#ffd21f"/>
+    <text x="150" y="1537" font-size="37" font-weight="950" fill="#fff" text-anchor="middle">♪</text>
+    <text x="204" y="1536" font-size="31" font-weight="900" fill="#111">@mychannel</text>
+    <rect x="365" y="1490" width="122" height="68" rx="34" fill="#fff"/>
+    <text x="426" y="1533" font-size="30" font-weight="950" fill="#111" text-anchor="middle">구독</text>
+    <text x="118" y="1642" font-size="29" font-weight="840" fill="#151515">내 채널 · real URL clip format</text>
+    <text x="118" y="1692" font-size="20" font-weight="700" fill="#616161">source: Wikimedia Commons CC0 · Entrevista 01.webm</text>
+    <rect x="118" y="1732" width="844" height="34" rx="17" fill="#9e9e9e"/>
+    <rect x="118" y="1732" width="353.8645833333333" height="34" rx="17" fill="#ff174b"/>
+  </g>
+</svg>

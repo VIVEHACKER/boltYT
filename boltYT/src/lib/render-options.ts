@@ -217,8 +217,6 @@ export function toRemotionCliArgs(opts: ResolvedRenderOptions): string[] {
 		opts.codec,
 		"--pixel-format",
 		opts.pixelFormat,
-		"--video-bitrate",
-		opts.videoBitrate,
 		"--audio-bitrate",
 		opts.audioBitrate,
 		"--jpeg-quality",
@@ -228,6 +226,8 @@ export function toRemotionCliArgs(opts: ResolvedRenderOptions): string[] {
 	];
 	if (opts.useCrf) {
 		args.push("--crf", String(opts.crf));
+	} else {
+		args.push("--video-bitrate", opts.videoBitrate);
 	}
 	if (opts.codec === "h264") {
 		args.push("--x264-preset", opts.x264Preset);
@@ -242,12 +242,15 @@ export function toRenderMediaOptions(
 	const base: Record<string, unknown> = {
 		codec: opts.codec,
 		pixelFormat: opts.pixelFormat,
-		videoBitrate: opts.videoBitrate,
 		audioBitrate: opts.audioBitrate,
 		jpegQuality: opts.jpegQuality,
 		hardwareAcceleration: opts.hardwareAccel,
 	};
-	if (opts.useCrf) base.crf = opts.crf;
+	if (opts.useCrf) {
+		base.crf = opts.crf;
+	} else {
+		base.videoBitrate = opts.videoBitrate;
+	}
 	if (opts.codec === "h264") base.x264Preset = opts.x264Preset;
 	return base;
 }

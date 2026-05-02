@@ -32,11 +32,13 @@ import {
 } from "../../lib/search";
 import { supabase } from "../../lib/supabase";
 import { sortByEventDate } from "../../lib/timeline";
+import type { ReferenceTemplate } from "../../types/database";
 import type { CollectedSource } from "./ContentWizardPage";
 
 interface StepResearchProps {
 	topicId: string;
 	sources: CollectedSource[];
+	referenceTemplate?: ReferenceTemplate | null;
 	onSourcesChange: (sources: CollectedSource[]) => void;
 	onNext: () => void;
 	onBack: () => void;
@@ -45,6 +47,7 @@ interface StepResearchProps {
 export default function StepResearch({
 	topicId,
 	sources,
+	referenceTemplate,
 	onSourcesChange,
 	onNext,
 	onBack,
@@ -73,6 +76,11 @@ export default function StepResearch({
 		pexels: keysStatus.pexels,
 		pixabay: keysStatus.pixabay,
 	};
+	const isDramaRecapReference =
+		referenceTemplate?.id === "builtin-drama-recap-longform" ||
+		/(드라마|영화|몰아보기|recap|movie|drama)/i.test(
+			`${referenceTemplate?.name ?? ""} ${referenceTemplate?.source_title ?? ""}`,
+		);
 
 	// 키 상태가 바뀌었을 때 현재 활성 탭이 비가용이면 첫 가용 탭으로 전환 (초기 공백 방지)
 	useEffect(() => {
@@ -207,6 +215,7 @@ export default function StepResearch({
 								bodyText: article.body || undefined,
 								publisher: article.publisher || s.publisher,
 								title: article.title || s.title,
+								thumbnail: article.thumbnail || s.thumbnail,
 								eventTitle:
 									s.eventTitle && s.eventTitle !== s.title
 										? s.eventTitle
@@ -346,6 +355,16 @@ export default function StepResearch({
 				기사 발행일은 참고용으로만 확인할 수 있습니다.
 			</PText>
 
+			{isDramaRecapReference && (
+				<PInlineNotification
+					state="info"
+					dismissButton={false}
+					className="mb-static-md"
+					heading="드라마/영화 몰아보기 자료 기준"
+					description="작품 제목, 공식 소개, 인물 관계, 줄거리 요약, 리뷰/해설 자료를 모아주세요. 원본 영상과 음악을 그대로 쓰는 방식이 아니라, 자료를 바탕으로 새 해설 대본·BGM·TTS 톤을 구성합니다."
+				/>
+			)}
+
 			{/* Search bar */}
 			<div className="flex gap-static-sm mb-static-md">
 				<div className="flex-1">
@@ -353,7 +372,11 @@ export default function StepResearch({
 						name="search"
 						label="검색"
 						hideLabel
-						placeholder="검색어를 입력하세요 (예: 이형호 사건, 화성연쇄살인)"
+						placeholder={
+							isDramaRecapReference
+								? "작품명 + 줄거리/등장인물/결말/리뷰 (예: 패밀리 장혁 장나라 줄거리)"
+								: "검색어를 입력하세요 (예: 이형호 사건, 화성연쇄살인)"
+						}
 						value={searchQuery}
 						onInput={(e) =>
 							setSearchQuery((e.target as HTMLInputElement).value)

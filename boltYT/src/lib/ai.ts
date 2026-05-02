@@ -7,6 +7,18 @@ import {
 	buildChronologicalTimeline,
 	formatTimelineConstraint,
 } from "./timeline";
+import {
+	analyzeTopicProductionReadiness,
+	formatTopicProductionReadinessForPrompt,
+	type TopicProductionReadinessReport,
+} from "./topic-production-readiness";
+import {
+	analyzeAnimationProductionReadiness,
+	formatAnimationReadinessForPrompt,
+	type AnimationBible,
+	type AnimationProductionFamily,
+	type AnimationProductionReadinessReport,
+} from "./animation-production";
 
 async function callOpenAI(
 	systemPrompt: string,
@@ -130,12 +142,96 @@ interface SceneResult {
 interface ScriptResult {
 	shorts_script: string;
 	longform_scenes: SceneResult[];
+	animation_bible?: AnimationBible;
+	production_family?: AnimationProductionFamily;
+}
+
+function formatMinutes(seconds: number): string {
+	const minutes = seconds / 60;
+	if (!Number.isFinite(minutes) || minutes <= 0) return "6~12분";
+	if (minutes >= 60) {
+		const hours = Math.floor(minutes / 60);
+		const rest = Math.round(minutes % 60);
+		return rest > 0 ? `${hours}시간 ${rest}분` : `${hours}시간`;
+	}
+	return `${Math.round(minutes)}분`;
+}
+
+function isFeatureLengthReference(referencePreset?: ReferencePreset): boolean {
+	return (referencePreset?.script?.targetDuration ?? 0) >= 1800;
+}
+
+function buildLongformPacing(referencePreset?: ReferencePreset): string {
+	if (!referencePreset?.script) {
+		return "롱폼: 10~18개 씬, 6~12분 목표. 씬당 10~28초. 챕터형 전개, 나레이션 3~6문장, 자료/문서/지도/영상 근거를 번갈아 사용.";
+	}
+
+	const target = referencePreset.script.targetDuration;
+	const sceneCount = referencePreset.script.sceneCount;
+	const avg = referencePreset.script.avgSceneDuration;
+	const hook = referencePreset.script.hookDuration;
+
+	if (isFeatureLengthReference(referencePreset)) {
+		return `레퍼런스 장편 롱폼: ${sceneCount}개 내외 씬, ${formatMinutes(target)} 목표. 첫 ${hook}초 안에 작품의 핵심 아이러니/비밀을 던지고, 6~10개 챕터로 쪼개세요. 씬 평균은 ${avg}초이며, 각 씬은 실제 TTS 길이가 맞도록 충분한 나레이션(6~10문장)을 작성합니다. 줄거리 요약만 나열하지 말고 인물 관계, 선택의 이유, 장르적 재미, 결말 회수를 섞어 중반 반복을 막으세요.`;
+	}
+
+	return `레퍼런스 롱폼: ${sceneCount}개 내외 씬, ${formatMinutes(target)} 목표. 씬 평균 ${avg}초, 첫 ${hook}초는 강한 질문/상황으로 시작합니다. 챕터형 전개와 자료/문서/지도/영상 근거를 번갈아 사용하세요.`;
+}
+
+function buildLongformSceneRules(referencePreset?: ReferencePreset): string {
+	if (!isFeatureLengthReference(referencePreset)) {
+		return `=== 롱폼(16:9) 규칙 ===
+5단계 네러티브 구조를 반드시 지킨다. 비율은 전체 씬 수 기준.
+
+[도입 — 전체의 15%]
+- 씬1: 핵심 질문/충격 사실로 바로 시작. "~이 있습니다"형 설명 금지.
+- 강렬한 영상/이미지 + zoom 트랜지션. duration: 10~18초.
+
+[배경 — 전체의 20%]
+- 씬2~4: 사건·인물·맥락 소개. 시청자가 몰입할 맥락만. duration: 14~24초.
+- transition: crossfade or slide_left.
+
+[전개 — 전체의 40%]
+- 씬5~12: 핵심 사실을 하나씩 순서대로 풀어감. 각 씬에 하나의 포인트만.
+- 수집 이미지·영상·문서·지도 최대 활용. duration: 16~28초. transition: crossfade.
+
+[반전/클라이맥스 — 전체의 15%]
+- 가장 놀라운 반전 또는 핵심 충격. text_emphasis는 사용하지 말고 증거/문서/지도/영상/디테일 샷으로 보여주세요.
+- mood: "horror" 또는 "mystery". duration: 10~20초.
+
+[결말 — 전체의 10%]
+- 마지막 씬: 현재 상황, 미해결 의문, 다음에 확인해야 할 사실, 부드러운 CTA. duration: 18~32초.
+- transition: crossfade. mood: "neutral" or "warm".
+
+공통:
+- 총 10~18개 씬, 6~12분 분량을 목표로 한다.
+- 나레이션은 씬당 3~6문장. 짧은 구어체 문장. 접속사로 자연스럽게 연결.
+- 쇼츠식 6~8초 인터럽트를 반복하지 말고, 챕터마다 화면 문법을 바꾼다.
+- video 비율은 자료가 충분할 때 40~55% 수준. 나머지는 문서, 지도, 아카이브 이미지, 정교한 재구성으로 근거 밀도를 만든다.
+- 각 단계 전환 시 transition으로 리듬 변화를 준다.`;
+	}
+
+	const target = referencePreset!.script.targetDuration;
+	const sceneCount = referencePreset!.script.sceneCount;
+	const avg = referencePreset!.script.avgSceneDuration;
+	return `=== 장편 몰아보기 롱폼(16:9) 규칙 ===
+- 목표 길이: ${formatMinutes(target)}. 총 ${Math.max(48, sceneCount - 8)}~${sceneCount + 8}개 씬을 만든다.
+- 씬 duration 평균은 ${avg}초 전후로 잡고, 실제 TTS 길이가 너무 짧아지지 않도록 각 씬 나레이션을 6~10문장으로 충분히 작성한다.
+- 구조는 cold open → 작품 전제 → 인물 관계 → 1막 사건 → 중반 반전 → 압박 누적 → 감정 저점 → 결말 회수 → 짧은 리뷰 순서로 간다.
+- 드라마/영화 제목이 주어지면 줄거리, 인물 관계, 장르 톤, 공개 자료를 분석해 새 해설 대본으로 재구성한다.
+- 원작 대사나 특정 장면 묘사를 그대로 베끼지 말고, 시청자가 이해할 수 있는 요약·해석·연결 설명으로 쓴다.
+- 영상 슬롯은 사용자가 권리를 가진 클립/예고편/공식 공개 자료/직접 업로드 자료를 넣는 전제로 배치한다. 자료가 없으면 문서형 화면, 관계도, 챕터 카드, 이미지 재구성으로 대체한다.
+- BGM은 도입, 코믹 완급, 긴장, 감정 저점, 결말 회수마다 분위기가 바뀌도록 장면 mood를 조절한다.
+- 쇼츠식 텍스트 카드 남발 금지. 긴 호흡의 해설과 장면 근거가 이어져야 한다.
+- transition은 crossfade, slide, zoom 중심. glitch/whip은 중간 반전이나 클라이맥스에만 제한적으로 사용한다.`;
 }
 
 export async function generateScript(
 	briefId: string,
 	format: string,
 	referencePreset?: ReferencePreset,
+	productionType: "standard" | "animation" = "standard",
+	animationReadiness?: AnimationProductionReadinessReport,
 ): Promise<ScriptResult> {
 	const { data: brief } = await supabase
 		.from("briefs")
@@ -146,9 +242,100 @@ export async function generateScript(
 	const b = brief as Record<string, unknown> | null;
 
 	const isShorts = format === "shorts";
+	if (productionType === "animation") {
+		const readiness =
+			animationReadiness ??
+			analyzeAnimationProductionReadiness({
+				topicTitle: String(b?.core_message ?? ""),
+				format,
+			});
+		const familyRules = `제작 포맷 패밀리:
+- id: ${readiness.productionFamily}
+- label: ${readiness.productionFamilyLabel}
+- 이 포맷은 특정 채널 복제가 아니라 공개적으로 관찰 가능한 구조/리듬/샷 문법만 참고합니다.
+- 품질 게이트: ${readiness.qualityGates.join(" / ")}
+- 리스크 제어: ${readiness.riskControls.join(" / ")}`;
+		const pacing = isShorts
+			? "쇼츠 애니메이션: 7~12개 씬, 30~55초. 첫 2초 안에 주인공의 문제 또는 반전을 보여주세요. 컷은 빠르지만 캐릭터 외형은 유지하세요."
+			: "롱폼 애니메이션: 10~18개 씬, 4~8분 목표. 3막 구조(도입/실패/전환/클라이맥스/여운)를 지키고 중반부에 새 갈등을 넣으세요.";
+		const referenceSection = referencePreset
+			? `\n${buildScriptConstraint(referencePreset)}\n`
+			: "";
+		const result = await callOpenAI(
+			"당신은 유튜브 애니메이션 쇼츠/롱폼 작가이자 스토리보드 디렉터입니다. 반드시 지정된 JSON 형식으로만 응답하세요.",
+			`브리프:
+핵심 메시지: ${b?.core_message ?? ""}
+타겟: ${b?.target_audience ?? ""}
+주의사항: ${b?.cautions ?? ""}
+형식: ${format}
+
+${formatAnimationReadinessForPrompt(readiness)}
+${familyRules}
+${referenceSection}
+
+${pacing}
+
+작성 규칙:
+- 실사 다큐/뉴스 자료 기반처럼 쓰지 마세요. 모든 장면은 애니메이션 키포즈와 캐릭터 액션으로 설계합니다.
+- 캐릭터 바이블을 먼저 만들고, 모든 visual_prompt에 같은 주인공 외형/의상/색상/세계관 단서를 반복하세요.
+- 제작 포맷 패밀리(${readiness.productionFamilyLabel})에 맞는 샷 문법과 결말 방식을 따르세요.
+- 유명 채널 레퍼런스는 구조 분석용입니다. 특정 캐릭터, 고유 그래픽 스타일, 대사, 편집 리듬을 그대로 모사하지 마세요.
+- 캐릭터가 매 컷 다른 사람처럼 보이지 않도록 외형 문장을 고정해서 visual_prompt에 넣으세요.
+- 씬마다 하나의 스토리 비트만 다루세요: 목표, 방해, 리액션, 실패, 선택, 반전, 결말.
+- TTS는 캐릭터 대사처럼 자연스러운 구어체로 쓰되, 자막이 길어지지 않게 짧은 문장으로 자릅니다.
+- type은 image만 사용하세요. 텍스트만 보이는 강조 씬은 만들지 마세요.
+- 훅과 반전은 별도 카드 화면이 아니라 캐릭터 액션, 표정 변화, 오브젝트 클로즈업, 컷 전환으로 보여주세요.
+- visual_prompt는 영어로 작성하고, 텍스트/로고/워터마크를 넣지 마세요.
+
+응답 형식:
+{
+  "production_family": "${readiness.productionFamily}",
+  "animation_bible": {
+    "style": "consistent 2D character animation",
+    "world": "short world description",
+    "characters": [
+      {
+        "name": "character name",
+        "role": "protagonist",
+        "appearance": "fixed appearance, outfit, color, silhouette",
+        "personality": "personality",
+        "voice_tone": "voice direction"
+      }
+    ],
+    "recurring_props": ["prop1", "prop2"],
+    "color_palette": ["color1", "color2"]
+  },
+  "shorts_script": "쇼츠용 스크립트",
+  "longform_scenes": [
+    {
+      "narration": "짧은 나레이션 또는 대사",
+      "type": "image",
+      "visual_prompt": "English prompt with fixed character appearance and action",
+      "duration": ${isShorts ? 3 : 12},
+      "transition": "none",
+      "mood": "warm",
+      "text_effect": "none"
+    }
+  ]
+}`,
+		);
+
+		return parseJSON<ScriptResult>(result);
+	}
 	const pacing = isShorts
 		? "쇼츠: 7~12개 씬, 30~55초. 첫 10초는 씬당 1.5~3초, 이후도 4.2초 초과 금지. 나레이션 1~2문장. 하드컷/whip/glitch 전환 70% 이상."
-		: "롱폼: 6~8개 씬, 3~5분. 씬당 8~15초. 나레이션 3~5문장.";
+		: buildLongformPacing(referencePreset);
+	const mediaBalance = isShorts
+		? `- 기본값은 image가 아니라 video라고 생각하세요. evidence/quote/document 성격의 씬이 아니면 우선 video를 선택하세요.
+	- 전체 비텍스트 씬 중 절반 이상은 video 타입이 되도록 구성하세요.
+	- 시작 10초 안에 들어가는 첫 2~3개 씬은 80% 이상이 video 타입이 되도록 구성하세요.`
+		: `- 롱폼은 쇼츠처럼 모든 장면을 빠른 video로 몰지 마세요. 실제 영상, 문서, 지도, 기사 이미지, 재구성 이미지를 챕터 리듬에 맞게 배치하세요.
+	- 관련 영상 자료가 충분할 때만 비텍스트 씬의 40~55%를 video로 구성하세요. 영상 자료가 약하면 무리하게 video 타입을 늘리지 마세요.
+	- 시작부는 강한 질문으로 열되, 10초마다 휙휙 바뀌는 쇼츠식 인터럽트보다 출처와 맥락이 보이는 다큐 리듬을 우선하세요.`;
+	const policyGuard = `- AI 재구성/합성 장면을 실제 CCTV, 실제 영상, 단독 영상처럼 표현하지 마세요.
+	- 출처가 없는 내용은 단정하지 말고 "자료에 따르면", "보도에 따르면", "추정됩니다"처럼 근거 수준을 표현하세요.
+	- 잔혹 장면, 시신, 유혈, 사고 순간을 충격 유도용으로 묘사하지 마세요. 필요한 경우 비노출 자료와 맥락 설명으로 대체하세요.
+	- 같은 템플릿을 반복한 대량생산형 영상처럼 보이지 않게, 이 주제만의 타임라인/근거/해석/결론을 넣으세요.`;
 
 	const referenceSection = referencePreset
 		? `\n${buildScriptConstraint(referencePreset)}\n`
@@ -161,9 +348,8 @@ export async function generateScript(
 	씬 작성 규칙:
 	- 씬은 시간순 또는 인과순으로 흘러가야 합니다.
 	- 각 씬은 하나의 사건/정보 비트만 다루세요.
-	- 기본값은 image가 아니라 video라고 생각하세요. evidence/quote/document 성격의 씬이 아니면 우선 video를 선택하세요.
-	- 전체 비텍스트 씬 중 절반 이상은 video 타입이 되도록 구성하세요.
-	- 시작 10초 안에 들어가는 첫 2~3개 씬은 80% 이상이 video 타입이 되도록 구성하세요.
+	${mediaBalance}
+	${policyGuard}
 	- visual_prompt는 그 씬에서 실제로 보여야 할 장면을 영어로 구체적으로 쓰세요. 추상적인 분위기 설명만 쓰지 마세요.
 	- visual_prompt에는 장소 + 인물/대상 + 행동/증거물 중 최소 2가지를 포함해, 한 씬을 3~5개의 샷으로 쪼개도 성립하게 쓰세요.
 	- 앞 씬과 겹치는 화면 설명을 반복하지 마세요.
@@ -256,6 +442,8 @@ export async function generateResearchScript(
 	format: string,
 	researchBrief?: ResearchBrief,
 	referencePreset?: ReferencePreset,
+	productionReadiness?: TopicProductionReadinessReport,
+	nichePlaybookContext?: string,
 ): Promise<ScriptResult> {
 	const { data: topic } = await supabase
 		.from("topics")
@@ -336,10 +524,47 @@ ${timelineConstraint}
 	const referenceSection = referencePreset
 		? `\n${buildScriptConstraint(referencePreset)}\n`
 		: "";
+	const readinessReport =
+		productionReadiness ??
+		analyzeTopicProductionReadiness({
+			topicTitle: t?.title ?? "",
+			format,
+			sources,
+			researchBrief: effectiveBrief,
+		});
+	const productionReadinessSection = `\n${formatTopicProductionReadinessForPrompt(readinessReport)}\n`;
+	const nichePlaybookSection = nichePlaybookContext
+		? `\n=== 니치 리서치 플레이북 ===\n${nichePlaybookContext}\n`
+		: "";
+
+	const isShorts = format === "shorts";
+	const featureLengthReference = isFeatureLengthReference(referencePreset);
+	const mediaBalanceRules = isShorts
+		? `9. evidence/quote/document 성격이 아닌 씬은 기본적으로 video 타입을 우선하세요. 비텍스트 씬의 60% 이상을 video로 구성하세요.
+10. 시작 10초 안에 들어가는 첫 2~3개 씬은 최소 80%가 video 타입이 되게 하세요.`
+		: featureLengthReference
+			? `9. 장편 몰아보기는 영상 클립만 이어붙이지 말고, 인물 관계도/챕터 카드/자료 화면/재구성 이미지/사용자 제공 클립을 챕터별로 섞으세요.
+10. 관련 영상 자료가 충분한 경우에도 비텍스트 씬의 35~50%만 video로 두고, 나머지는 이해를 돕는 편집 화면으로 구성하세요.
+11. 각 씬 나레이션은 실제 TTS 길이가 duration에 맞도록 충분히 작성하세요. 짧은 요약문만 쓰면 장편 목표 길이에 도달하지 못합니다.`
+			: `9. 롱폼은 쇼츠식 video 과밀 편집을 피하고, 실제 영상/문서/지도/기사 이미지/재구성 컷을 챕터별로 섞으세요.
+10. 관련 영상 자료가 충분한 경우에만 비텍스트 씬의 40~55%를 video로 구성하세요. 영상 자료가 약하면 image/document/map/evidence 씬을 우선하세요.`;
+	const policyGuard = `정책/신뢰 가드:
+- AI 재구성/합성 장면을 실제 CCTV, 실제 영상, 단독 영상처럼 표현하지 마세요.
+- 실제 인물·장소·사건을 현실적으로 합성한 경우 업로드 설명에 AI 재구성 고지가 필요하다는 전제로 작성하세요.
+- 출처 없는 단정, 범인 확정, 조작/은폐 같은 고위험 주장은 자료 근거가 있을 때만 쓰고, 없으면 추정 표현으로 낮추세요.
+- 잔혹 장면, 시신, 유혈, 사고 순간은 충격 유도용으로 묘사하지 말고 비노출 자료와 맥락 설명으로 대체하세요.
+- 기사 읽기/이미지 슬라이드쇼처럼 보이지 않게 원본 해설, 사건 순서, 자료 해석, 결론을 반드시 포함하세요.`;
+
+	const systemRole = featureLengthReference
+		? `당신은 한국 유튜브 드라마/영화 몰아보기 롱폼 작가이자 편집 구성 디렉터입니다.
+핵심은 작품/주제를 분석해 새 해설 대본, 챕터 구성, 장면별 음악 톤, TTS 호흡을 설계하는 것입니다.
+원본 영상·음악·대사를 그대로 복제하지 말고 공개 자료와 사용자 제공 클립을 전제로 새 설명/해석으로 재구성하세요.`
+		: `당신은 한국 유튜브 미스테리/공포/정보 채널의 스크립트 작성 전문가입니다.
+참고 채널: "편집중", "까마귀의 밤", "미스테리 호러쇼" 스타일.
+`;
 
 	const result = await callOpenAI(
-		`당신은 한국 유튜브 미스테리/공포/정보 채널의 스크립트 작성 전문가입니다.
-참고 채널: "편집중", "까마귀의 밤", "미스테리 호러쇼" 스타일.
+		`${systemRole}
 
 핵심 원칙:
 1. 자료에 나오는 구체적인 정보(인물 이름, 날짜, 장소, 사건 경위, 수치)를 반드시 나레이션에 포함하세요.
@@ -349,13 +574,14 @@ ${effectiveBrief ? "3. 아래 리서치 브리프의 팩트를 우선 사용하�
 5. 시청자가 바로 옆에서 이야기를 듣는 것처럼 생생하고 몰입감 있는 구어체로 작성하세요.
 6. 수집된 자료(뉴스 기사, 이미지)를 영상에 직접 사용합니다. source_index로 지정합니다.
 7. 뉴스 내용은 나레이션으로 전달합니다. 화면에는 분위기 있는 이미지/영상을 배경으로 깔아주세요.
-8. news_overlay는 사용하지 마세요. 모든 씬은 image, video, text_emphasis 중에서 선택하세요.
-9. evidence/quote/document 성격이 아닌 씬은 기본적으로 video 타입을 우선하세요. 비텍스트 씬의 60% 이상을 video로 구성하세요.
-10. 시작 10초 안에 들어가는 첫 2~3개 씬은 최소 80%가 video 타입이 되게 하세요.
+8. news_overlay와 text_emphasis는 사용하지 마세요. 모든 씬은 image 또는 video 중에서만 선택하세요.
+${mediaBalanceRules}
+${nichePlaybookContext ? "11. 니치 리서치 플레이북의 훅 시간, 오프닝 공식, 제작 제약을 첫 씬과 전체 페이싱에 반영하세요. 단, 자료 팩트와 정책 가드를 우선합니다." : ""}
+${policyGuard}
 반드시 지정된 JSON 형식으로만 응답하세요.`,
 		`주제: ${t?.title ?? ""}
 형식: ${format}
-${researchSection}${referenceSection}
+${researchSection}${productionReadinessSection}${nichePlaybookSection}${referenceSection}
 === 수집된 자료 목록 (통합 인덱스) ===
 ${sourceList || "(없음)"}
 
@@ -367,7 +593,7 @@ ${sourceList || "(없음)"}
   "longform_scenes": [
     {
       "narration": "나레이션 텍스트",
-      "type": "image | video | text_emphasis | news_overlay",
+      "type": "image | video",
       "visual_prompt": "영문 이미지 설명",
       "source_index": 0,
       "duration": 12,
@@ -381,7 +607,7 @@ ${sourceList || "(없음)"}
 씬 타입 규칙:
 - "image": 이미지 배경 + 나레이션. source_index로 수집 이미지 지정 또는 -1이면 AI 생성.
 - "video": 영상 클립 배경 + 나레이션. source_index로 수집 YouTube 영상 지정 (영상 자료만 가능).
-- "text_emphasis": 텍스트 강조 화면. 충격적인 사실/반전을 큰 글씨로.
+- ⛔ "text_emphasis"는 사용하지 마세요. 충격적인 사실/반전도 별도 카드가 아니라 영상/이미지 샷 위 자막, 줌, SFX, 컷 전환으로 처리합니다.
 - ⛔ "news_overlay"는 사용하지 마세요. 뉴스 정보는 나레이션으로 전달하고 배경은 image나 video로.
 
 스크립트 작성 규칙:
@@ -390,9 +616,8 @@ ${sourceList || "(없음)"}
 - source_index: 자료 인덱스 (0부터). 수집 자료 사용 시 지정. AI 생성이면 -1.
 - 뉴스 기사 내용은 나레이션 텍스트에 자연스럽게 녹여서 전달하세요. 카드 UI 금지.
 - YouTube 영상 자료가 있으면 반드시 "video" 타입으로 배경에 활용하세요.
-- evidence/quote/document 삽입용 씬이 아니면 기본적으로 "video" 타입을 우선하세요.
-- 전체 비텍스트 씬의 최소 60%는 "video" 타입으로 구성하세요.
-- 시작 10초 안에 들어가는 첫 2~3개 씬은 최소 80%를 "video" 타입으로 배치하세요.
+${mediaBalanceRules}
+${policyGuard}
 - 이미지 자료가 있으면 해당 이미지를 source_index로 직접 사용하세요.
 	- 사건 흐름상 필요하면 같은 source_index를 여러 씬에서 재사용해도 됩니다.
 	- visual_prompt는 그 씬의 실제 장소/인물/행동/증거를 보여주는 영어 설명이어야 합니다.
@@ -409,46 +634,19 @@ ${
 - 나레이션은 씬당 1~2문장만. 짧고 강렬하게.
 - 씬1(훅, 2초 안팎): 시청자가 스크롤을 멈출 최강 사실 1개로 바로 시작. 도입·배경 금지.
 - 씬2~4(전개): 핵심 사실만 빠르게. 씬당 사건 비트 1개만 — 두 정보를 한 씬에 넣지 마세요.
-- 6~8초마다 패턴 인터럽트 1회. text_emphasis 또는 glitch/whip 전환으로 리듬을 꺾으세요.
-- 씬 수의 50~70% 지점(씬 수가 3개 이상일 때): 가장 반전적인 사실을 text_emphasis + glitch로. 충격 카드 필수.
+- 6~8초마다 패턴 인터럽트 1회. 별도 텍스트 카드가 아니라 영상 컷, 클로즈업, glitch/whip 전환, SFX로 리듬을 꺾으세요.
+- 씬 수의 50~70% 지점(씬 수가 3개 이상일 때): 가장 반전적인 사실을 evidence/detail/video 샷 + glitch 전환으로 보여주세요. 충격 카드 금지.
 - 마지막 씬: 2~3초로 짧게 끝내고, "이 사건은 아직도 미제입니다" 또는 "당신이라면?" 형식의 여운 한 줄로 마무리.
 - transition: "none", "whip_left", "whip_right", "glitch" 합계 70% 이상. crossfade 10% 이내.
 - mood: "horror" 또는 "mystery" 위주.
 - visual_prompt: 무드 묘사 금지. "장소+인물/대상+행동" 형식. 예: "야간 부두, 우비 입은 형사들이 손전등으로 현장 수색"`
-		: `
-=== 롱폼(16:9) 규칙 ===
-5단계 네러티브 구조를 반드시 지킨다. 비율은 전체 씬 수 기준.
-
-[도입 — 전체의 15%]
-- 씬1: 핵심 질문/충격 사실로 바로 시작. "~이 있습니다"형 설명 금지.
-- 강렬한 영상/이미지 + zoom 트랜지션. duration: 8~12초.
-
-[배경 — 전체의 20%]
-- 씬2~3: 사건·인물·맥락 소개. 시청자가 몰입할 맥락만. duration: 10~15초.
-- transition: crossfade or slide_left.
-
-[전개 — 전체의 40%]
-- 씬4~7: 핵심 사실을 하나씩 순서대로 풀어감. 각 씬에 하나의 포인트만.
-- 수집 이미지·영상 최대 활용. duration: 12~18초. transition: crossfade.
-
-[반전/클라이맥스 — 전체의 15%]
-- 씬8~9: 가장 놀라운 반전 또는 핵심 충격. text_emphasis + glitch 트랜지션.
-- mood: "horror" 또는 "mystery". duration: 8~12초.
-
-[결말 — 전체의 10%]
-- 마지막 씬: 현재 상황, 미해결 의문, 시청자 행동 유도(CTA). duration: 10~15초.
-- transition: fade or crossfade. mood: "neutral" or "warm".
-
-공통:
-- 총 8~12개 씬, 5~8분 분량.
-- 나레이션은 씬당 3~5문장. 짧은 구어체 문장. 접속사로 자연스럽게 연결.
-- 각 단계 전환 시 transition으로 리듬 변화를 준다.`
+		: buildLongformSceneRules(referencePreset)
 }
 
 연출 필드 (각 씬에 반드시 포함):
 - transition: "crossfade"(기본), "zoom"(극적), "slide_left"/"slide_right"(장면 이동), "glitch"(충격/반전), "whip_left"/"whip_right"(빠른 휙 전환 — 쇼츠에서 템포 올릴 때), "none"(하드컷)
 - mood: "horror"(차가운 파랑), "mystery"(따뜻한 앰버), "news"(중립), "neutral", "warm"
-- text_effect: text_emphasis 전용. "typewriter", "glitch", "scale_in", "none". 반전→glitch, 질문→typewriter, 강조→scale_in
+- text_effect: 사용하지 않는 값입니다. 항상 "none"으로 두세요. 강조는 씬 타입이 아니라 자막/컷/SFX/카메라 무브로 처리합니다.
 - visual_prompt는 영어로 작성. 어둡고 분위기 있는 시네마틱 톤으로.`,
 	);
 
@@ -463,9 +661,16 @@ export async function generateImage(
 	sceneId: string,
 	visualPrompt: string,
 	referencePreset?: ReferencePreset,
+	options?: import("./image-gen").ImageGenerationOptions,
 ): Promise<string> {
 	const { generateImage: gen } = await import("./image-gen");
-	const { url } = await gen(sceneId, visualPrompt, undefined, referencePreset);
+	const { url } = await gen(
+		sceneId,
+		visualPrompt,
+		undefined,
+		referencePreset,
+		options,
+	);
 	return url;
 }
 
@@ -473,6 +678,7 @@ export async function generateImageToPath(
 	storagePath: string,
 	visualPrompt: string,
 	referencePreset?: ReferencePreset,
+	options?: import("./image-gen").ImageGenerationOptions,
 ): Promise<string> {
 	const { generateImageToPath: gen } = await import("./image-gen");
 	const { url } = await gen(
@@ -480,6 +686,7 @@ export async function generateImageToPath(
 		visualPrompt,
 		undefined,
 		referencePreset,
+		options,
 	);
 	return url;
 }

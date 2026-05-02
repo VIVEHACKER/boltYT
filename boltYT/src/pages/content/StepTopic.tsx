@@ -10,6 +10,11 @@ import {
 } from "@porsche-design-system/components-react";
 import { useCallback, useEffect, useState } from "react";
 import { fetchTopicSuggestions } from "../../lib/ai";
+import {
+	attachNicheHandoffToTopic,
+	formatCompactNumber,
+	type NicheResearchHandoff,
+} from "../../lib/niche-research";
 import { supabase } from "../../lib/supabase";
 import type { Channel } from "../../types/database";
 
@@ -18,6 +23,9 @@ interface StepTopicProps {
 	selectedChannelId: string;
 	onChannelChange: (id: string) => void;
 	onNext: (topicId: string) => void;
+	initialTitle?: string;
+	source?: string;
+	nicheHandoff?: NicheResearchHandoff | null;
 }
 
 export default function StepTopic({
@@ -25,8 +33,11 @@ export default function StepTopic({
 	selectedChannelId,
 	onChannelChange,
 	onNext,
+	initialTitle = "",
+	source = "manual",
+	nicheHandoff,
 }: StepTopicProps) {
-	const [title, setTitle] = useState("");
+	const [title, setTitle] = useState(initialTitle);
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState("");
 	const [suggestions, setSuggestions] = useState<string[]>([]);
@@ -54,6 +65,11 @@ export default function StepTopic({
 		loadSuggestions(selectedChannelId);
 	}, [selectedChannelId, loadSuggestions]);
 
+	useEffect(() => {
+		if (!initialTitle.trim()) return;
+		setTitle((current) => current || initialTitle);
+	}, [initialTitle]);
+
 	async function handleSubmit() {
 		if (!title.trim()) {
 			setError("주제를 입력해주세요.");
@@ -68,7 +84,7 @@ export default function StepTopic({
 				channel_id: selectedChannelId,
 				title: title.trim(),
 				status: "active",
-				source: "manual",
+				source,
 			})
 			.select()
 			.maybeSingle();
@@ -77,6 +93,10 @@ export default function StepTopic({
 			setError(insertError?.message ?? "주제 저장에 실패했습니다.");
 			setLoading(false);
 			return;
+		}
+
+		if (nicheHandoff) {
+			attachNicheHandoffToTopic(data.id, nicheHandoff.id);
 		}
 
 		onNext(data.id);
@@ -111,6 +131,38 @@ export default function StepTopic({
 					state={error ? "error" : "none"}
 					message={error}
 				/>
+
+				{nicheHandoff && (
+					<div className="rounded-[8px] bg-canvas p-static-md border border-contrast-low">
+						<div className="flex items-center gap-static-sm mb-static-xs">
+							<PTag color="notification-info-soft">니치 리서치 연결됨</PTag>
+							<PText size="small" weight="semi-bold">
+								{nicheHandoff.summary.query}
+							</PText>
+						</div>
+						<PText size="small" color="contrast-medium">
+							{nicheHandoff.playbook.headline}
+						</PText>
+						<div className="mt-static-sm flex flex-wrap gap-static-xs">
+							<PTag color="background-surface">
+								{nicheHandoff.playbook.score}점
+							</PTag>
+							{nicheHandoff.playbook.analysisQuality && (
+								<PTag color="background-surface">
+									신뢰도 {nicheHandoff.playbook.analysisQuality.score}점
+								</PTag>
+							)}
+							<PTag color="background-surface">
+								중앙 조회수{" "}
+								{formatCompactNumber(nicheHandoff.summary.medianViews)}
+							</PTag>
+							<PTag color="background-surface">
+								일평균{" "}
+								{formatCompactNumber(nicheHandoff.summary.medianViewsPerDay)}/일
+							</PTag>
+						</div>
+					</div>
+				)}
 
 				<div>
 					<div className="flex items-center gap-static-sm mb-static-sm">

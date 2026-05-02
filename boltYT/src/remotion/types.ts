@@ -41,7 +41,11 @@ export type TextEffect = "typewriter" | "glitch" | "scale_in" | "none";
 export type CaptionStyle = "karaoke" | "chunked" | "none";
 
 // ─── Layout ───
-export type LayoutVariant = "full" | "split" | "letterbox";
+export type LayoutVariant =
+	| "full"
+	| "split"
+	| "letterbox"
+	| "social_clip_card";
 
 // ─── Subtitle ───
 export interface SubtitleStyle {

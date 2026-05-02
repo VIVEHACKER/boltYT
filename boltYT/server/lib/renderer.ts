@@ -17,6 +17,10 @@ import { preprocessProjectAudio } from "./audio-effects-ffmpeg.js";
 import type { RenderJob } from "./job-manager.js";
 import { createLogger } from "./logger.js";
 import { enqueueProxyBuildBackground } from "./proxy-enqueue.js";
+import {
+	evaluateRenderOutput,
+	isRenderReferenceProfile,
+} from "./render-output-qc.js";
 import { checkFfmpegAvailability } from "./render-auth.js";
 import { createWorkerPool } from "./worker-pool.js";
 
@@ -176,11 +180,29 @@ export function createRenderer(opts: RendererOptions): Renderer {
 				});
 			});
 
+			const referenceProfile = isRenderReferenceProfile(
+				processedProps.referenceFrameProfile,
+			)
+				? processedProps.referenceFrameProfile
+				: undefined;
+			job.qcResult = await evaluateRenderOutput(outputPath, {
+				referenceProfile,
+			});
+			if (!job.qcResult.passed) {
+				throw new Error(
+					`render_qc_failed: ${job.qcResult.score}/100 ${job.qcResult.issues.join(", ")}`,
+				);
+			}
+
 			job.status = "complete";
 			job.progress = 100;
 			job.completedAt = new Date().toISOString();
 			saveQueue();
-			log.info("Render complete", { outputPath });
+			log.info("Render complete", {
+				outputPath,
+				qcScore: job.qcResult.score,
+				qcVerdict: job.qcResult.verdict,
+			});
 			enqueueProxyBuildBackground(outputPath, (r) => {
 				if (!r.ok)
 					log.warn("proxy enqueue failed", { outputPath, error: r.error });
@@ -194,11 +216,13 @@ export function createRenderer(opts: RendererOptions): Renderer {
 					? "timeout"
 					: msg.includes("memory") || msg.includes("OOM")
 						? "oom"
-						: msg.includes("ENOENT")
-							? "file_not_found"
-							: "unknown";
+				: msg.includes("ENOENT")
+					? "file_not_found"
+					: msg.includes("render_qc_failed")
+						? "quality_gate"
+						: "unknown";
 
-			if (retries < MAX_RETRIES) {
+			if (retries < MAX_RETRIES && errorCategory !== "quality_gate") {
 				job.status = "queued";
 				job.retryCount = retries + 1;
 				job.progress = 0;

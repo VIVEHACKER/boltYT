@@ -35,6 +35,7 @@ const ContentDetailPage = lazy(
 const TimelineEditor = lazy(() => import("./pages/content/TimelineEditor"));
 const UploadsPage = lazy(() => import("./pages/UploadsPage"));
 const AnalyticsPage = lazy(() => import("./pages/AnalyticsPage"));
+const NicheResearchPage = lazy(() => import("./pages/NicheResearchPage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const DiagnosticsPage = lazy(() => import("./pages/DiagnosticsPage"));
 
@@ -89,6 +90,7 @@ export default function App() {
 								/>
 								<Route path="/uploads" element={<UploadsPage />} />
 								<Route path="/analytics" element={<AnalyticsPage />} />
+								<Route path="/niche-research" element={<NicheResearchPage />} />
 								<Route path="/settings" element={<SettingsPage />} />
 								<Route path="/diagnostics" element={<DiagnosticsPage />} />
 							</Route>

@@ -31,6 +31,8 @@ interface UploadResult {
 	ok: boolean;
 	videoId: string;
 	url: string;
+	thumbnailSet?: boolean;
+	thumbnailError?: string;
 }
 
 interface AnalyticsResult {
@@ -131,6 +133,7 @@ export async function uploadVideo(params: {
 	title: string;
 	description: string;
 	tags: string[];
+	thumbnailDataUrl?: string;
 	privacyStatus?: "public" | "unlisted" | "private";
 	scheduledAt?: string;
 }): Promise<UploadResult> {
@@ -141,6 +144,7 @@ export async function uploadVideo(params: {
 			title: params.title,
 			description: params.description,
 			tags: params.tags.join(","),
+			thumbnailDataUrl: params.thumbnailDataUrl,
 			privacyStatus: params.privacyStatus ?? "private",
 			scheduledAt: params.scheduledAt,
 		}),

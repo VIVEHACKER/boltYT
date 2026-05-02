@@ -23,6 +23,7 @@ import {
 	getIgAuthStatus,
 	uploadToInstagram,
 } from "../lib/instagram";
+import { loadLocalFileUrl } from "../lib/local-db";
 import type { MediaSource } from "../lib/media-license";
 import { supabase } from "../lib/supabase";
 import {
@@ -36,6 +37,7 @@ import {
 	getVideoAnalytics,
 	uploadVideo,
 } from "../lib/youtube";
+import { analyzeYouTubePolicyRisk } from "../lib/youtube-policy-risk";
 
 type Platform = "youtube" | "tiktok" | "instagram";
 
@@ -52,12 +54,33 @@ interface UploadRow {
 	scheduled_at: string | null;
 	published_at: string | null;
 	created_at: string;
+	thumbnail_path?: string;
 }
 
 interface UploadState {
 	uploading: string | null;
 	error: string | null;
 	scheduling: string | null;
+}
+
+async function blobUrlToDataUrl(url: string): Promise<string> {
+	const res = await fetch(url);
+	if (!res.ok) return "";
+	const blob = await res.blob();
+	return new Promise((resolve, reject) => {
+		const reader = new FileReader();
+		reader.onload = () =>
+			resolve(typeof reader.result === "string" ? reader.result : "");
+		reader.onerror = () => reject(reader.error);
+		reader.readAsDataURL(blob);
+	});
+}
+
+async function loadThumbnailDataUrl(upload: UploadRow): Promise<string> {
+	if (!upload.thumbnail_path) return "";
+	const blobUrl = await loadLocalFileUrl(upload.thumbnail_path, "image/jpeg");
+	if (!blobUrl) return "";
+	return blobUrlToDataUrl(blobUrl);
 }
 
 export default function UploadsPage() {
@@ -125,6 +148,22 @@ export default function UploadsPage() {
 			return;
 		}
 
+		const policyReport = analyzeYouTubePolicyRisk({
+			title: upload.title,
+			description: upload.description,
+			scenes: [],
+		});
+		const criticalPolicyIssue = policyReport.issues.find(
+			(issue) => issue.severity === "critical",
+		);
+		if (criticalPolicyIssue) {
+			setState((s) => ({
+				...s,
+				error: `YouTube 정책 리스크로 업로드 중단: ${criticalPolicyIssue.message}`,
+			}));
+			return;
+		}
+
 		setState({ uploading: upload.id, error: null, scheduling: null });
 
 		// 상태를 uploading으로 변경
@@ -165,11 +204,13 @@ export default function UploadsPage() {
 				throw new Error("렌더 파일 경로를 찾을 수 없습니다.");
 			}
 
+			const thumbnailDataUrl = await loadThumbnailDataUrl(upload);
 			const result = await uploadVideo({
 				filePath: storagePath,
 				title: upload.title,
 				description: upload.description,
 				tags: upload.tags,
+				thumbnailDataUrl: thumbnailDataUrl || undefined,
 				privacyStatus: upload.scheduled_at ? "private" : "public",
 				scheduledAt: upload.scheduled_at ?? undefined,
 			});
@@ -498,11 +539,22 @@ export default function UploadsPage() {
 				</div>
 			) : (
 				<div className="flex flex-col gap-static-md">
-					{uploads.map((upload) => (
-						<div
-							key={upload.id}
-							className="bg-surface rounded-[8px] p-static-lg"
-						>
+					{uploads.map((upload) => {
+						const policyReport = analyzeYouTubePolicyRisk({
+							title: upload.title,
+							description: upload.description,
+							scenes: [],
+						});
+						const policyIssues = policyReport.issues.filter(
+							(issue) =>
+								issue.severity === "critical" || issue.severity === "warning",
+						);
+
+						return (
+							<div
+								key={upload.id}
+								className="bg-surface rounded-[8px] p-static-lg"
+							>
 							<div className="flex items-start justify-between">
 								<div className="flex-1 min-w-0">
 									{/* 제목 + 상태 */}
@@ -695,8 +747,30 @@ export default function UploadsPage() {
 									)}
 								</div>
 							</div>
+							{policyIssues.length > 0 && (
+								<PInlineNotification
+									state={
+										policyIssues[0].severity === "critical" ? "error" : "warning"
+									}
+									className="mt-static-md"
+									dismissButton={false}
+								>
+									<PText size="x-small" weight="semi-bold">
+										YouTube 정책 체크
+									</PText>
+									<PText size="x-small" color="contrast-medium">
+										{policyIssues[0].message}
+									</PText>
+									{policyReport.requiredActions[0] && (
+										<PText size="x-small" color="contrast-medium">
+											{policyReport.requiredActions[0]}
+										</PText>
+									)}
+								</PInlineNotification>
+							)}
 						</div>
-					))}
+						);
+					})}
 				</div>
 			)}
 		</div>

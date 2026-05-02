@@ -70,32 +70,39 @@ const VID1 = "generated/video_1.mp4"; // 꼬꼬무 SBS (아버지 출연) — 30
 // 각 씬: 동일 소스 영상을 trim_start/trim_end로 3등분 → 다른 구간 재생
 // trim_start/trim_end 는 씬 durationInFrames 기준 정규화 (0.0~1.0)
 const DEMO_SHOTS: SceneShot[][] = [
-	// 씬1 (21.5s, video_2): 3컷 — 0~7s / 7~14s / 14~21.5s
+	// 씬1: 첫 6초 안에 3개 이상의 실질 비주얼 비트가 나오도록 자료 컷 선배치
 	[
 		{
 			id: "1a",
 			kind: "establishing",
-			duration_seconds: 7,
-			media_type: "video",
-			trim_start: 0.0,
-			trim_end: 0.33,
+			duration_seconds: 2.1,
+			media_type: "image",
+			source_url: "demo/scene1.jpg",
 			motion: "slow_zoom_in",
 			crop: "full",
 		},
 		{
 			id: "1b",
 			kind: "context",
-			duration_seconds: 7,
-			media_type: "video",
-			trim_start: 0.33,
-			trim_end: 0.66,
+			duration_seconds: 2.1,
+			media_type: "image",
+			source_url: "demo/scene2.jpg",
 			motion: "pan_left",
 			crop: "medium",
 		},
 		{
 			id: "1c",
+			kind: "evidence",
+			duration_seconds: 2.1,
+			media_type: "image",
+			source_url: "demo/scene3.jpg",
+			motion: "pan_right",
+			crop: "close",
+		},
+		{
+			id: "1d",
 			kind: "punch",
-			duration_seconds: 7.5,
+			duration_seconds: 15.2,
 			media_type: "video",
 			trim_start: 0.66,
 			trim_end: 1.0,
@@ -184,9 +191,9 @@ const DEMO_SHOTS: SceneShot[][] = [
 const VIDEOS = [VID2, VID1, VID2];
 
 const AUDIOS = [
-	staticFile("generated/narration_1.mp3"),
-	staticFile("generated/narration_3.mp3"),
-	staticFile("generated/narration_6.mp3"),
+	staticFile("demo/narration.mp3"),
+	staticFile("demo/narration.mp3"),
+	staticFile("demo/narration.mp3"),
 ];
 
 export const DEMO_BGM_URL = staticFile("sfx/dark-ambient.mp3");

@@ -125,17 +125,20 @@ describe("hardware acceleration", () => {
 		expect(r.useCrf).toBe(false);
 		const args = toRemotionCliArgs(r);
 		expect(args).not.toContain("--crf");
+		expect(args).toContain("--video-bitrate");
 		expect(args).toContain("--hardware-acceleration");
 		expect(args).toContain("required");
 	});
 
-	it("useCrf true includes --crf in cli + renderMedia options", () => {
+	it("useCrf true uses --crf without --video-bitrate", () => {
 		const r = resolveRenderOptions({ hardwareAccel: "disable" });
 		expect(r.useCrf).toBe(true);
 		const args = toRemotionCliArgs(r);
 		expect(args).toContain("--crf");
+		expect(args).not.toContain("--video-bitrate");
 		const opts = toRenderMediaOptions(r);
 		expect(opts.crf).toBeDefined();
+		expect(opts.videoBitrate).toBeUndefined();
 		expect(opts.hardwareAcceleration).toBe("disable");
 	});
 

@@ -147,7 +147,7 @@ function getBgContainerStyle(
 		return {
 			padding: 0,
 			display: "flex",
-			gap: emphasis ? 12 : 6,
+			gap: emphasis ? 10 : 5,
 			flexWrap: "wrap",
 			justifyContent: "center",
 			alignItems: "center",
@@ -155,12 +155,12 @@ function getBgContainerStyle(
 	}
 	if (bgStyle === "block") {
 		return {
-			background: "rgba(0, 0, 0, 0.78)",
+			background: "rgba(0, 0, 0, 0.68)",
 			borderRadius: 4,
-			padding: emphasis ? "18px 38px" : "12px 24px",
-			boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
+			padding: emphasis ? "14px 28px" : "10px 18px",
+			boxShadow: "0 3px 12px rgba(0,0,0,0.32)",
 			display: "flex",
-			gap: emphasis ? 12 : 6,
+			gap: emphasis ? 10 : 5,
 			flexWrap: "wrap",
 			justifyContent: "center",
 			alignItems: "center",
@@ -168,16 +168,16 @@ function getBgContainerStyle(
 	}
 	// pill (기본)
 	return {
-		background: "rgba(0, 0, 0, 0.42)",
-		backdropFilter: "blur(6px)",
-		WebkitBackdropFilter: "blur(6px)",
-		borderRadius: 14,
-		padding: emphasis ? "15px 30px" : "9px 18px",
+		background: "rgba(0, 0, 0, 0.28)",
+		backdropFilter: "blur(8px)",
+		WebkitBackdropFilter: "blur(8px)",
+		borderRadius: 12,
+		padding: emphasis ? "11px 22px" : "7px 14px",
 		boxShadow:
-			"0 4px 16px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.04)",
-		border: "1px solid rgba(255,255,255,0.05)",
+			"0 3px 12px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.03)",
+		border: "1px solid rgba(255,255,255,0.04)",
 		display: "flex",
-		gap: emphasis ? 10 : 5,
+		gap: emphasis ? 8 : 4,
 		flexWrap: "wrap",
 		justifyContent: "center",
 		alignItems: "center",
@@ -192,18 +192,18 @@ function getWordEffect(
 ): Pick<React.CSSProperties, "textShadow" | "WebkitTextStroke"> {
 	if (bgStyle === "stroke") {
 		return {
-			WebkitTextStroke: "2px rgba(0,0,0,0.92)",
+			WebkitTextStroke: "1.5px rgba(0,0,0,0.9)",
 			// 멀티 레이어: 가까운 그림자 + 먼 부드러운 그림자
 			textShadow: isActive
-				? "0 1px 0 rgba(0,0,0,0.8), 0 3px 8px rgba(0,0,0,0.7), 0 6px 18px rgba(0,0,0,0.4)"
-				: "0 1px 0 rgba(0,0,0,0.7), 0 2px 5px rgba(0,0,0,0.6)",
+				? "0 1px 0 rgba(0,0,0,0.76), 0 2px 6px rgba(0,0,0,0.56), 0 5px 14px rgba(0,0,0,0.28)"
+				: "0 1px 0 rgba(0,0,0,0.62), 0 2px 4px rgba(0,0,0,0.46)",
 		};
 	}
 	if (bgStyle === "glow") {
 		return {
 			WebkitTextStroke: "1.5px rgba(0,0,0,0.9)",
 			// 글로우 + 깊이 그림자
-			textShadow: `0 0 8px ${accentColor}aa, 0 0 18px ${accentColor}66, 0 0 32px ${accentColor}33, 0 2px 6px rgba(0,0,0,0.8)`,
+			textShadow: `0 0 6px ${accentColor}66, 0 0 14px ${accentColor}33, 0 2px 6px rgba(0,0,0,0.76)`,
 		};
 	}
 	if (bgStyle === "ticker" || bgStyle === "spotlight") {
@@ -216,8 +216,8 @@ function getWordEffect(
 	return {
 		WebkitTextStroke: "1.5px rgba(0,0,0,0.85)",
 		textShadow: isActive
-			? "0 1px 0 rgba(0,0,0,0.7), 0 2px 6px rgba(0,0,0,0.6), 0 5px 14px rgba(0,0,0,0.35)"
-			: "0 1px 0 rgba(0,0,0,0.55), 0 2px 4px rgba(0,0,0,0.5)",
+			? "0 1px 0 rgba(0,0,0,0.62), 0 2px 5px rgba(0,0,0,0.52), 0 4px 10px rgba(0,0,0,0.24)"
+			: "0 1px 0 rgba(0,0,0,0.48), 0 2px 4px rgba(0,0,0,0.38)",
 	};
 }
 
@@ -338,15 +338,14 @@ export function ChunkedCaption({
 					const isActive = frame >= w.startFrame && frame < w.endFrame;
 					const isPast = frame >= w.endFrame;
 					const state = isActive ? "active" : isPast ? "past" : "future";
-					const activeColor =
-						emphasis || bgStyle === "glow" ? accentColor : "#ffffff";
+					const activeColor = "#ffffff";
 
 					// 활성 단어: 살짝 커지는 효과
 					const wordScale = isActive
 						? interpolate(
 								frame,
 								[w.startFrame, w.startFrame + 3],
-								[motionTheme.activeWordScale, 1.0],
+								[Math.min(motionTheme.activeWordScale, emphasis ? 1.08 : 1.05), 1.0],
 								{
 									extrapolateLeft: "clamp",
 									extrapolateRight: "clamp",
@@ -368,16 +367,20 @@ export function ChunkedCaption({
 						: isPast
 							? "rgba(255,255,255,0.9)"
 							: "rgba(255,255,255,0.72)";
-					const finalColor = emphasized && !isActive ? accentColor : baseColor;
+					const finalColor = emphasized
+						? isActive
+							? accentColor
+							: baseColor
+						: baseColor;
 					const finalWeight = emphasized
 						? isActive
-							? 800
-							: 720
+							? 760
+							: 700
 						: isActive
-							? 750
+							? 690
 							: emphasis
-								? 680
-								: 580;
+								? 640
+								: 560;
 					// emoji 포함된 단어는 line-height 보정 (이모지가 위/아래로 잘리는 문제 방지)
 					const hasEmoji = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(
 						w.word,

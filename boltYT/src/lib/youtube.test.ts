@@ -199,6 +199,25 @@ describe("uploadVideo", () => {
 		expect(body.tags).toBe("a,b,c");
 	});
 
+	it("thumbnailDataUrl 전달 시 업로드 요청 본문에 포함", async () => {
+		const fetchMock = okFetch({
+			ok: true,
+			videoId: "thumb",
+			url: "",
+			thumbnailSet: true,
+		});
+		await uploadVideo({
+			filePath: "/f.mp4",
+			title: "T",
+			description: "D",
+			tags: [],
+			thumbnailDataUrl: "data:image/jpeg;base64,abc",
+		});
+		const call = fetchMock.mock.calls[0] as [string, RequestInit];
+		const body = JSON.parse(call[1].body as string) as Record<string, unknown>;
+		expect(body.thumbnailDataUrl).toBe("data:image/jpeg;base64,abc");
+	});
+
 	it("서버 오류 → 예외 throw", async () => {
 		failFetch(500);
 		await expect(

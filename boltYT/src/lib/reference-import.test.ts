@@ -64,6 +64,11 @@ import {
 	updateReferenceTemplate,
 	waitForAnalysis,
 } from "./reference-import";
+import {
+	BUILT_IN_REFERENCE_TEMPLATE_CHANNEL_ID,
+	isBuiltInReference,
+	listBuiltInReferenceTemplates,
+} from "./reference-template-presets";
 
 function makeJob(overrides: Partial<AnalysisJob> = {}): AnalysisJob {
 	return {
@@ -134,6 +139,43 @@ describe("startYouTubeAnalysis", () => {
 		const call = vi.mocked(fetch).mock.calls[0];
 		expect(call[0] as string).toContain("/api/reference/analyze");
 		expect((call[1] as RequestInit).method).toBe("POST");
+		expect(JSON.parse(String((call[1] as RequestInit).body))).toEqual({
+			type: "youtube",
+			url: "https://youtu.be/abc",
+			mode: "auto",
+		});
+	});
+
+	it("분석 모드 지정 → request body에 포함", async () => {
+		const job = makeJob({ status: "queued" });
+		vi.stubGlobal(
+			"fetch",
+			vi.fn().mockResolvedValue({
+				ok: true,
+				json: () => Promise.resolve({ job }),
+			}),
+		);
+		await startYouTubeAnalysis("https://youtu.be/abc", { mode: "longform" });
+		const call = vi.mocked(fetch).mock.calls[0];
+		expect(JSON.parse(String((call[1] as RequestInit).body)).mode).toBe(
+			"longform",
+		);
+	});
+
+	it("딥 레퍼런스 모드 지정 → request body에 포함", async () => {
+		const job = makeJob({ status: "queued" });
+		vi.stubGlobal(
+			"fetch",
+			vi.fn().mockResolvedValue({
+				ok: true,
+				json: () => Promise.resolve({ job }),
+			}),
+		);
+		await startYouTubeAnalysis("https://youtu.be/abc", { mode: "deep" });
+		const call = vi.mocked(fetch).mock.calls[0];
+		expect(JSON.parse(String((call[1] as RequestInit).body)).mode).toBe(
+			"deep",
+		);
 	});
 
 	it("HTTP 오류 → throw", async () => {
@@ -307,13 +349,17 @@ describe("listReferenceTemplates", () => {
 		const rows = [{ id: "r1" }, { id: "r2" }];
 		mocks.mockOrder.mockReturnValue({ data: rows, error: null });
 		const result = await listReferenceTemplates("ch-1");
-		expect(result).toHaveLength(2);
+		expect(result).toHaveLength(listBuiltInReferenceTemplates().length + 2);
+		expect(result[0].channel_id).toBe("ch-1");
+		expect(isBuiltInReference(result[0])).toBe(true);
+		expect(result.at(-1)).toEqual(rows[1]);
 	});
 
-	it("data null → 빈 배열", async () => {
+	it("data null → 내장 템플릿만 반환", async () => {
 		mocks.mockOrder.mockReturnValue({ data: null, error: null });
 		const result = await listReferenceTemplates("ch-1");
-		expect(result).toEqual([]);
+		expect(result).toHaveLength(listBuiltInReferenceTemplates().length);
+		expect(result.every((row) => row.channel_id === "ch-1")).toBe(true);
 	});
 
 	it("오류 → throw", async () => {
@@ -336,6 +382,15 @@ describe("getReferenceTemplate", () => {
 		mocks.mockMaybeSingle.mockResolvedValue({ data: row, error: null });
 		const result = await getReferenceTemplate("r1");
 		expect(result).toEqual(row);
+	});
+
+	it("내장 템플릿 ID → Supabase 조회 없이 반환", async () => {
+		mocks.mockMaybeSingle.mockClear();
+		const result = await getReferenceTemplate("builtin-social-clip-real-video");
+		expect(result?.id).toBe("builtin-social-clip-real-video");
+		expect(result?.channel_id).toBe(BUILT_IN_REFERENCE_TEMPLATE_CHANNEL_ID);
+		expect(isBuiltInReference(result)).toBe(true);
+		expect(mocks.mockMaybeSingle).not.toHaveBeenCalled();
 	});
 
 	it("없음 → null", async () => {
@@ -377,6 +432,14 @@ describe("updateReferenceTemplate", () => {
 			"update failed",
 		);
 	});
+
+	it("내장 템플릿 수정 → throw", async () => {
+		await expect(
+			updateReferenceTemplate("builtin-social-clip-real-video", {
+				name: "Changed",
+			}),
+		).rejects.toThrow("내장 레퍼런스");
+	});
 });
 
 // ─── deleteReferenceTemplate ──────────────────────────────────────────────────
@@ -400,5 +463,11 @@ describe("deleteReferenceTemplate", () => {
 		await expect(deleteReferenceTemplate("r1")).rejects.toThrow(
 			"delete failed",
 		);
+	});
+
+	it("내장 템플릿 삭제 → throw", async () => {
+		await expect(
+			deleteReferenceTemplate("builtin-social-clip-real-video"),
+		).rejects.toThrow("내장 레퍼런스");
 	});
 });

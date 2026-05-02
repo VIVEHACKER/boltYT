@@ -72,6 +72,74 @@ describe("sfx", () => {
 		expect(result[0].enterSfx?.file).toBeTruthy();
 		expect(result[0].enterOffsetFrames).toBe(0);
 	});
+
+	it("애니메이션 액션 샷은 가족별 SFX cue를 자동 배정한다", () => {
+		const result = assignSfxToScenes([
+			{
+				type: "image",
+				productionType: "animation",
+				productionFamily: "meme_original",
+				animationShotCount: 3,
+				animationEndingShot: true,
+				needsActionSfx: true,
+				transition: "none",
+				durationInFrames: 72,
+			},
+		]);
+
+		expect(result[0].enterSfx?.category).toBe("whoosh");
+		expect(result[0].transitionSfx).toBeUndefined();
+	});
+
+	it("애니메이션 호러 패밀리는 드론/서스펜스 계열을 고른다", () => {
+		const result = assignSfxToScenes([
+			{
+				type: "image",
+				productionType: "animation",
+				productionFamily: "myth_horror_story",
+				animationShotCount: 2,
+				needsActionSfx: true,
+				transition: "crossfade",
+				durationInFrames: 90,
+			},
+			{
+				type: "image",
+				productionType: "animation",
+				productionFamily: "myth_horror_story",
+				animationShotCount: 2,
+				transition: "crossfade",
+				durationInFrames: 90,
+			},
+		]);
+
+		expect(result[0].enterSfx?.category).toBe("drone");
+		expect(result[0].transitionSfx?.category).toBe("suspense_hit");
+	});
+
+	it("샷 메타데이터가 지정한 SFX 카테고리를 우선한다", () => {
+		const result = assignSfxToScenes([
+			{
+				type: "image",
+				productionType: "animation",
+				productionFamily: "animated_explainer",
+				animationShotCount: 2,
+				preferredEnterSfxCategory: "bell",
+				preferredTransitionSfxCategory: "reveal",
+				transition: "crossfade",
+				durationInFrames: 90,
+			},
+			{
+				type: "image",
+				productionType: "animation",
+				productionFamily: "animated_explainer",
+				animationShotCount: 1,
+				durationInFrames: 90,
+			},
+		]);
+
+		expect(result[0].enterSfx?.category).toBe("bell");
+		expect(result[0].transitionSfx?.category).toBe("reveal");
+	});
 });
 
 // ─── getTransitionBgmDip ──────────────────────────────────────────────────────

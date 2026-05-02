@@ -7,6 +7,7 @@
 
 import type {
 	CaptionStyle,
+	LayoutVariant,
 	SceneMood,
 	SubtitleStyle,
 	TransitionType,
@@ -21,6 +22,7 @@ export interface ReferencePreset {
 		sceneCount: number;
 		avgSceneDuration: number;
 		hookDuration: number;
+		targetDuration: number;
 		hookPattern: ReferenceTemplate["hook_pattern"];
 		pacing: ReferenceTemplate["pacing_preset"];
 		structure: ReferenceTemplate["script_structure"];
@@ -50,7 +52,11 @@ export interface ReferencePreset {
 		subtitlePosition: ReferenceTemplate["subtitle_position"];
 		subtitleBgStyle: ReferenceTemplate["subtitle_bg_style"];
 		defaultTransition: TransitionType;
+		sceneLayout?: LayoutVariant;
 	};
+	// 레퍼런스 분석기가 저장한 픽셀/오디오/편집 DNA 원본.
+	// 렌더러가 직접 복제하지 않고, 프롬프트/자동편집 힌트로만 소비한다.
+	productionDna?: Record<string, unknown>;
 }
 
 // ─── 매핑 헬퍼 ───
@@ -92,6 +98,156 @@ const BGM_MOOD_MAP: Record<string, BgmMood> = {
 	cinematic: "dramatic",
 };
 
+const LAYOUT_VARIANTS: LayoutVariant[] = [
+	"full",
+	"split",
+	"letterbox",
+	"social_clip_card",
+];
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function isLayoutVariant(value: unknown): value is LayoutVariant {
+	return (
+		typeof value === "string" &&
+		LAYOUT_VARIANTS.includes(value as LayoutVariant)
+	);
+}
+
+function numericField(value: unknown): number | undefined {
+	return typeof value === "number" && Number.isFinite(value) && value > 0
+		? value
+		: undefined;
+}
+
+function finiteNumberField(value: unknown): number | undefined {
+	return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function formatNumber(value: number, decimals = 1): string {
+	const rounded = Number(value.toFixed(decimals));
+	return Number.isInteger(rounded) ? String(rounded) : String(rounded);
+}
+
+function stringField(value: unknown): string {
+	return typeof value === "string" ? value.trim() : "";
+}
+
+function stringArray(value: unknown): string[] {
+	if (Array.isArray(value)) {
+		return value.filter((item): item is string => typeof item === "string");
+	}
+	if (typeof value === "string" && value.trim()) return [value.trim()];
+	return [];
+}
+
+function productionDnaFromRaw(
+	ref: ReferenceTemplate,
+): Record<string, unknown> | undefined {
+	const raw = isRecord(ref.raw_analysis) ? ref.raw_analysis : undefined;
+	const dna = isRecord(raw?.production_dna) ? raw.production_dna : undefined;
+	return dna;
+}
+
+function nestedRecord(
+	record: Record<string, unknown> | undefined,
+	key: string,
+): Record<string, unknown> | undefined {
+	const value = record?.[key];
+	return isRecord(value) ? value : undefined;
+}
+
+function explicitFormatProfile(
+	ref: ReferenceTemplate,
+	format: "shorts" | "longform",
+):
+	| {
+			durationSeconds?: number;
+			sceneCount?: number;
+			avgSceneDuration?: number;
+			hookDuration?: number;
+	  }
+	| undefined {
+	const raw = isRecord(ref.raw_analysis) ? ref.raw_analysis : undefined;
+	const method = isRecord(raw?.production_method)
+		? raw.production_method
+		: undefined;
+	const profiles = isRecord(method?.formatProfiles)
+		? method.formatProfiles
+		: undefined;
+	const profile = isRecord(profiles?.[format])
+		? profiles[format]
+		: undefined;
+	if (!profile) return undefined;
+	return {
+		durationSeconds: numericField(profile.durationSeconds),
+		sceneCount: numericField(profile.sceneCount),
+		avgSceneDuration: numericField(profile.avgSceneDuration),
+		hookDuration: numericField(profile.hookDuration),
+	};
+}
+
+function explicitSceneLayout(
+	ref: ReferenceTemplate,
+	format: "shorts" | "longform",
+): LayoutVariant | undefined {
+	const raw = isRecord(ref.raw_analysis) ? ref.raw_analysis : undefined;
+	const method = isRecord(raw?.production_method)
+		? raw.production_method
+		: undefined;
+	const sceneLayouts = isRecord(method?.sceneLayouts)
+		? method.sceneLayouts
+		: undefined;
+	const candidate =
+		sceneLayouts?.[format] ??
+		method?.sceneLayout ?? method?.layoutVariant ?? raw?.sceneLayout;
+	if (format === "longform" && candidate === "social_clip_card") {
+		return undefined;
+	}
+	return isLayoutVariant(candidate) ? candidate : undefined;
+}
+
+function inferSceneLayout(
+	ref: ReferenceTemplate,
+	format: "shorts" | "longform",
+): LayoutVariant | undefined {
+	const explicit = explicitSceneLayout(ref, format);
+	if (explicit) return explicit;
+
+	const fingerprint = [
+		ref.name,
+		ref.source_title,
+		ref.source_creator,
+		ref.source_url,
+		ref.visual_prompt_template,
+		ref.transcript,
+		JSON.stringify(ref.raw_analysis ?? {}),
+	]
+		.join(" ")
+		.toLowerCase();
+
+	if (
+		format === "shorts" &&
+		[
+			"ssulply",
+			"썰플리",
+			"street interview",
+			"interview footage",
+			"live interview",
+			"social clip",
+			"clip curation",
+			"헌팅",
+			"hmDt88ANJMI".toLowerCase(),
+		].some((needle) => fingerprint.includes(needle))
+	) {
+		return "social_clip_card";
+	}
+
+	return undefined;
+}
+
 export function referenceToPreset(
 	ref: ReferenceTemplate,
 	format: "shorts" | "longform" = "shorts",
@@ -105,12 +261,24 @@ export function referenceToPreset(
 
 	const bgmMoodKey = ref.bgm_mood.toLowerCase().trim();
 	const bgmMood = BGM_MOOD_MAP[bgmMoodKey] ?? "";
+	const formatProfile = explicitFormatProfile(ref, format);
+	const sceneCount =
+		(formatProfile?.sceneCount ?? ref.scene_count) || (isShorts ? 8 : 10);
+	const avgSceneDuration =
+		(formatProfile?.avgSceneDuration ?? ref.avg_scene_duration) ||
+		(isShorts ? 4 : 10);
+	const hookDuration = (formatProfile?.hookDuration ?? ref.hook_duration) || 3;
+	const targetDuration =
+		formatProfile?.durationSeconds ??
+		Math.round(sceneCount * avgSceneDuration);
+	const productionDna = productionDnaFromRaw(ref);
 
 	return {
 		script: {
-			sceneCount: ref.scene_count || (isShorts ? 8 : 10),
-			avgSceneDuration: ref.avg_scene_duration || (isShorts ? 4 : 10),
-			hookDuration: ref.hook_duration || 3,
+			sceneCount,
+			avgSceneDuration,
+			hookDuration,
+			targetDuration,
 			hookPattern: ref.hook_pattern,
 			pacing: ref.pacing_preset,
 			structure: ref.script_structure,
@@ -145,7 +313,9 @@ export function referenceToPreset(
 			subtitlePosition: ref.subtitle_position,
 			subtitleBgStyle: ref.subtitle_bg_style,
 			defaultTransition: TRANSITION_MAP[ref.transition_style] ?? "crossfade",
+			sceneLayout: inferSceneLayout(ref, format),
 		},
+		productionDna,
 	};
 }
 
@@ -193,6 +363,7 @@ export function enrichVisualPrompt(
 					? "dynamic contrast lighting"
 					: "natural cinematic lighting";
 	const moodHint = moodVisualIntensity(mood);
+	const dnaHint = buildProductionDnaVisualHint(preset.productionDna);
 
 	const parts = [
 		sceneVisualPrompt,
@@ -200,8 +371,38 @@ export function enrichVisualPrompt(
 		colorHint,
 		lightingHint,
 		moodHint,
+		dnaHint,
 	].filter(Boolean);
 	return parts.join(", ");
+}
+
+function buildProductionDnaVisualHint(
+	dna: Record<string, unknown> | undefined,
+): string {
+	if (!dna) return "";
+	const layout = nestedRecord(dna, "layout");
+	const camera = nestedRecord(dna, "camera");
+	const color = nestedRecord(dna, "color");
+	const layoutParts = [
+		stringField(layout?.compositionPattern),
+		stringField(layout?.subjectZone),
+		stringField(layout?.subtitleCollisionRisk)
+			? `subtitle collision risk: ${stringField(layout?.subtitleCollisionRisk)}`
+			: "",
+	].filter(Boolean);
+	const cameraMode = stringField(camera?.mode);
+	const motionIntensity =
+		typeof camera?.motionIntensity === "number"
+			? `motion intensity ${camera.motionIntensity}`
+			: "";
+	const temperature = stringField(color?.temperature);
+	const parts = [
+		layoutParts.length > 0 ? `reference layout: ${layoutParts.join(", ")}` : "",
+		cameraMode ? `camera mode: ${cameraMode}` : "",
+		motionIntensity,
+		temperature ? `color temperature: ${temperature}` : "",
+	].filter(Boolean);
+	return parts.length > 0 ? parts.join(", ") : "";
 }
 
 /**
@@ -227,12 +428,75 @@ export function buildScriptConstraint(preset: ReferencePreset): string {
 	const hookStr = s.hookPattern
 		? `\n훅 패턴: ${s.hookPattern} (첫 ${s.hookDuration}초에 이 패턴 사용)`
 		: "";
+	const dnaStr = buildProductionDnaScriptConstraint(preset.productionDna);
 
 	return `
 === 레퍼런스 스타일 준수 ===
 - 씬 수: ${s.sceneCount}개 (±1 허용)
+- 목표 길이: ${s.targetDuration}초
 - 평균 씬 길이: ${s.avgSceneDuration}초
 - 페이싱: ${s.pacing}
-- 무드: ${s.mood}${hookStr}${toneStr}${structureStr}
+- 무드: ${s.mood}${hookStr}${toneStr}${dnaStr}${structureStr}
 `.trim();
+}
+
+function buildProductionDnaScriptConstraint(
+	dna: Record<string, unknown> | undefined,
+): string {
+	if (!dna) return "";
+	const camera = nestedRecord(dna, "camera");
+	const transitions = nestedRecord(dna, "transitions");
+	const layout = nestedRecord(dna, "layout");
+	const subtitles = nestedRecord(dna, "subtitles");
+	const audio = nestedRecord(dna, "audio");
+	const transitionRules = stringArray(transitions?.rules);
+	const textSafeZones = stringArray(layout?.textSafeZones);
+	const cutDensity = finiteNumberField(camera?.cutDensityPerMinute);
+	const avgCutInterval = finiteNumberField(camera?.avgCutIntervalSeconds);
+	const firstCut = finiteNumberField(camera?.firstCutSeconds);
+	const first3Motion = finiteNumberField(camera?.first3Motion);
+	const integratedLufs = finiteNumberField(audio?.integratedLufs);
+	const volumeMeanDb = finiteNumberField(audio?.volumeMeanDb);
+	const lines = [
+		stringField(camera?.mode)
+			? `카메라 모드: ${stringField(camera?.mode)}`
+			: "",
+		cutDensity !== undefined
+			? `컷 밀도: 분당 ${formatNumber(cutDensity)}컷 기준`
+			: "",
+		avgCutInterval !== undefined
+			? `평균 컷 간격: ${formatNumber(avgCutInterval)}초 단위로 말이 끝나는 지점에 컷 정렬`
+			: "",
+		firstCut !== undefined
+			? `첫 컷: ${formatNumber(firstCut)}초 전후에 화면 변화를 넣어 초반 정체를 피함`
+			: "",
+		first3Motion !== undefined
+			? `초반 3초 모션 강도: ${formatNumber(first3Motion, 2)} 기준으로 훅 구간에 줌/자료컷/클로즈업을 배치`
+			: "",
+		stringField(layout?.compositionPattern)
+			? `배치: ${stringField(layout?.compositionPattern)} / 피사체 ${stringField(layout?.subjectZone)}`
+			: "",
+		textSafeZones.length > 0
+			? `텍스트 안전영역: ${textSafeZones.join(", ")}`
+			: "",
+		stringField(subtitles?.collisionRisk)
+			? `자막 충돌 위험: ${stringField(subtitles?.collisionRisk)}`
+			: "",
+		transitionRules.length > 0
+			? `전환 규칙: ${transitionRules.slice(0, 3).join(" / ")}`
+			: "",
+		stringField(audio?.bgmTempo) || stringField(audio?.bgmMood)
+			? `BGM 기준: ${stringField(audio?.bgmMood)} ${stringField(audio?.bgmTempo)}`
+			: "",
+		integratedLufs !== undefined
+			? `오디오 믹스: 레퍼런스 LUFS ${formatNumber(integratedLufs)} 근처로 TTS/BGM을 덕킹`
+			: volumeMeanDb !== undefined
+				? `오디오 믹스: 평균 볼륨 ${formatNumber(volumeMeanDb)}dB 근처로 TTS/BGM을 덕킹`
+				: "",
+	].filter(Boolean);
+	return lines.length > 0
+		? `\n제작 DNA(픽셀/오디오/편집 분석):\n${lines
+				.map((line) => `- ${line}`)
+				.join("\n")}`
+		: "";
 }

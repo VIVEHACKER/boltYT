@@ -11,6 +11,9 @@ import { supabase } from "./supabase";
 // ─── 타입 ───
 
 export type TtsProvider = "openai" | "elevenlabs";
+export type OpenAiTtsModel = "tts-1" | "tts-1-hd" | "gpt-4o-mini-tts";
+
+type NarrationProfile = "suspense" | "news" | "warm" | "upbeat" | "neutral";
 
 export interface TtsVoice {
 	id: string;
@@ -26,6 +29,10 @@ export interface TtsOptions {
 	voice?: string;
 	provider?: TtsProvider;
 	speed?: number;
+	openAiModel?: OpenAiTtsModel;
+	direction?: string;
+	toneKeywords?: string[];
+	endingHoldSeconds?: number;
 }
 
 export interface NarrationTtsSignal {
@@ -33,6 +40,25 @@ export interface NarrationTtsSignal {
 	mood?: string;
 	type?: string;
 }
+
+const OPENAI_DEFAULT_MODEL: OpenAiTtsModel = "tts-1-hd";
+const OPENAI_DIRECTION_MODEL: OpenAiTtsModel = "gpt-4o-mini-tts";
+
+const PROFILE_TONE_KEYWORDS: Record<NarrationProfile, string[]> = {
+	suspense: ["긴장감", "절제", "다큐 톤", "단서 강조"],
+	news: ["정확함", "또박또박", "브리핑", "냉정함"],
+	warm: ["따뜻함", "절제된 감정", "여운", "공감"],
+	upbeat: ["속도감", "선명한 강조", "에너지", "반전 포인트"],
+	neutral: ["차분함", "명료함", "다큐 톤"],
+};
+
+const PROFILE_ENDING_HOLD: Record<NarrationProfile, number> = {
+	suspense: 0.42,
+	news: 0.28,
+	warm: 0.38,
+	upbeat: 0.24,
+	neutral: 0.32,
+};
 
 // ─── 음성 목록 ───
 
@@ -218,14 +244,21 @@ function countMatches(text: string, patterns: RegExp[]): number {
 	);
 }
 
-export function inferNarrationTtsOptions(
+function uniqueToneKeywords(groups: Array<string[] | undefined>): string[] {
+	const merged = groups.flatMap((group) => group ?? []).map((item) => item.trim());
+	return [...new Set(merged.filter(Boolean))].slice(0, 6);
+}
+
+function resolveNarrationProfile(
 	scenes: NarrationTtsSignal[],
-): TtsOptions {
+	extraToneKeywords: string[] = [],
+): NarrationProfile {
 	const combinedNarration = scenes
 		.map((scene) => scene.narration?.trim() ?? "")
 		.filter(Boolean)
 		.join(" ");
 	const lower = combinedNarration.toLowerCase();
+	const toneHints = extraToneKeywords.join(" ").toLowerCase();
 	const moods = scenes.map((scene) => scene.mood ?? "");
 	const mysteryMoodCount = moods.filter(
 		(mood) => mood === "mystery" || mood === "horror",
@@ -252,7 +285,8 @@ export function inferNarrationTtsOptions(
 			/missing/u,
 			/murder/u,
 			/investigation/u,
-		]);
+		]) +
+		countMatches(toneHints, [/긴장/u, /서스펜스/u, /미스터리/u, /다큐/u]);
 	const newsScore =
 		newsMoodCount +
 		countMatches(lower, [
@@ -263,7 +297,8 @@ export function inferNarrationTtsOptions(
 			/브리핑/u,
 			/news/u,
 			/report/u,
-		]);
+		]) +
+		countMatches(toneHints, [/브리핑/u, /정확/u, /앵커/u, /또박/u]);
 	const warmScore =
 		warmMoodCount +
 		countMatches(lower, [
@@ -275,18 +310,122 @@ export function inferNarrationTtsOptions(
 			/마음/u,
 			/family/u,
 			/hope/u,
-		]);
-	const upbeatScore = countMatches(lower, [
-		/반전/u,
-		/놀라운/u,
-		/드디어/u,
-		/성공/u,
-		/기록/u,
-		/upbeat/u,
-		/viral/u,
-	]);
+		]) +
+		countMatches(toneHints, [/따뜻/u, /공감/u, /여운/u, /잔잔/u]);
+	const upbeatScore =
+		countMatches(lower, [
+			/반전/u,
+			/놀라운/u,
+			/드디어/u,
+			/성공/u,
+			/기록/u,
+			/upbeat/u,
+			/viral/u,
+		]) +
+		countMatches(toneHints, [/속도/u, /에너지/u, /강조/u, /반전/u]) +
+		(videoSceneCount >= Math.ceil(Math.max(scenes.length, 1) / 2) ? 1 : 0);
 
-	if (suspenseScore >= 2) {
+	if (suspenseScore >= 2) return "suspense";
+	if (newsScore >= 2) return "news";
+	if (warmScore >= 2) return "warm";
+	if (upbeatScore >= 2) return "upbeat";
+	return "neutral";
+}
+
+function buildNarrationDirection(
+	profile: NarrationProfile,
+	toneKeywords: string[],
+): string {
+	const toneSuffix =
+		toneKeywords.length > 0
+			? ` 톤 키워드는 ${toneKeywords.join(", ")} 중심으로 유지할 것.`
+			: "";
+
+	switch (profile) {
+		case "suspense":
+			return `한국어 사건 다큐 나레이션. 차분하고 낮은 톤으로 시작하고, 핵심 단서에서만 짧게 힘을 줄 것. 과장하거나 감탄사처럼 읽지 말고 문장 끝을 서두르지 말 것.${toneSuffix}`;
+		case "news":
+			return `한국어 브리핑 나레이션. 또박또박 정확하게 읽고, 숫자와 고유명사를 선명하게 발음할 것. 감정 과장을 줄이고 단정한 앵커 톤을 유지할 것.${toneSuffix}`;
+		case "warm":
+			return `한국어 휴먼스토리 나레이션. 부드럽고 절제된 감정으로 읽고, 문장 사이에 짧게 숨을 둘 것. 울먹이거나 지나치게 감상적으로 읽지 말 것.${toneSuffix}`;
+		case "upbeat":
+			return `한국어 숏폼 나레이션. 템포는 빠르되 발음은 분명하게 유지하고, 반전 포인트에서만 짧게 에너지를 줄 것. 과한 하이텐션보다 리듬감 있는 전달을 우선할 것.${toneSuffix}`;
+		default:
+			return `한국어 설명형 나레이션. 차분하고 명료하게 읽고, 문장마다 짧은 호흡을 유지할 것. 과장 없이 다큐멘터리 톤을 유지할 것.${toneSuffix}`;
+	}
+}
+
+function inferProfileFromOptions(options?: TtsOptions): NarrationProfile {
+	const hints = [
+		options?.direction,
+		(options?.toneKeywords ?? []).join(" "),
+	]
+		.filter(Boolean)
+		.join(" ")
+		.toLowerCase();
+
+	if (/긴장|서스펜스|미스터리|단서|추적/.test(hints)) return "suspense";
+	if (/브리핑|정확|앵커|뉴스|또박/.test(hints)) return "news";
+	if (/따뜻|공감|여운|잔잔|휴먼/.test(hints)) return "warm";
+	if (/속도|에너지|반전|강조|숏폼/.test(hints)) return "upbeat";
+	return "neutral";
+}
+
+function getElevenLabsVoiceSettings(options: TtsOptions, speed: number) {
+	const profile = inferProfileFromOptions(options);
+	switch (profile) {
+		case "suspense":
+			return {
+				stability: 0.5,
+				similarity_boost: 0.76,
+				style: 0.28,
+				use_speaker_boost: true,
+				speed,
+			};
+		case "news":
+			return {
+				stability: 0.68,
+				similarity_boost: 0.74,
+				style: 0.1,
+				use_speaker_boost: true,
+				speed,
+			};
+		case "warm":
+			return {
+				stability: 0.62,
+				similarity_boost: 0.7,
+				style: 0.18,
+				use_speaker_boost: true,
+				speed,
+			};
+		case "upbeat":
+			return {
+				stability: 0.52,
+				similarity_boost: 0.74,
+				style: 0.22,
+				use_speaker_boost: true,
+				speed,
+			};
+		default:
+			return {
+				stability: 0.58,
+				similarity_boost: 0.72,
+				style: 0.12,
+				use_speaker_boost: true,
+				speed,
+			};
+	}
+}
+
+export function inferNarrationTtsOptions(
+	scenes: NarrationTtsSignal[],
+): TtsOptions {
+	const profile = resolveNarrationProfile(scenes);
+	const videoSceneCount = scenes.filter(
+		(scene) => scene.type === "video",
+	).length;
+
+	if (profile === "suspense") {
 		return {
 			voice: videoSceneCount >= Math.ceil(scenes.length / 2) ? "sage" : "ash",
 			provider: "openai",
@@ -294,7 +433,7 @@ export function inferNarrationTtsOptions(
 		};
 	}
 
-	if (newsScore >= 2) {
+	if (profile === "news") {
 		return {
 			voice: "sage",
 			provider: "openai",
@@ -302,7 +441,7 @@ export function inferNarrationTtsOptions(
 		};
 	}
 
-	if (warmScore >= 2) {
+	if (profile === "warm") {
 		return {
 			voice: "ash",
 			provider: "openai",
@@ -310,7 +449,7 @@ export function inferNarrationTtsOptions(
 		};
 	}
 
-	if (upbeatScore >= 2) {
+	if (profile === "upbeat") {
 		return {
 			voice: "coral",
 			provider: "openai",
@@ -322,6 +461,40 @@ export function inferNarrationTtsOptions(
 		voice: "sage",
 		provider: "openai",
 		speed: 0.97,
+	};
+}
+
+export function composeNarrationTtsOptions(
+	scenes: NarrationTtsSignal[],
+	baseOptions: TtsOptions = {},
+): TtsOptions {
+	const inferred = inferNarrationTtsOptions(scenes);
+	const profile = resolveNarrationProfile(
+		scenes,
+		baseOptions.toneKeywords ?? [],
+	);
+	const provider = baseOptions.provider ?? inferred.provider;
+	const toneKeywords = uniqueToneKeywords([
+		PROFILE_TONE_KEYWORDS[profile],
+		baseOptions.toneKeywords,
+	]);
+	const direction =
+		baseOptions.direction ?? buildNarrationDirection(profile, toneKeywords);
+
+	return {
+		...inferred,
+		...baseOptions,
+		toneKeywords,
+		direction,
+		openAiModel:
+			provider === "openai"
+				? (baseOptions.openAiModel ??
+					(direction ? OPENAI_DIRECTION_MODEL : OPENAI_DEFAULT_MODEL))
+				: undefined,
+		endingHoldSeconds: Math.max(
+			baseOptions.endingHoldSeconds ?? 0,
+			PROFILE_ENDING_HOLD[profile],
+		),
 	};
 }
 
@@ -393,6 +566,25 @@ export function inferNarrationPauseSeconds(
 	return Math.min(0.34, Number(pause.toFixed(2)));
 }
 
+export function inferNarrationEndingHoldSeconds(
+	text: string,
+	options?: TtsOptions,
+): number {
+	const trimmed = text.trim();
+	let hold = options?.endingHoldSeconds ?? PROFILE_ENDING_HOLD.neutral;
+
+	if (!trimmed) {
+		return Number(hold.toFixed(2));
+	}
+	if (/[.!?]$/.test(trimmed)) hold += 0.04;
+	if (/[!?]$/.test(trimmed)) hold += 0.03;
+	if (/(?:\.\.\.|…)$/.test(trimmed)) hold += 0.06;
+	if (trimmed.length >= 70) hold += 0.04;
+	if (trimmed.length >= 130) hold += 0.03;
+
+	return Math.min(0.52, Number(hold.toFixed(2)));
+}
+
 function concatNarrationBuffers(
 	audioContext: AudioContext,
 	segments: Array<{ buffer: AudioBuffer; pauseSeconds: number }>,
@@ -443,19 +635,27 @@ async function callOpenAiTts(
 	text: string,
 	voice: string,
 	speed: number,
+	options?: TtsOptions,
 ): Promise<ArrayBuffer> {
 	const proxy = getApiProxyUrl();
+	const model =
+		options?.openAiModel ??
+		(options?.direction ? OPENAI_DIRECTION_MODEL : OPENAI_DEFAULT_MODEL);
+	const body: Record<string, unknown> = {
+		model,
+		input: text,
+		voice,
+		response_format: "mp3",
+		speed,
+	};
+	if (options?.direction && model === OPENAI_DIRECTION_MODEL) {
+		body.instructions = options.direction;
+	}
 
 	const res = await fetch(`${proxy}/api/openai/tts`, {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({
-			model: "tts-1-hd",
-			input: text,
-			voice,
-			response_format: "mp3",
-			speed,
-		}),
+		body: JSON.stringify(body),
 	});
 
 	if (!res.ok) {
@@ -471,6 +671,7 @@ async function callElevenLabsTts(
 	text: string,
 	voiceId: string,
 	speed: number,
+	options?: TtsOptions,
 ): Promise<ArrayBuffer> {
 	const proxy = getApiProxyUrl();
 
@@ -480,13 +681,7 @@ async function callElevenLabsTts(
 		body: JSON.stringify({
 			text,
 			model_id: "eleven_multilingual_v2",
-			voice_settings: {
-				stability: 0.58,
-				similarity_boost: 0.72,
-				style: 0.12,
-				use_speaker_boost: true,
-				speed,
-			},
+			voice_settings: getElevenLabsVoiceSettings(options ?? {}, speed),
 		}),
 	});
 
@@ -509,9 +704,9 @@ export async function generateTtsChunk(
 	const speed = options?.speed ?? defaults.speed;
 
 	if (provider === "elevenlabs") {
-		return callElevenLabsTts(text, voice, speed);
+		return callElevenLabsTts(text, voice, speed, options);
 	}
-	return callOpenAiTts(text, voice, speed);
+	return callOpenAiTts(text, voice, speed, options);
 }
 
 /** Whisper로 오디오 전사 → word timings 추출 (프레임 단위) */
@@ -631,10 +826,14 @@ export async function generateContinuousNarration(
 		const decoded = await audioContext.decodeAudioData(dsp.buffer.slice(0));
 		const pauseSeconds = inferNarrationPauseSeconds(
 			scene.narration_text,
-			index === scenes.length - 1,
+			false,
 		);
+		const endingHoldSeconds =
+			index === scenes.length - 1
+				? inferNarrationEndingHoldSeconds(scene.narration_text, options)
+				: 0;
 		const sceneDuration = durationToSceneSeconds(
-			decoded.duration + pauseSeconds,
+			decoded.duration + pauseSeconds + endingHoldSeconds,
 		);
 		const durationFrames = Math.max(1, Math.round(decoded.duration * 30));
 		const wordTimings = await transcribeToWordTimings(
@@ -645,7 +844,7 @@ export async function generateContinuousNarration(
 		preparedSegments.push({
 			sceneId: scene.id,
 			buffer: decoded,
-			pauseSeconds,
+			pauseSeconds: pauseSeconds + endingHoldSeconds,
 			sceneDuration,
 			wordTimings,
 		});

@@ -157,6 +157,7 @@ const server = createServer(async (req, res) => {
 	if (url.pathname === "/download") {
 		const videoUrl = url.searchParams.get("url");
 		const maxDuration = Number(url.searchParams.get("maxDuration") ?? 30);
+		const start = Number(url.searchParams.get("start") ?? 0);
 
 		if (!videoUrl) {
 			res.writeHead(400, cors({ "Content-Type": "text/plain" }));
@@ -194,6 +195,12 @@ const server = createServer(async (req, res) => {
 			return;
 		}
 
+		if (!Number.isFinite(start) || start < 0 || start > 7200) {
+			res.writeHead(400, cors({ "Content-Type": "text/plain" }));
+			res.end("start must be 0-7200");
+			return;
+		}
+
 		// 동시 다운로드 제한
 		if (activeDownloads >= MAX_CONCURRENT_DOWNLOADS) {
 			res.writeHead(429, cors({ "Content-Type": "text/plain" }));
@@ -206,7 +213,9 @@ const server = createServer(async (req, res) => {
 		const outputPath = join(TEMP_DIR, `${id}.mp4`);
 
 		try {
-			process.stderr.write(`[download] ${videoUrl} (max ${maxDuration}s)\n`);
+			process.stderr.write(
+				`[download] ${videoUrl} (${start}s → ${start + maxDuration}s)\n`,
+			);
 
 			// yt-dlp로 다운로드 (720p, maxDuration 제한)
 			await new Promise<void>((resolve, reject) => {
@@ -224,7 +233,7 @@ const server = createServer(async (req, res) => {
 				if (maxDuration > 0) {
 					args.push(
 						"--download-sections",
-						`*0-${maxDuration}`,
+						`*${start}-${start + maxDuration}`,
 						"--force-keyframes-at-cuts",
 					);
 				}
@@ -379,7 +388,7 @@ server.listen(PORT, () => {
 	process.stderr.write("Endpoints:\n");
 	process.stderr.write("  GET  /health              — 상태 확인\n");
 	process.stderr.write(
-		"  GET  /download?url=...    — YouTube 영상 다운로드 (maxDuration=30)\n",
+		"  GET  /download?url=...    — YouTube 영상 다운로드 (maxDuration=30&start=0)\n",
 	);
 	process.stderr.write(
 		"  POST /build-proxy         — 프로젝트 내부 비디오 → 720p proxy 렌더 enqueue\n",

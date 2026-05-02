@@ -1,0 +1,239 @@
+{
+  "file": "/Users/jjuni/bolt/boltYT/public/generated/reference-style-mystery-1777722880-v2-shorts.mp4",
+  "score": 96,
+  "verdict": "revise",
+  "passed": false,
+  "metrics": {
+    "durationSeconds": 15.5,
+    "sizeBytes": 1752683,
+    "bitRate": 904610,
+    "video": {
+      "codec": "h264",
+      "width": 1080,
+      "height": 1920,
+      "fps": 24,
+      "frames": 372,
+      "bitRate": 854046
+    },
+    "audio": {
+      "codec": "aac",
+      "channels": 1,
+      "sampleRate": 48000,
+      "bitRate": 44401
+    },
+    "volume": {
+      "meanDb": -50.7,
+      "maxDb": -43.3
+    },
+    "loudness": {
+      "integratedLufs": -53.1,
+      "loudnessRangeLu": 0,
+      "truePeakDbfs": -43.3
+    },
+    "visualRegion": {
+      "frameCount": 20,
+      "avgDiff": 0.06268,
+      "maxDiff": 0.24508,
+      "meaningfulDiffs": 8,
+      "strongDiffs": 5,
+      "first3AvgDiff": 0.05004,
+      "diffSeries": [
+        {
+          "timeSeconds": 0.5,
+          "diff": 0.006
+        },
+        {
+          "timeSeconds": 1,
+          "diff": 0.00662
+        },
+        {
+          "timeSeconds": 1.5,
+          "diff": 0.23083
+        },
+        {
+          "timeSeconds": 2,
+          "diff": 0.00346
+        },
+        {
+          "timeSeconds": 2.5,
+          "diff": 0.00332
+        },
+        {
+          "timeSeconds": 3,
+          "diff": 0.13401
+        },
+        {
+          "timeSeconds": 3.5,
+          "diff": 0.00248
+        },
+        {
+          "timeSeconds": 4,
+          "diff": 0.00111
+        },
+        {
+          "timeSeconds": 4.5,
+          "diff": 0.24508
+        },
+        {
+          "timeSeconds": 5,
+          "diff": 0.03961
+        },
+        {
+          "timeSeconds": 5.5,
+          "diff": 0.01766
+        },
+        {
+          "timeSeconds": 6,
+          "diff": 0.06884
+        },
+        {
+          "timeSeconds": 6.5,
+          "diff": 0.07089
+        },
+        {
+          "timeSeconds": 7,
+          "diff": 0.00451
+        },
+        {
+          "timeSeconds": 7.5,
+          "diff": 0.0004
+        },
+        {
+          "timeSeconds": 8,
+          "diff": 0.1376
+        },
+        {
+          "timeSeconds": 8.5,
+          "diff": 0.01108
+        },
+        {
+          "timeSeconds": 9,
+          "diff": 0.01023
+        },
+        {
+          "timeSeconds": 9.5,
+          "diff": 0.1971
+        }
+      ]
+    },
+    "fullFrame": {
+      "frameCount": 20,
+      "avgDiff": 0.04213,
+      "maxDiff": 0.16525,
+      "meaningfulDiffs": 7,
+      "strongDiffs": 5,
+      "first3AvgDiff": 0.03228,
+      "diffSeries": [
+        {
+          "timeSeconds": 0.5,
+          "diff": 0.00431
+        },
+        {
+          "timeSeconds": 1,
+          "diff": 0.00297
+        },
+        {
+          "timeSeconds": 1.5,
+          "diff": 0.14796
+        },
+        {
+          "timeSeconds": 2,
+          "diff": 0.00403
+        },
+        {
+          "timeSeconds": 2.5,
+          "diff": 0.00212
+        },
+        {
+          "timeSeconds": 3,
+          "diff": 0.08614
+        },
+        {
+          "timeSeconds": 3.5,
+          "diff": 0.00434
+        },
+        {
+          "timeSeconds": 4,
+          "diff": 0.00059
+        },
+        {
+          "timeSeconds": 4.5,
+          "diff": 0.16525
+        },
+        {
+          "timeSeconds": 5,
+          "diff": 0.03082
+        },
+        {
+          "timeSeconds": 5.5,
+          "diff": 0.01087
+        },
+        {
+          "timeSeconds": 6,
+          "diff": 0.05314
+        },
+        {
+          "timeSeconds": 6.5,
+          "diff": 0.05237
+        },
+        {
+          "timeSeconds": 7,
+          "diff": 0.00242
+        },
+        {
+          "timeSeconds": 7.5,
+          "diff": 0.00025
+        },
+        {
+          "timeSeconds": 8,
+          "diff": 0.08733
+        },
+        {
+          "timeSeconds": 8.5,
+          "diff": 0.00671
+        },
+        {
+          "timeSeconds": 9,
+          "diff": 0.0058
+        },
+        {
+          "timeSeconds": 9.5,
+          "diff": 0.13298
+        }
+      ]
+    },
+    "sceneCuts": {
+      "selectedFrames": 12,
+      "estimatedCuts": 11,
+      "times": [
+        0.0416667,
+        1.583333,
+        1.625,
+        3.125,
+        4.666667,
+        4.708333,
+        6.208333,
+        6.25,
+        7.75,
+        7.791667,
+        9.333333,
+        9.375
+      ]
+    },
+    "black": {
+      "segments": [],
+      "count": 0
+    }
+  },
+  "strengths": [
+    "platform_canvas_ok"
+  ],
+  "issues": [
+    "audio_level_needs_mix",
+    "audio_loudness_needs_master"
+  ],
+  "requiredActions": [
+    "TTS 평균 -22~-16 LUFS 상당, 피크 -3~-1 dB 근처로 재믹스하세요.",
+    "최종 믹스를 통합 라우드니스 -18~-14 LUFS 근처로 맞추고 BGM은 음성보다 뒤에 배치하세요."
+  ]
+}

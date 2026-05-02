@@ -69,11 +69,3 @@ export function FilmGrain({ intensity = "subtle", opacity = 1 }: Props) {
 		</AbsoluteFill>
 	);
 }
-
-/** Mood/preset → 권장 grain intensity. */
-export function suggestGrainIntensity(mood?: string): GrainIntensity | null {
-	if (mood === "horror" || mood === "mystery") return "medium";
-	if (mood === "warm") return "subtle";
-	if (mood === "news") return null;
-	return null;
-}

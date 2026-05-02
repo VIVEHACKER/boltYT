@@ -7,6 +7,7 @@
  */
 
 import { getApiProxyUrl } from "./proxy";
+import { analyzeYouTubePolicyRisk } from "./youtube-policy-risk";
 
 async function callAI(
 	system: string,
@@ -343,6 +344,17 @@ export function verifySceneQuality(
 		imageUrl?: string;
 		videoUrl?: string;
 		audioUrl?: string;
+		shots?: Array<{
+			media_type?: "image" | "video";
+			source_url?: string;
+			duration_seconds?: number;
+			visual_role?: string;
+			motion?: string;
+			source_confidence?: number;
+			quality_score?: number;
+			selection_provider?: string;
+			rejection_reason?: string;
+		}>;
 	}>,
 ): QCReport {
 	const issues: QCReport["issues"] = [];
@@ -352,12 +364,95 @@ export function verifySceneQuality(
 		const s = scenes[i];
 		const idx = i + 1;
 
-		// 비주얼 없는 씬 (text_emphasis 제외)
-		if (s.scene_type !== "text_emphasis" && !s.imageUrl && !s.videoUrl) {
+		if (s.scene_type === "text_emphasis") {
+			issues.push({
+				scene_index: idx,
+				severity: "critical",
+				message: `씬 ${idx}: text_emphasis 단독 카드 씬은 금지 — 실제 영상/이미지 샷 위 자막으로 대체하세요`,
+			});
+		}
+
+		// 비주얼 없는 씬
+		if (!s.imageUrl && !s.videoUrl) {
 			issues.push({
 				scene_index: idx,
 				severity: "critical",
 				message: `씬 ${idx}: 배경 이미지/영상 없음 — 검은 화면으로 보일 수 있음`,
+			});
+		}
+
+		const videoShots =
+			s.shots?.filter((shot) => (shot.media_type ?? "video") === "video") ?? [];
+		const resolvedVideoShots = videoShots.filter((shot) => shot.source_url);
+
+		if (
+			s.scene_type === "video" &&
+			!s.videoUrl &&
+			resolvedVideoShots.length === 0
+		) {
+			issues.push({
+				scene_index: idx,
+				severity: "warning",
+				message: `씬 ${idx}: video 씬이지만 실제 영상 소스가 없음 — 이미지 슬라이드처럼 보일 수 있음`,
+			});
+		}
+
+		if (
+			videoShots.length > 0 &&
+			resolvedVideoShots.length < Math.ceil(videoShots.length * 0.6)
+		) {
+			issues.push({
+				scene_index: idx,
+				severity: "warning",
+				message: `씬 ${idx}: 영상 샷 ${videoShots.length}개 중 ${resolvedVideoShots.length}개만 연결됨 — 컷 품질 편차 가능`,
+			});
+		}
+
+		const visualShots = s.shots ?? [];
+		const resolvedShots = visualShots.filter((shot) => shot.source_url);
+		const lowConfidenceShots = resolvedShots.filter(
+			(shot) =>
+				typeof shot.source_confidence === "number" &&
+				shot.source_confidence < 55,
+		);
+		if (
+			resolvedShots.length >= 3 &&
+			lowConfidenceShots.length > resolvedShots.length * 0.3
+		) {
+			issues.push({
+				scene_index: idx,
+				severity: "warning",
+				message: `씬 ${idx}: 저신뢰 시각 자료 ${lowConfidenceShots.length}/${resolvedShots.length}개 — 주제와 안 맞는 이미지가 섞일 수 있음`,
+			});
+		}
+
+		const genericStockShots = resolvedShots.filter(
+			(shot) =>
+				(shot.selection_provider === "pexels" ||
+					shot.selection_provider === "pixabay") &&
+				shot.visual_role !== "context" &&
+				shot.visual_role !== "transition",
+		);
+		if (genericStockShots.length > Math.max(1, resolvedShots.length * 0.4)) {
+			issues.push({
+				scene_index: idx,
+				severity: "warning",
+				message: `씬 ${idx}: 스톡 fallback 비중이 높음 — 기사/아카이브/지도/문서 자료 우선 보강 필요`,
+			});
+		}
+
+		const reconstructionShots = visualShots.filter(
+			(shot) => shot.visual_role === "reconstruction",
+		);
+		if (
+			reconstructionShots.length > 0 &&
+			s.scene_type !== "text_emphasis" &&
+			reconstructionShots.length >= Math.ceil(visualShots.length * 0.6)
+		) {
+			issues.push({
+				scene_index: idx,
+				severity: "info",
+				message: `씬 ${idx}: AI 재구성 비중이 높음 — 실제 자료처럼 보이지 않게 스타일/출처 표시 확인`,
 			});
 		}
 
@@ -405,26 +500,88 @@ export function verifySceneQuality(
 		suggestions.push("영상이 30초 미만 — 시청 유지율이 낮을 수 있음");
 	}
 
-	const videoScenes = scenes.filter(
-		(s) => s.videoUrl || s.scene_type === "video",
-	);
+	const videoScenes = scenes.filter((s) => {
+		const hasVideoShot = s.shots?.some(
+			(shot) => (shot.media_type ?? "video") === "video" && shot.source_url,
+		);
+		return s.videoUrl || hasVideoShot;
+	});
 	if (videoScenes.length === 0) {
 		suggestions.push(
-			"영상 클립이 하나도 없음 — 이미지만으로는 몰입감 부족. 관련 영상 추가 권장",
+			"실제 영상 클립이 없음 — 모션 자료화면, 지도, 문서 크롭, 콜아웃 밀도로 보강 필요",
+		);
+	}
+
+	if (scenes.length > 0 && videoScenes.length / scenes.length < 0.45) {
+		suggestions.push(
+			"실제 영상 소스 비율이 낮음 — 강제 AI 영상보다 훅/반전/엔딩 hero shot만 선택적으로 보강",
+		);
+	}
+
+	const allShots = scenes.flatMap((scene) => scene.shots ?? []);
+	const designedShots = allShots.filter(
+		(shot) =>
+			shot.source_url &&
+			((shot.media_type ?? "video") === "video" ||
+				shot.visual_role === "document" ||
+				shot.visual_role === "evidence" ||
+				shot.visual_role === "archive" ||
+				shot.visual_role === "map" ||
+				shot.visual_role === "data" ||
+				(shot.motion && shot.motion !== "static")),
+	);
+	if (allShots.length > 0 && designedShots.length / allShots.length < 0.75) {
+		suggestions.push(
+			"설계된 자료화면 샷이 75% 미만 — 정적 이미지 나열 위험. 약한 샷만 재검색/모션 보강 필요",
+		);
+	}
+	const sourceAnchoredShots = allShots.filter(
+		(shot) =>
+			shot.source_url &&
+			shot.visual_role !== "reconstruction" &&
+			(shot.selection_provider === "youtube" ||
+				shot.selection_provider === "wikimedia" ||
+				shot.selection_provider === "naver" ||
+				shot.selection_provider === "direct" ||
+				shot.visual_role === "document" ||
+				shot.visual_role === "evidence" ||
+				shot.visual_role === "archive"),
+	);
+	if (allShots.length > 0 && sourceAnchoredShots.length / allShots.length < 0.55) {
+		suggestions.push(
+			"소스 앵커가 있는 샷이 55% 미만 — 랜덤 이미지 나열처럼 보일 수 있음. 약한 샷만 재검색 권장",
 		);
 	}
 
 	const textScenes = scenes.filter((s) => s.scene_type === "text_emphasis");
-	if (textScenes.length > scenes.length * 0.4) {
-		suggestions.push("텍스트 강조 씬이 40% 이상 — 비주얼 비율 높이기 권장");
+	if (textScenes.length > 0) {
+		suggestions.push(
+			"text_emphasis 단독 씬 금지 — 훅/반전은 영상/이미지 샷, 컷 전환, SFX, 자막 강조로 처리",
+		);
 	}
+
+	const policyReport = analyzeYouTubePolicyRisk({
+		scenes: scenes.map((scene) => ({
+			narration_text: scene.narration_text,
+			scene_type: scene.scene_type,
+			shots: scene.shots,
+		})),
+	});
+	for (const issue of policyReport.issues) {
+		issues.push({
+			scene_index: issue.sceneIndex ?? 0,
+			severity: issue.severity,
+			message: `YouTube 정책 리스크: ${issue.message}`,
+		});
+	}
+	suggestions.push(...policyReport.requiredActions);
 
 	const criticals = issues.filter((i) => i.severity === "critical").length;
 	const warnings = issues.filter((i) => i.severity === "warning").length;
 	const score = Math.max(0, 100 - criticals * 20 - warnings * 5);
 
 	return {
-		passed: criticals === 0,
+		passed: criticals === 0 && score >= 75,
 		overall_score: score,
 		issues,
 		suggestions,

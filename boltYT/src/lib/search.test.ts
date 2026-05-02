@@ -14,7 +14,9 @@ import {
 	searchNaverNews,
 	searchPexelsImages,
 	searchPexelsVideos,
+	searchPixabayImages,
 	searchPixabayVideos,
+	searchWikimediaImages,
 	searchYouTubeVideos,
 } from "./search";
 
@@ -142,9 +144,16 @@ describe("searchNaverImages", () => {
 // ─── fetchArticleBody ─────────────────────────────────────────────────────────
 describe("fetchArticleBody", () => {
 	it("성공 → 본문 반환", async () => {
-		okFetch({ title: "제목", body: "본문", publisher: "언론사" });
+		okFetch({
+			title: "제목",
+			body: "본문",
+			publisher: "언론사",
+			thumbnail: "https://img.example.com/hero.jpg",
+			images: ["https://img.example.com/hero.jpg"],
+		});
 		const r = await fetchArticleBody("https://example.com/article");
 		expect(r.body).toBe("본문");
+		expect(r.thumbnail).toBe("https://img.example.com/hero.jpg");
 	});
 
 	it("HTTP 오류 → hostname 추출 + 빈 본문", async () => {
@@ -152,6 +161,7 @@ describe("fetchArticleBody", () => {
 		const r = await fetchArticleBody("https://news.naver.com/article/123");
 		expect(r.body).toBe("");
 		expect(r.publisher).toBe("news.naver.com");
+		expect(r.images).toEqual([]);
 	});
 
 	it("잘못된 URL + HTTP 오류 → publisher 빈 문자열", async () => {
@@ -166,7 +176,13 @@ describe("fetchArticleBody", () => {
 			vi.fn().mockRejectedValue(new Error("network error")),
 		);
 		const r = await fetchArticleBody("https://example.com");
-		expect(r).toEqual({ title: "", body: "", publisher: "" });
+		expect(r).toEqual({
+			title: "",
+			body: "",
+			publisher: "",
+			thumbnail: "",
+			images: [],
+		});
 	});
 });
 
@@ -347,6 +363,130 @@ describe("searchPexelsImages", () => {
 	it("HTTP 오류 → throw", async () => {
 		failFetch(500);
 		await expect(searchPexelsImages("테스트")).rejects.toThrow("Pexels 이미지");
+	});
+});
+
+// ─── searchPixabayImages ─────────────────────────────────────────────────────
+describe("searchPixabayImages", () => {
+	it("긴 변 1280 이상만 통과", async () => {
+		okFetch({
+			hits: [
+				{
+					id: 1,
+					pageURL: "https://pixabay.com/p/1",
+					largeImageURL: "https://img/large.jpg",
+					webformatURL: "https://img/web.jpg",
+					imageWidth: 1920,
+					imageHeight: 1080,
+					tags: "crime, scene",
+					user: "pixuser",
+				},
+				{
+					id: 2,
+					pageURL: "https://pixabay.com/p/2",
+					largeImageURL: "https://img/small.jpg",
+					webformatURL: "https://img/small-web.jpg",
+					imageWidth: 640,
+					imageHeight: 360,
+					tags: "small",
+					user: "smalluser",
+				},
+			],
+		});
+		const results = await searchPixabayImages("crime scene");
+		expect(results).toHaveLength(1);
+		expect(results[0].downloadUrl).toBe("https://img/large.jpg");
+	});
+
+	it("HTTP 오류 → throw", async () => {
+		failFetch(500);
+		await expect(searchPixabayImages("테스트")).rejects.toThrow(
+			"Pixabay 이미지",
+		);
+	});
+});
+
+// ─── searchWikimediaImages ───────────────────────────────────────────────────
+describe("searchWikimediaImages", () => {
+	it("MediaWiki imageinfo를 다운로드 가능한 이미지 후보로 변환한다", async () => {
+		okFetch({
+			query: {
+				pages: {
+					"1": {
+						pageid: 1,
+						title: "File:Amelia Earhart portrait.jpg",
+						imageinfo: [
+							{
+								url: "https://upload.wikimedia.org/full.jpg",
+								thumburl: "https://upload.wikimedia.org/thumb.jpg",
+								width: 1600,
+								height: 2200,
+								mime: "image/jpeg",
+								descriptionshorturl:
+									"https://commons.wikimedia.org/wiki/File:Amelia",
+								extmetadata: {
+									LicenseShortName: { value: "Public domain" },
+									Artist: { value: "<span>Unknown</span>" },
+								},
+							},
+						],
+					},
+				},
+			},
+		});
+
+		const results = await searchWikimediaImages("Amelia Earhart", 2);
+		expect(results).toHaveLength(1);
+		expect(results[0]).toEqual(
+			expect.objectContaining({
+				title: "Amelia Earhart portrait.jpg",
+				downloadUrl: "https://upload.wikimedia.org/thumb.jpg",
+				license: "Public domain",
+				artist: "Unknown",
+			}),
+		);
+	});
+
+	it("이미지가 아니거나 해상도가 낮은 결과는 제외한다", async () => {
+		okFetch({
+			query: {
+				pages: {
+					"1": {
+						pageid: 1,
+						title: "File:Small.jpg",
+						imageinfo: [
+							{
+								url: "https://upload.wikimedia.org/small.jpg",
+								width: 500,
+								height: 400,
+								mime: "image/jpeg",
+							},
+						],
+					},
+					"2": {
+						pageid: 2,
+						title: "File:Audio.ogg",
+						imageinfo: [
+							{
+								url: "https://upload.wikimedia.org/audio.ogg",
+								width: 1600,
+								height: 1200,
+								mime: "audio/ogg",
+							},
+						],
+					},
+				},
+			},
+		});
+
+		expect(await searchWikimediaImages("test")).toHaveLength(0);
+	});
+
+	it("HTTP 오류 → throw", async () => {
+		failFetch(500);
+		await expect(searchWikimediaImages("테스트")).rejects.toThrow(
+			"Wikimedia 이미지",
+		);
 	});
 });
 

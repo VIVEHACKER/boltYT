@@ -23,6 +23,7 @@ dist-ssr
 *.sln
 *.sw?
 .harness/
+.quality/
 .claude/
 .playwright-profile/
 test-screenshots/

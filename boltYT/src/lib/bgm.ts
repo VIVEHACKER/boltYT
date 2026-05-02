@@ -6,6 +6,11 @@
 
 import { storeLocalFile } from "./local-db";
 import { getApiProxyUrl } from "./proxy";
+import {
+	pickProfessionalBgmTrack,
+	rankBgmTracks,
+	type ScoredBgmTrack,
+} from "./bgm-quality";
 
 // ─── 타입 ───
 
@@ -20,6 +25,9 @@ export interface BgmTrack {
 	downloadUrl: string;
 	tags: string[];
 	source: "pixabay" | "builtin";
+	qualityScore?: number;
+	qualityReasons?: string[];
+	qualityWarnings?: string[];
 }
 
 export type BgmMood =
@@ -207,13 +215,14 @@ export async function searchBgmFromPreset(preset: {
 	};
 	const dur = durationHint[preset.tempo];
 
-	return searchBgm(query, {
+	const tracks = await searchBgm(query, {
 		mood: preset.mood || undefined,
 		minDuration: dur.min,
 		maxDuration: dur.max,
 		order: "popular",
 		editorsChoice: true,
 	});
+	return rankBgmTracks(tracks, preset);
 }
 
 /** BGM 다운로드 → IndexedDB 저장 */
@@ -305,6 +314,8 @@ export interface AutoPickResult {
 	storagePath: string;
 	source: "user_default" | "local_preset" | "curated_pixabay" | "search";
 	track?: BgmTrack;
+	qualityScore?: number;
+	qualityWarnings?: string[];
 }
 
 export interface AutoBgmSceneHint {
@@ -380,7 +391,9 @@ export async function autoPickBgm(
 		// mood 없으면 키워드 검색만
 		const tracks = await searchBgmFromPreset(preset);
 		if (tracks.length === 0) return null;
-		return downloadAndStore(tracks[0], scriptId, "search");
+		const picked = pickProfessionalBgmTrack(tracks, preset);
+		if (!picked) return null;
+		return downloadAndStore(picked, scriptId, "search");
 	}
 
 	// 1. 사용자 기본 BGM
@@ -415,28 +428,48 @@ export async function autoPickBgm(
 			minDuration: 60,
 			maxDuration: 300,
 		});
-		if (tracks.length > 0) {
-			return downloadAndStore(tracks[0], scriptId, "curated_pixabay");
+		const picked = pickProfessionalBgmTrack(tracks, {
+			...preset,
+			keywords: [...preset.keywords, q],
+		});
+		if (picked) {
+			return downloadAndStore(picked, scriptId, "curated_pixabay");
 		}
 	}
 
 	// 4. Fallback: 일반 키워드 검색
 	const fallback = await searchBgmFromPreset(preset);
 	if (fallback.length > 0) {
-		return downloadAndStore(fallback[0], scriptId, "search");
+		const picked = pickProfessionalBgmTrack(fallback, preset);
+		if (picked) return downloadAndStore(picked, scriptId, "search");
 	}
 
 	return null;
 }
 
 async function downloadAndStore(
-	track: BgmTrack,
+	track: BgmTrack | ScoredBgmTrack,
 	scriptId: string,
 	source: AutoPickResult["source"],
 ): Promise<AutoPickResult> {
 	const url = await downloadBgm(track, scriptId);
 	const storagePath = `scripts/${scriptId}/bgm.mp3`;
 	localStorage.setItem(`bgm_path_${scriptId}`, storagePath);
+	const scored =
+		typeof track.qualityScore === "number"
+			? track
+			: rankBgmTracks([track], {})[0];
+	localStorage.setItem(
+		`bgm_selection_${scriptId}`,
+		JSON.stringify({
+			source,
+			trackId: track.id,
+			title: track.title,
+			artist: track.artist,
+			qualityScore: scored.qualityScore,
+			qualityWarnings: scored.qualityWarnings,
+		}),
+	);
 
 	// 비동기 BPM 분석 — 실패해도 main flow는 진행
 	void (async () => {
@@ -454,5 +487,12 @@ async function downloadAndStore(
 		}
 	})();
 
-	return { url, storagePath, source, track };
+	return {
+		url,
+		storagePath,
+		source,
+		track,
+		qualityScore: scored.qualityScore,
+		qualityWarnings: scored.qualityWarnings,
+	};
 }

@@ -18,6 +18,14 @@ import {
 	getReferenceTemplate,
 	updateReferenceTemplate,
 } from "../../lib/reference-import";
+import {
+	formatReferenceOutputFormats,
+	getReferenceTemplateMethodDescription,
+	getReferenceTemplateMethodLabel,
+	getReferenceTemplateMethodRules,
+	getReferenceTemplateRecommendedMode,
+	isBuiltInReference,
+} from "../../lib/reference-template-presets";
 import type { ReferenceTemplate } from "../../types/database";
 
 const VISUAL_MOODS: ReferenceTemplate["visual_mood"][] = [
@@ -148,6 +156,17 @@ export default function ReferenceDetailPage() {
 		}
 	}
 
+	function contentUrlFor(target: ReferenceTemplate) {
+		const params = new URLSearchParams({
+			template: target.id,
+			mode: getReferenceTemplateRecommendedMode(target),
+		});
+		if (!isBuiltInReference(target) && target.channel_id) {
+			params.set("channel", target.channel_id);
+		}
+		return `/content/new?${params.toString()}`;
+	}
+
 	if (loading) {
 		return (
 			<div className="flex items-center justify-center h-64">
@@ -168,6 +187,11 @@ export default function ReferenceDetailPage() {
 			</div>
 		);
 	}
+
+	const builtIn = isBuiltInReference(template);
+	const methodLabel = getReferenceTemplateMethodLabel(template);
+	const methodDescription = getReferenceTemplateMethodDescription(template);
+	const methodRules = getReferenceTemplateMethodRules(template);
 
 	return (
 		<div className="max-w-4xl space-y-6">
@@ -193,7 +217,7 @@ export default function ReferenceDetailPage() {
 								{template.source_creator}
 							</PText>
 						)}
-						{template.source_url && (
+						{template.source_url && !builtIn && (
 							<a
 								href={template.source_url}
 								target="_blank"
@@ -229,6 +253,42 @@ export default function ReferenceDetailPage() {
 					description={error}
 					onDismiss={() => setError(null)}
 				/>
+			)}
+			{builtIn && (
+				<PInlineNotification
+					state="info"
+					heading="내장 제작 방식"
+					description="삭제/수정하지 않고 그대로 재사용하는 템플릿입니다. 아래 버튼으로 내용만 바꿔 새 콘텐츠를 만들 수 있습니다."
+					dismissButton={false}
+				/>
+			)}
+			{methodLabel && (
+				<Section title="제작 방식">
+					<div>
+							<PTag color="background-base">{methodLabel}</PTag>
+							<PTag color="background-base">
+								{formatReferenceOutputFormats(template)}
+							</PTag>
+							{methodDescription && (
+							<PText
+								size="small"
+								color="neutral-contrast-medium"
+								className="mt-3"
+							>
+								{methodDescription}
+							</PText>
+						)}
+					</div>
+					{methodRules.length > 0 && (
+						<div className="space-y-2">
+							{methodRules.map((rule) => (
+								<PText key={rule} size="small" color="neutral-contrast-medium">
+									- {rule}
+								</PText>
+							))}
+						</div>
+					)}
+				</Section>
 			)}
 
 			{/* 기본 */}
@@ -612,28 +672,30 @@ export default function ReferenceDetailPage() {
 			)}
 
 			<div className="flex justify-between pt-4 border-t border-[#2a2a2a]">
-				<PButton
-					variant="secondary"
-					icon="delete"
-					onClick={handleDelete}
-					aria-label="삭제"
-				>
-					<Trash2 size={14} className="mr-1 inline" /> 삭제
-				</PButton>
+				{builtIn ? (
+					<div />
+				) : (
+					<PButton
+						variant="secondary"
+						icon="delete"
+						onClick={handleDelete}
+						aria-label="삭제"
+					>
+						<Trash2 size={14} className="mr-1 inline" /> 삭제
+					</PButton>
+				)}
 				<div className="flex gap-2">
 					<PButton
 						variant="secondary"
-						onClick={() =>
-							navigate(
-								`/content/new?channel=${template.channel_id}&template=${template.id}`,
-							)
-						}
+						onClick={() => navigate(contentUrlFor(template))}
 					>
 						이 템플릿으로 콘텐츠 만들기
 					</PButton>
-					<PButton onClick={handleSave} loading={saving}>
-						<Save size={14} className="mr-1 inline" /> 저장
-					</PButton>
+					{!builtIn && (
+						<PButton onClick={handleSave} loading={saving}>
+							<Save size={14} className="mr-1 inline" /> 저장
+						</PButton>
+					)}
 				</div>
 			</div>
 		</div>

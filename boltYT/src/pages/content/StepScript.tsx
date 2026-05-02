@@ -11,18 +11,34 @@ import {
 import { ImagePlus, Newspaper, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import TabButton from "../../components/TabButton";
+import {
+	analyzeAnimationProductionReadiness,
+	applyAnimationPacingRules,
+	ensureAnimationSceneShots,
+	formatAnimationReadinessForPrompt,
+	summarizeAnimationBible,
+	type AnimationBible,
+	type AnimationProductionFamily,
+	type AnimationProductionReadinessReport,
+} from "../../lib/animation-production";
 import { generateResearchScript, generateScript } from "../../lib/ai";
 import { planSceneSourceAssignments, researchTopic } from "../../lib/ai-agents";
 import { snapDurationToBeat } from "../../lib/beat-sync";
 import { suggestColorGrade } from "../../lib/color-grades";
 import { assignMotionGraphicsForScene } from "../../lib/motion-graphics";
 import { referenceToPreset } from "../../lib/reference-bridge";
+import { getReferenceTemplateSupportedFormats } from "../../lib/reference-template-presets";
+import {
+	formatNicheHandoffForPrompt,
+	type NicheResearchHandoff,
+} from "../../lib/niche-research";
 import {
 	applySceneSourcePlan,
 	buildFallbackSceneSourcePlan,
 } from "../../lib/scene-sequence";
 import type { SceneShot } from "../../lib/scene-shot-types";
 import {
+	applyLongformVideoRules,
 	applyShortsVideoRules,
 	buildSceneShots,
 	ensureSceneShots,
@@ -33,6 +49,11 @@ import {
 	syncSceneMetadataFromSource,
 } from "../../lib/scene-shots";
 import { supabase } from "../../lib/supabase";
+import {
+	analyzeTopicProductionReadiness,
+	type TopicProductionReadinessReport,
+} from "../../lib/topic-production-readiness";
+import { strengthenOpeningRetention } from "../../lib/youtube-retention";
 import type { ReferenceTemplate } from "../../types/database";
 import type { CollectedSource, ContentMode } from "./ContentWizardPage";
 
@@ -41,6 +62,7 @@ interface StepScriptProps {
 	mode?: ContentMode;
 	sources?: CollectedSource[];
 	referenceTemplate?: ReferenceTemplate | null;
+	nicheHandoff?: NicheResearchHandoff | null;
 	onNext: (scriptId: string) => void;
 	onBack: () => void;
 }
@@ -59,6 +81,7 @@ interface SceneData {
 	mood?: string;
 	textEffect?: string;
 	shots?: SceneShot[];
+	productionFamily?: AnimationProductionFamily;
 }
 
 export default function StepScript({
@@ -66,10 +89,16 @@ export default function StepScript({
 	mode = "ai",
 	sources = [],
 	referenceTemplate,
+	nicheHandoff,
 	onNext,
 	onBack,
 }: StepScriptProps) {
-	const [format, setFormat] = useState<"shorts" | "longform" | "both">("both");
+	const [format, setFormat] = useState<"shorts" | "longform" | "both">(() => {
+		if (!referenceTemplate) return "both";
+		const supported = getReferenceTemplateSupportedFormats(referenceTemplate);
+		if (supported.length === 1) return supported[0];
+		return "both";
+	});
 	const [shortsScript, setShortsScript] = useState("");
 	const [longformScenes, setLongformScenes] = useState<SceneData[]>([]);
 	const [generating, setGenerating] = useState(true);
@@ -78,6 +107,20 @@ export default function StepScript({
 	const [submitError, setSubmitError] = useState("");
 	const [searchKeywords, setSearchKeywords] = useState<string[]>([]);
 	const [aligningSources, setAligningSources] = useState(false);
+	const [topicReadiness, setTopicReadiness] =
+		useState<TopicProductionReadinessReport | null>(null);
+	const [animationReadiness, setAnimationReadiness] =
+		useState<AnimationProductionReadinessReport | null>(null);
+	const [animationBible, setAnimationBible] = useState<
+		AnimationBible | undefined
+	>(undefined);
+
+	useEffect(() => {
+		if (!referenceTemplate) return;
+		const supported = getReferenceTemplateSupportedFormats(referenceTemplate);
+		if (supported.length !== 1) return;
+		setFormat((current) => (current === supported[0] ? current : supported[0]));
+	}, [referenceTemplate]);
 
 	const toShotSources = useCallback(
 		(items: CollectedSource[]): ShotSource[] =>
@@ -98,9 +141,16 @@ export default function StepScript({
 	const applySceneShots = useCallback(
 		(scene: SceneData): SceneData => ({
 			...scene,
-			shots: ensureSceneShots(scene, toShotSources(sources)),
+			shots:
+				mode === "animation"
+					? ensureAnimationSceneShots(
+							scene,
+							animationBible,
+							animationReadiness?.productionFamily,
+						)
+					: ensureSceneShots(scene, toShotSources(sources)),
 		}),
-		[sources, toShotSources],
+		[animationBible, animationReadiness?.productionFamily, mode, sources, toShotSources],
 	);
 
 	const assignSourceToScene = useCallback(
@@ -143,23 +193,51 @@ export default function StepScript({
 	);
 
 	const alignScenesToTimeline = useCallback(
-		async (baseScenes: SceneData[]) => {
+		async (
+			baseScenes: SceneData[],
+			currentAnimationBible?: AnimationBible,
+			currentAnimationFamily?: AnimationProductionFamily,
+		) => {
 			if (baseScenes.length === 0) {
 				return baseScenes;
 			}
 
 			const finalizeScenes = (scenesToFinalize: SceneData[]) => {
 				const shotSources = toShotSources(sources);
-				const motionScenes = rebalanceScenesForMotion(
-					scenesToFinalize,
-					shotSources,
-				);
-				const shortsAdjusted =
-					format === "longform"
-						? motionScenes
-						: applyShortsVideoRules(motionScenes, shotSources);
-				return intensifyHookScenes(shortsAdjusted).map((scene) =>
-					applySceneShots(scene),
+				const family =
+					currentAnimationFamily ?? animationReadiness?.productionFamily;
+				const referenceLongformTarget =
+					referenceTemplate && format !== "shorts"
+						? referenceToPreset(referenceTemplate, "longform").script
+								.targetDuration
+						: undefined;
+				const adjusted =
+					mode === "animation"
+						? applyAnimationPacingRules(scenesToFinalize, format, family)
+						: format === "shorts"
+							? intensifyHookScenes(
+									applyShortsVideoRules(
+										rebalanceScenesForMotion(scenesToFinalize, shotSources),
+										shotSources,
+									),
+								)
+							: applyLongformVideoRules(scenesToFinalize, shotSources, {
+									targetTotalSeconds: referenceLongformTarget,
+								});
+				const retentionAdjusted = strengthenOpeningRetention(adjusted, {
+					format,
+				});
+				return retentionAdjusted.map((scene) =>
+					mode === "animation"
+						? {
+								...scene,
+								shots: ensureAnimationSceneShots(
+									scene,
+									currentAnimationBible ?? animationBible,
+									family,
+								),
+							}
+						: applySceneShots(scene),
 				);
 			};
 
@@ -216,7 +294,16 @@ export default function StepScript({
 				setAligningSources(false);
 			}
 		},
-		[applySceneShots, format, mode, sources, toShotSources],
+		[
+			animationBible,
+			animationReadiness?.productionFamily,
+			applySceneShots,
+			format,
+			mode,
+			referenceTemplate,
+			sources,
+			toShotSources,
+		],
 	);
 
 	const doGenerate = useCallback(async () => {
@@ -225,6 +312,9 @@ export default function StepScript({
 		try {
 			// Research Director: 주제 리서치 → 팩트 수집
 			let brief: Awaited<ReturnType<typeof researchTopic>> | undefined;
+			let topicTitle = "";
+			setTopicReadiness(null);
+			setAnimationReadiness(null);
 			if (mode === "research") {
 				try {
 					const { data: topic } = await supabase
@@ -232,6 +322,7 @@ export default function StepScript({
 						.select("title")
 						.eq("id", briefId)
 						.maybeSingle();
+					topicTitle = topic?.title ?? "";
 					if (topic?.title) {
 						brief = await researchTopic(topic.title);
 						if (brief?.search_keywords?.length) {
@@ -241,6 +332,63 @@ export default function StepScript({
 				} catch {
 					// 리서치 실패해도 스크립트 생성은 진행
 				}
+			} else if (mode === "animation") {
+				try {
+					const { data: briefRow } = await supabase
+						.from("briefs")
+						.select("core_message, topics(title)")
+						.eq("id", briefId)
+						.maybeSingle();
+					const topic = (briefRow as Record<string, unknown> | null)?.topics as
+						| Record<string, unknown>
+						| undefined;
+					topicTitle =
+						(topic?.title as string | undefined) ??
+						((briefRow as Record<string, unknown> | null)?.core_message as
+							| string
+							| undefined) ??
+						"";
+				} catch {
+					// 브리프 제목 조회 실패 시 아래 게이트가 보수적으로 판단
+				}
+			}
+
+			const readiness =
+				mode === "research"
+					? analyzeTopicProductionReadiness({
+							topicTitle,
+							format,
+							sources,
+							researchBrief: brief,
+						})
+					: null;
+			setTopicReadiness(readiness);
+			if (readiness && !readiness.canGenerate) {
+				setShortsScript("");
+				setLongformScenes([]);
+				setGenError(
+					`제작 보류: ${readiness.requiredActions[0] ?? "자료를 보강한 뒤 다시 생성하세요."}`,
+				);
+				return;
+			}
+			const animationGate =
+				mode === "animation"
+					? analyzeAnimationProductionReadiness({
+							topicTitle,
+							format,
+						})
+					: null;
+			setAnimationReadiness(animationGate);
+			if (animationGate && !animationGate.canGenerate) {
+				setShortsScript("");
+				setLongformScenes([]);
+				setGenError(
+					`애니메이션 제작 보류: ${
+						animationGate.requiredActions[0] ??
+						"주인공과 갈등이 드러나도록 주제를 보강하세요."
+					}`,
+				);
+				return;
 			}
 
 			const preset = referenceTemplate
@@ -258,8 +406,19 @@ export default function StepScript({
 							format,
 							brief,
 							preset,
+							readiness ?? undefined,
+							nicheHandoff
+								? formatNicheHandoffForPrompt(nicheHandoff)
+								: undefined,
 						)
-					: await generateScript(briefId, format, preset);
+					: await generateScript(
+							briefId,
+							format,
+							preset,
+							mode === "animation" ? "animation" : "standard",
+							animationGate ?? undefined,
+						);
+			setAnimationBible(script.animation_bible);
 			setShortsScript(script.shorts_script || "");
 			const mappedScenes = (
 				(script.longform_scenes as Array<{
@@ -295,9 +454,14 @@ export default function StepScript({
 					mood: s.mood ?? "neutral",
 					textEffect: s.text_effect ?? "none",
 					shots: [],
+					productionFamily: animationGate?.productionFamily,
 				};
 			});
-			const alignedScenes = await alignScenesToTimeline(mappedScenes);
+			const alignedScenes = await alignScenesToTimeline(
+				mappedScenes,
+				script.animation_bible,
+				animationGate?.productionFamily,
+			);
 			setLongformScenes(alignedScenes);
 		} catch (err) {
 			setGenError(
@@ -313,6 +477,7 @@ export default function StepScript({
 		mode,
 		sources,
 		referenceTemplate,
+		nicheHandoff,
 	]);
 
 	const lastAutoBriefId = useRef<string | null>(null);
@@ -390,7 +555,17 @@ export default function StepScript({
 		setLongformScenes((prev) =>
 			prev.map((scene, currentSceneIndex) =>
 				currentSceneIndex === sceneIndex
-					? { ...scene, shots: buildSceneShots(scene, toShotSources(sources)) }
+					? {
+							...scene,
+							shots:
+								mode === "animation"
+									? ensureAnimationSceneShots(
+											{ ...scene, shots: [] },
+											animationBible,
+											animationReadiness?.productionFamily,
+										)
+									: buildSceneShots(scene, toShotSources(sources)),
+						}
 					: scene,
 			),
 		);
@@ -400,9 +575,16 @@ export default function StepScript({
 		setLongformScenes((prev) =>
 			prev.map((scene) => ({
 				...scene,
-				shots: buildSceneShots(scene, toShotSources(sources)),
+				shots:
+					mode === "animation"
+						? ensureAnimationSceneShots(
+								{ ...scene, shots: [] },
+								animationBible,
+								animationReadiness?.productionFamily,
+							)
+						: buildSceneShots(scene, toShotSources(sources)),
 			})),
-		);
+	);
 	}
 
 	async function handleSubmit() {
@@ -418,6 +600,27 @@ export default function StepScript({
 					shorts_script: shortsScript,
 					format_selection: format,
 					search_keywords: searchKeywords,
+					production_type:
+						mode === "animation"
+							? "animation"
+							: mode === "research"
+								? "documentary"
+								: "standard",
+					animation_bible: animationBible,
+					animation_readiness: animationReadiness,
+					production_family: animationReadiness?.productionFamily,
+					production_family_label: animationReadiness?.productionFamilyLabel,
+					topic_readiness: topicReadiness,
+					niche_research: nicheHandoff
+						? {
+								id: nicheHandoff.id,
+								topic: nicheHandoff.topic,
+								query: nicheHandoff.summary.query,
+								decision: nicheHandoff.playbook.decision,
+								score: nicheHandoff.playbook.score,
+								playbook: nicheHandoff.playbook,
+							}
+						: null,
 				},
 				status: "approved",
 				reference_template_id: referenceTemplate?.id ?? null,
@@ -498,6 +701,189 @@ export default function StepScript({
 		onNext(script.id);
 	}
 
+	function renderTopicReadinessPanel() {
+		if (!topicReadiness || mode !== "research") return null;
+		const state: "error" | "warning" | "info" =
+			topicReadiness.status === "blocked"
+				? "error"
+				: topicReadiness.status === "needs_reframe"
+					? "warning"
+					: "info";
+		const heading =
+			topicReadiness.status === "blocked"
+				? "제작 보류: 입력 자료 부족"
+				: topicReadiness.status === "needs_reframe"
+					? "재기획 권고: 자료 밀도 부족"
+					: "프리프로덕션 통과";
+		const primaryIssue =
+			topicReadiness.issues[0]?.message ??
+			"현재 자료로 사건 흐름 기반 제작이 가능합니다.";
+
+		return (
+			<div className="mb-static-md">
+				<PInlineNotification
+					state={state}
+					heading={`${heading} · ${topicReadiness.score}/100`}
+					description={primaryIssue}
+					dismissButton={false}
+				/>
+				<div className="mt-static-sm bg-canvas rounded-[4px] p-static-sm">
+					<div className="flex items-center gap-static-xs flex-wrap mb-static-xs">
+						<PTag color="background-frosted">
+							각도: {topicReadiness.recommendedAngle}
+						</PTag>
+						<PTag color="background-surface">
+							추천 형식: {topicReadiness.recommendedFormat}
+						</PTag>
+						<PTag color="background-surface">
+							팩트 자료 {topicReadiness.metrics.factualSourceCount}개
+						</PTag>
+						<PTag color="background-surface">
+							본문 {topicReadiness.metrics.totalTextChars}자
+						</PTag>
+						<PTag color="background-surface">
+							영상 {topicReadiness.metrics.videoSourceCount}개
+						</PTag>
+					</div>
+					{topicReadiness.requiredActions.length > 0 && (
+						<div className="mb-static-xs">
+							<PText size="x-small" weight="semi-bold">
+								필수 보강
+							</PText>
+							<ul className="mt-1 list-disc pl-4 text-[12px] text-contrast-medium">
+								{topicReadiness.requiredActions.slice(0, 3).map((action) => (
+									<li key={action}>{action}</li>
+								))}
+							</ul>
+						</div>
+					)}
+					{topicReadiness.reframeOptions.length > 0 && (
+						<div>
+							<PText size="x-small" weight="semi-bold">
+								재기획 방향
+							</PText>
+							<ul className="mt-1 list-disc pl-4 text-[12px] text-contrast-medium">
+								{topicReadiness.reframeOptions.slice(0, 3).map((option) => (
+									<li key={option}>{option}</li>
+								))}
+							</ul>
+						</div>
+					)}
+				</div>
+			</div>
+		);
+	}
+
+	function renderAnimationReadinessPanel() {
+		if (!animationReadiness || mode !== "animation") return null;
+		const state: "error" | "warning" | "info" =
+			animationReadiness.status === "blocked"
+				? "error"
+				: animationReadiness.status === "needs_development"
+					? "warning"
+					: "info";
+		const heading =
+			animationReadiness.status === "blocked"
+				? "애니메이션 제작 보류"
+				: animationReadiness.status === "needs_development"
+					? "스토리 개발 권고"
+					: "애니메이션 프리프로덕션 통과";
+		const primaryIssue =
+			animationReadiness.issues[0]?.message ??
+			"현재 입력으로 캐릭터/스토리보드 기반 제작이 가능합니다.";
+
+		return (
+			<div className="mb-static-md">
+				<PInlineNotification
+					state={state}
+					heading={`${heading} · ${animationReadiness.score}/100`}
+					description={primaryIssue}
+					dismissButton={false}
+				/>
+				<div className="mt-static-sm bg-canvas rounded-[4px] p-static-sm">
+					<div className="flex items-center gap-static-xs flex-wrap mb-static-xs">
+						<PTag color="background-frosted">
+							포맷: {animationReadiness.productionFamilyLabel}
+						</PTag>
+						<PTag color="background-surface">
+							스타일: {animationReadiness.recommendedAnimationStyle}
+						</PTag>
+						<PTag color="background-surface">
+							각도: {animationReadiness.storyAngle}
+						</PTag>
+						<PTag color="background-surface">
+							추천 형식: {animationReadiness.recommendedFormat}
+						</PTag>
+					</div>
+					{animationBible && (
+						<PText size="x-small" color="contrast-medium" className="mb-1">
+							캐릭터 바이블: {summarizeAnimationBible(animationBible)}
+						</PText>
+					)}
+					{animationReadiness.requiredActions.length > 0 && (
+						<ul className="mt-1 list-disc pl-4 text-[12px] text-contrast-medium">
+							{animationReadiness.requiredActions
+								.slice(0, 3)
+								.map((action) => (
+									<li key={action}>{action}</li>
+							))}
+						</ul>
+					)}
+					{animationReadiness.qualityGates.length > 0 && (
+						<div className="mt-static-xs">
+							<PText size="x-small" weight="semi-bold">
+								포맷별 품질 게이트
+							</PText>
+							<ul className="mt-1 list-disc pl-4 text-[12px] text-contrast-medium">
+								{animationReadiness.qualityGates.slice(0, 3).map((gate) => (
+									<li key={gate}>{gate}</li>
+								))}
+							</ul>
+						</div>
+					)}
+					{animationReadiness.riskControls.length > 0 && (
+						<div className="mt-static-xs">
+							<PText size="x-small" weight="semi-bold">
+								레퍼런스 리스크 제어
+							</PText>
+							<ul className="mt-1 list-disc pl-4 text-[12px] text-contrast-medium">
+								{animationReadiness.riskControls
+									.slice(0, 2)
+									.map((control) => (
+										<li key={control}>{control}</li>
+									))}
+							</ul>
+						</div>
+					)}
+					<details className="mt-static-xs text-[12px] text-contrast-medium">
+						<summary className="cursor-pointer">프롬프트 지시 보기</summary>
+						<pre className="mt-1 whitespace-pre-wrap text-[11px]">
+							{formatAnimationReadinessForPrompt(animationReadiness)}
+						</pre>
+					</details>
+				</div>
+			</div>
+		);
+	}
+
+	function renderNicheHandoffPanel(handoff: NicheResearchHandoff) {
+		return (
+			<div className="mb-static-md bg-canvas rounded-[4px] p-static-sm border border-contrast-low">
+				<div className="flex items-center gap-static-xs flex-wrap mb-static-xs">
+					<PTag color="notification-info-soft">니치 플레이북 적용</PTag>
+					<PTag color="background-surface">{handoff.playbook.score}점</PTag>
+					<PTag color="background-surface">{handoff.summary.query}</PTag>
+				</div>
+				<PText size="small" weight="semi-bold">
+					{handoff.topic}
+				</PText>
+				<PText size="x-small" color="contrast-medium" className="mt-1">
+					{handoff.playbook.openingFormula.slice(0, 2).join(" · ")}
+				</PText>
+			</div>
+		);
+	}
+
 	if (generating) {
 		return (
 			<div className="bg-surface rounded-[8px] p-static-lg text-center py-fluid-lg">
@@ -515,6 +901,8 @@ export default function StepScript({
 	if (genError) {
 		return (
 			<div className="bg-surface rounded-[8px] p-static-lg">
+				{renderTopicReadinessPanel()}
+				{renderAnimationReadinessPanel()}
 				<PInlineNotification
 					heading="스크립트 생성 실패"
 					description={genError}
@@ -531,6 +919,13 @@ export default function StepScript({
 		);
 	}
 
+	const formatChoices: Array<"both" | "shorts" | "longform"> = (() => {
+		if (!referenceTemplate) return ["both", "shorts", "longform"];
+		const supported = getReferenceTemplateSupportedFormats(referenceTemplate);
+		if (supported.length === 1) return [supported[0]];
+		return ["both", ...supported];
+	})();
+
 	return (
 		<div className="bg-surface rounded-[8px] p-static-lg">
 			<div className="flex items-center gap-static-sm mb-static-sm">
@@ -545,8 +940,12 @@ export default function StepScript({
 				생성된 스크립트를 검토하고 수정하세요.
 			</PText>
 
+			{renderTopicReadinessPanel()}
+			{renderAnimationReadinessPanel()}
+			{nicheHandoff && renderNicheHandoffPanel(nicheHandoff)}
+
 			<div className="flex gap-static-sm mb-static-lg">
-				{(["both", "shorts", "longform"] as const).map((f) => (
+				{formatChoices.map((f) => (
 					<TabButton key={f} active={format === f} onClick={() => setFormat(f)}>
 						{f === "both"
 							? "쇼츠 + 롱폼"
@@ -948,7 +1347,14 @@ export default function StepScript({
 					>
 						다시 생성
 					</PButton>
-					<PButton loading={saving} onClick={handleSubmit}>
+					<PButton
+						loading={saving}
+						disabled={
+							topicReadiness?.status === "blocked" ||
+							animationReadiness?.status === "blocked"
+						}
+						onClick={handleSubmit}
+					>
 						다음: 미디어 생성
 					</PButton>
 				</div>

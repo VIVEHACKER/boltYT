@@ -19,6 +19,7 @@ import {
 	checkRenderServer,
 	getRenderQueue,
 	getRenderStatus,
+	isRenderJobError,
 	pollRenderProgress,
 	submitRender,
 } from "./render-queue";
@@ -220,6 +221,7 @@ describe("pollRenderProgress", () => {
 		status: string,
 		progress = 100,
 		error?: string,
+		extra: Record<string, unknown> = {},
 	): Record<string, unknown> {
 		return {
 			job: {
@@ -231,6 +233,7 @@ describe("pollRenderProgress", () => {
 				outputPath: "/out.mp4",
 				createdAt: "",
 				error,
+				...extra,
 			},
 		};
 	}
@@ -246,11 +249,24 @@ describe("pollRenderProgress", () => {
 	});
 
 	it("failed 상태 → reject", async () => {
-		okFetch(makeJob("failed", 50, "render error"));
+		okFetch(
+			makeJob("failed", 50, "render error", {
+				errorCategory: "quality_gate",
+				qcResult: { score: 63, passed: false },
+			}),
+		);
 		const promise = pollRenderProgress("j1", vi.fn(), 1000);
 		promise.catch(() => {}); // unhandled rejection 방지
 		await vi.runAllTimersAsync();
-		await expect(promise).rejects.toThrow();
+		let caught: unknown;
+		await promise.catch((error) => {
+			caught = error;
+		});
+		expect(isRenderJobError(caught)).toBe(true);
+		if (isRenderJobError(caught)) {
+			expect(caught.job.errorCategory).toBe("quality_gate");
+			expect((caught.job.qcResult as { score?: number }).score).toBe(63);
+		}
 	});
 
 	it("cancelled 상태 → reject", async () => {

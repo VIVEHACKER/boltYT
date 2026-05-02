@@ -12,6 +12,8 @@ export type ApiKeysStatus = {
 	pixabay: boolean;
 	youtube: boolean;
 	naver: boolean;
+	fal: boolean;
+	google: boolean;
 };
 
 export const EMPTY_STATUS: ApiKeysStatus = {
@@ -21,6 +23,8 @@ export const EMPTY_STATUS: ApiKeysStatus = {
 	pixabay: false,
 	youtube: false,
 	naver: false,
+	fal: false,
+	google: false,
 };
 
 export interface ApiKeysContextValue {

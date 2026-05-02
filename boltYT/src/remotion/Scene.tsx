@@ -13,6 +13,7 @@ import {
 import { useProxyAvailable } from "../hooks/useProxyAvailable";
 import { compileColorGraphToCss } from "../lib/color-graph-css";
 import {
+	collectAccentFrames,
 	computeMicroEditStyle,
 	computeNewsCardLayerMotion,
 	computeOverlayTypographyStyle,
@@ -22,13 +23,14 @@ import {
 import {
 	getNewsCardTheme,
 	inferNewsSurfaceTone,
+	type NewsSurfaceTone,
 } from "../lib/news-surface-theme";
 import type { SceneShot } from "../lib/scene-shot-types";
+import { SFX_CATALOG, type SfxCategory, type SfxEntry } from "../lib/sfx";
 import { getShotOverlayTheme } from "../lib/shot-overlay-theme";
 import { computeTextEmphasisCueTheme } from "../lib/text-emphasis-cue-theme";
 import { computeTextEmphasisWordStyle } from "../lib/text-emphasis-highlight";
 import { computeTextEmphasisLayout } from "../lib/text-emphasis-layout";
-import { getTextEmphasisSurfaceTheme } from "../lib/text-emphasis-surface-theme";
 import { evaluateTransformKeyframes } from "../lib/timeline-model";
 import { ChunkedCaption } from "./ChunkedCaption";
 import { TextEffectWrapper } from "./effects/TextEffects";
@@ -39,7 +41,14 @@ import { ColorGrade } from "./overlays/ColorGrade";
 import { LowerThird } from "./overlays/LowerThird";
 import { LightLeak, Particles } from "./overlays/Particles";
 import { resolveVideoSrc } from "./resolve-video-src";
-import type { CaptionStyle, RemotionScene, SubtitleStyle } from "./types";
+import { buildShotTimeline } from "./shot-timing";
+import type {
+	CaptionStyle,
+	LayoutVariant,
+	RemotionScene,
+	SubtitleStyle,
+	TextEffect,
+} from "./types";
 import { DEFAULT_SUBTITLE, isVertical, SHORTS_SAFE_AREA } from "./types";
 
 /** 쇼츠 여부에 따른 레이아웃 값 */
@@ -77,6 +86,46 @@ function getShotScale(crop?: SceneShot["crop"], baseScale = 1) {
 	}
 }
 
+function getShotObjectFit(crop?: SceneShot["crop"]): "cover" | "contain" {
+	return crop === "full" ? "contain" : "cover";
+}
+
+function secondsToFrames(seconds: number | undefined, fps: number) {
+	if (typeof seconds !== "number" || !Number.isFinite(seconds)) return 0;
+	return Math.max(0, Math.floor(seconds * fps));
+}
+
+function isLegacyDownloadedTrim(shot: SceneShot | undefined): boolean {
+	if (!shot) return false;
+	const trimStart = shot.trim_start ?? 0;
+	const trimEnd = shot.trim_end;
+	return (
+		shot.selection_provider === "youtube" &&
+		Number.isFinite(trimStart) &&
+		trimStart <= 0.01 &&
+		typeof trimEnd === "number" &&
+		trimEnd <= 1.01 &&
+		Number(shot.duration_seconds) > 1.2
+	);
+}
+
+function shotEndAtFrame(
+	shot: SceneShot | undefined,
+	fps: number,
+	startFrom: number,
+	fallbackDurationFrames?: number,
+): number | undefined {
+	const fallback =
+		typeof fallbackDurationFrames === "number" && fallbackDurationFrames > 0
+			? startFrom + fallbackDurationFrames
+			: undefined;
+	if (isLegacyDownloadedTrim(shot)) return fallback;
+	if (typeof shot?.trim_end === "number" && Number.isFinite(shot.trim_end)) {
+		return Math.max(startFrom + 2, secondsToFrames(shot.trim_end, fps));
+	}
+	return fallback;
+}
+
 function clamp(value: number, min: number, max: number) {
 	return Math.max(min, Math.min(max, value));
 }
@@ -95,54 +144,380 @@ function mergeMotionStyles(
 	};
 }
 
-function buildShotTimeline(
-	shots: SceneShot[] | undefined,
-	totalFrames: number,
-) {
-	if (!shots || shots.length === 0) return [];
+function activeSpeechIntensity(
+	frame: number,
+	wordTimings?: RemotionScene["wordTimings"],
+): number {
+	if (!wordTimings?.length) return 0;
+	const active = wordTimings.find(
+		(word) => frame >= word.startFrame && frame <= word.endFrame,
+	);
+	if (!active) return 0;
+	const span = Math.max(1, active.endFrame - active.startFrame);
+	const local = (frame - active.startFrame) / span;
+	return Math.sin(Math.PI * clamp(local, 0, 1));
+}
 
-	const baseFrames = shots.map((shot) =>
-		Math.max(1, Math.round(Math.max(0.4, shot.duration_seconds) * 30)),
-	);
-	const sum = baseFrames.reduce((acc, value) => acc + value, 0);
-	const scaled = baseFrames.map((value) =>
-		Math.max(1, Math.round((value / Math.max(sum, 1)) * totalFrames)),
-	);
-	const scaledSum = scaled.reduce((acc, value) => acc + value, 0);
-	scaled[scaled.length - 1] = Math.max(
-		1,
-		scaled[scaled.length - 1] + (totalFrames - scaledSum),
-	);
+function computeAnimationSpeechStyle(
+	shot: SceneShot | undefined,
+	frame: number,
+	wordTimings?: RemotionScene["wordTimings"],
+): { transform?: string; filter?: string } {
+	const rig = shot?.animation_rig;
+	if (!rig) return {};
+	const speech = activeSpeechIntensity(frame, wordTimings);
+	if (speech <= 0) return {};
+	const mouthWeight =
+		rig.mouthCue === "wide" ? 1 : rig.mouthCue === "open" ? 0.72 : 0.36;
+	const expressionWeight =
+		rig.expression === "surprised" || rig.expression === "fear" ? 1.15 : 1;
+	const scale = 1 + speech * mouthWeight * expressionWeight * 0.014;
+	const lift = -speech * clamp(rig.actionIntensity, 0.2, 1) * 3.5;
+	return {
+		transform: `translateY(${lift.toFixed(2)}px) scale(${scale.toFixed(3)})`,
+		filter: `brightness(${(1 + speech * 0.025).toFixed(3)}) saturate(${(1 + speech * 0.035).toFixed(3)})`,
+	};
+}
 
-	let cursor = 0;
-	return shots.map((shot, index) => {
-		const from = cursor;
-		const durationInFrames = Math.max(1, scaled[index]);
-		cursor += durationInFrames;
-		return {
-			shot,
-			from,
-			durationInFrames,
-		};
+function animationRigMicroTransform(
+	shot: SceneShot | undefined,
+	localFrame: number,
+	durationInFrames: number,
+): string {
+	const rig = shot?.animation_rig;
+	if (!rig) return "";
+	const progress = durationInFrames <= 1 ? 1 : localFrame / durationInFrames;
+	const eased = Math.sin(progress * Math.PI);
+	const beat = Math.sin(progress * Math.PI * 2);
+	const intensity = clamp(rig.actionIntensity, 0, 1);
+	const anticipation =
+		rig.pose === "action" && progress < 0.18
+			? Math.sin((progress / 0.18) * Math.PI) * 5 * intensity
+			: 0;
+	const settle =
+		rig.pose === "action" && progress > 0.82
+			? Math.sin(((progress - 0.82) / 0.18) * Math.PI) * 3 * intensity
+			: 0;
+	const y =
+		rig.pose === "action"
+			? -10 * eased * intensity + anticipation + settle
+			: -4 * eased * intensity;
+	const rotation =
+		rig.pose === "action"
+			? beat * 2.2 * intensity
+			: rig.expression === "surprised" || rig.expression === "fear"
+				? beat * 1.1 * intensity
+				: 0;
+	const mouthPulse =
+		rig.mouthCue === "open" || rig.mouthCue === "wide"
+			? 1 + 0.012 * eased * intensity
+			: 1;
+	const squash =
+		rig.pose === "action" ? 1 + 0.012 * eased * intensity : 1;
+	return `translateY(${y.toFixed(2)}px) rotate(${rotation.toFixed(2)}deg) scale(${(mouthPulse * squash).toFixed(3)})`;
+}
+
+function withAnimationRigMotion(
+	base: React.CSSProperties,
+	shot: SceneShot | undefined,
+	localFrame: number,
+	durationInFrames: number,
+): React.CSSProperties {
+	const rigTransform = animationRigMicroTransform(
+		shot,
+		localFrame,
+		durationInFrames,
+	);
+	if (!rigTransform) return base;
+	return {
+		...base,
+		transform: [base.transform, rigTransform].filter(Boolean).join(" "),
+	};
+}
+
+function isAnimationPerformanceShot(shot?: SceneShot): boolean {
+	return Boolean(shot?.animation_rig || shot?.animation_family);
+}
+
+function animationAccentColor(scene: RemotionScene, shot?: SceneShot): string {
+	const cue = shot?.sfx_cue?.category;
+	if (cue === "impact" || cue === "suspense_hit") return "255, 232, 138";
+	if (cue === "glitch") return "112, 231, 255";
+	if (cue === "notification" || cue === "bell") return "132, 204, 255";
+	if (scene.mood === "horror" || scene.mood === "mystery") return "167, 139, 250";
+	return "255, 255, 255";
+}
+
+function AnimationPerformanceOverlay({
+	scene,
+	shot,
+	sceneFrame,
+	localFrame,
+	durationInFrames,
+}: {
+	scene: RemotionScene;
+	shot?: SceneShot;
+	sceneFrame: number;
+	localFrame: number;
+	durationInFrames: number;
+}) {
+	const rig = shot?.animation_rig;
+	if (!isAnimationPerformanceShot(shot) || !rig) return null;
+	const progress =
+		durationInFrames <= 1 ? 1 : clamp(localFrame / durationInFrames, 0, 1);
+	const beat = Math.sin(progress * Math.PI);
+	const speech = activeSpeechIntensity(
+		Math.max(0, Math.round(sceneFrame)),
+		scene.wordTimings,
+	);
+	const accent = animationAccentColor(scene, shot);
+	const actionOpacity = clamp(rig.actionIntensity, 0, 1) * beat;
+	const impactFrame =
+		shot?.kind === "punch"
+			? localFrame >= Math.max(0, durationInFrames - 10)
+			: localFrame <= 8;
+	const impactOpacity =
+		impactFrame && (shot?.sfx_cue?.intensity ?? 0) > 0.6
+			? clamp((shot.sfx_cue?.intensity ?? 0) * 0.22, 0, 0.22)
+			: 0;
+	const blinkCycle = Math.sin((localFrame / 30) * Math.PI * 2);
+	const blinkOpacity =
+		rig.expression === "surprised" || rig.expression === "fear"
+			? 0
+			: blinkCycle > 0.96
+				? 0.42
+				: 0;
+	const speechGlowOpacity =
+		(rig.mouthCue === "open" || rig.mouthCue === "wide") && speech > 0
+			? speech * 0.18
+			: 0;
+	const actionLineOpacity =
+		rig.pose === "action" ? clamp(actionOpacity * 0.3, 0, 0.3) : 0;
+
+	return (
+		<AbsoluteFill style={{ pointerEvents: "none", overflow: "hidden" }}>
+			{impactOpacity > 0 && (
+				<AbsoluteFill
+					style={{
+						background: `radial-gradient(circle at 50% 45%, rgba(${accent}, ${impactOpacity}) 0%, rgba(${accent}, ${impactOpacity * 0.32}) 22%, transparent 58%)`,
+						mixBlendMode: "screen",
+					}}
+				/>
+			)}
+			{actionLineOpacity > 0 && (
+				<AbsoluteFill
+					style={{
+						background: `linear-gradient(105deg, transparent 0%, rgba(${accent}, ${actionLineOpacity}) 16%, transparent 27%, transparent 62%, rgba(${accent}, ${actionLineOpacity * 0.8}) 78%, transparent 92%)`,
+						transform: `translateX(${Math.sin(progress * Math.PI * 2) * 14}px)`,
+						filter: "blur(10px)",
+						mixBlendMode: "screen",
+					}}
+				/>
+			)}
+			{speechGlowOpacity > 0 && (
+				<div
+					style={{
+						position: "absolute",
+						left: "32%",
+						right: "32%",
+						bottom: "25%",
+						height: 48,
+						borderRadius: 999,
+						background: `radial-gradient(ellipse, rgba(${accent}, ${speechGlowOpacity}) 0%, transparent 72%)`,
+						filter: "blur(14px)",
+						transform: `scale(${1 + speech * 0.2})`,
+						mixBlendMode: "screen",
+					}}
+				/>
+			)}
+			{blinkOpacity > 0 && (
+				<div
+					style={{
+						position: "absolute",
+						left: "30%",
+						right: "30%",
+						top: "33%",
+						height: 2,
+						background: `rgba(${accent}, ${blinkOpacity})`,
+						boxShadow: `0 0 18px rgba(${accent}, ${blinkOpacity})`,
+						transform: "scaleX(0.42)",
+						mixBlendMode: "screen",
+					}}
+				/>
+			)}
+		</AbsoluteFill>
+	);
+}
+
+function rhythmPulseEnvelope(
+	frame: number,
+	cueFrame: number,
+	attackFrames: number,
+	releaseFrames: number,
+): number {
+	const start = cueFrame - 1;
+	const peak = cueFrame + attackFrames;
+	const end = peak + releaseFrames;
+	if (frame < start || frame > end) return 0;
+	if (frame <= peak) {
+		return clamp((frame - start) / Math.max(1, peak - start), 0, 1);
+	}
+	return clamp(1 - (frame - peak) / Math.max(1, end - peak), 0, 1);
+}
+
+function shotBoundaryFadeFrames(
+	shot: SceneShot | undefined,
+	scene: RemotionScene,
+): number {
+	if (!shot) return scene.pacing === "fast" || scene.hookBoost ? 3 : 5;
+	const cue = shot.sfx_cue;
+	const highImpact =
+		shot.kind === "punch" ||
+		cue?.category === "impact" ||
+		cue?.category === "glitch" ||
+		(cue?.intensity ?? 0) >= 0.82;
+	if (highImpact) return 1;
+	if (
+		cue?.category === "whoosh" ||
+		cue?.category === "reveal" ||
+		shot.motion === "pan_left" ||
+		shot.motion === "pan_right"
+	) {
+		return 2;
+	}
+	if (scene.pacing === "fast" || scene.hookBoost || shot.animation_rig) return 3;
+	if (shot.media_type === "video") return 4;
+	return 6;
+}
+
+function editorialAccentColor(scene: RemotionScene, shot?: SceneShot): string {
+	const cue = shot?.sfx_cue?.category;
+	if (cue === "glitch") return "84, 220, 255";
+	if (cue === "impact" || cue === "suspense_hit") return "255, 223, 118";
+	if (scene.mood === "warm") return "255, 198, 128";
+	if (scene.mood === "horror" || scene.mood === "mystery") return "166, 130, 255";
+	return "255, 255, 255";
+}
+
+function EditorialRhythmOverlay({
+	scene,
+	shot,
+	sceneFrame,
+	localFrame,
+	durationInFrames,
+	isVideoShot,
+}: {
+	scene: RemotionScene;
+	shot?: SceneShot;
+	sceneFrame: number;
+	localFrame: number;
+	durationInFrames: number;
+	isVideoShot?: boolean;
+}) {
+	const { width, height } = useVideoConfig();
+	const vertical = isVertical(width, height);
+	const cueFrames = collectAccentFrames(
+		scene.wordTimings,
+		scene.durationInFrames,
+		scene.hookBoost,
+	).slice(0, scene.hookBoost ? 4 : 3);
+	const pulse = cueFrames.reduce((maxPulse, cueFrame) => {
+		const cuePulse = rhythmPulseEnvelope(
+			sceneFrame,
+			cueFrame,
+			scene.hookBoost ? 2 : 1,
+			scene.hookBoost ? 10 : 7,
+		);
+		return Math.max(maxPulse, cuePulse);
+	}, 0);
+	const startSnap = interpolate(localFrame, [0, 3, 12], [1, 0.4, 0], {
+		extrapolateLeft: "clamp",
+		extrapolateRight: "clamp",
 	});
+	const framesToEnd = Math.max(0, durationInFrames - localFrame);
+	const endProgress = clamp((12 - framesToEnd) / 12, 0, 1);
+	const endSnap = endProgress * endProgress * 0.85;
+	const cueIntensity = clamp(shot?.sfx_cue?.intensity ?? 0, 0, 1);
+	const accent = editorialAccentColor(scene, shot);
+	const focusOpacity = clamp(
+		(scene.mood === "news" ? 0.08 : 0.13) +
+			pulse * 0.055 +
+			(isVideoShot ? 0 : 0.035),
+		0,
+		0.22,
+	);
+	const edgeOpacity = clamp(
+		(pulse * 0.1 + startSnap * 0.045 + endSnap * 0.05) *
+			(scene.hookBoost ? 1.25 : 1),
+		0,
+		0.16,
+	);
+	const impactOpacity = clamp(
+		(startSnap + endSnap + pulse * 0.5) *
+			cueIntensity *
+			(shot?.kind === "punch" ? 0.18 : 0.08),
+		0,
+		0.2,
+	);
+	const scanX = ((sceneFrame * (scene.hookBoost ? 1.7 : 1.1)) % 120) - 10;
+	const focusY =
+		shot?.crop === "detail" || shot?.crop === "close"
+			? vertical
+				? 38
+				: 42
+			: vertical
+				? 44
+				: 50;
+
+	return (
+		<AbsoluteFill style={{ pointerEvents: "none", overflow: "hidden" }}>
+			<AbsoluteFill
+				style={{
+					background: `radial-gradient(ellipse at 50% ${focusY}%, transparent 0%, transparent ${vertical ? "42%" : "50%"}, rgba(0,0,0,${focusOpacity}) 100%)`,
+					mixBlendMode: "multiply",
+				}}
+			/>
+			{edgeOpacity > 0.01 && (
+				<AbsoluteFill
+					style={{
+						background: `linear-gradient(112deg, transparent 0%, transparent ${Math.max(0, scanX - 10)}%, rgba(${accent}, ${edgeOpacity}) ${scanX}%, transparent ${Math.min(100, scanX + 11)}%, transparent 100%)`,
+						filter: "blur(8px)",
+						mixBlendMode: "soft-light",
+					}}
+				/>
+			)}
+			{impactOpacity > 0.01 && (
+				<AbsoluteFill
+					style={{
+						background: `linear-gradient(90deg, rgba(${accent}, ${impactOpacity}) 0%, transparent 18%, transparent 82%, rgba(${accent}, ${impactOpacity}) 100%)`,
+						filter: "blur(4px)",
+						mixBlendMode: "screen",
+					}}
+				/>
+			)}
+		</AbsoluteFill>
+	);
 }
 
 function useActiveShot(
 	shots: SceneShot[] | undefined,
 	durationInFrames: number,
+	wordTimings?: RemotionScene["wordTimings"],
 ): {
 	shot?: SceneShot;
+	from: number;
 	localFrame: number;
 	durationInFrames: number;
 } {
 	const frame = useCurrentFrame();
 	const timeline = useMemo(
-		() => buildShotTimeline(shots, durationInFrames),
-		[shots, durationInFrames],
+		() => buildShotTimeline(shots, durationInFrames, { wordTimings }),
+		[shots, durationInFrames, wordTimings],
 	);
 	if (timeline.length === 0) {
 		return {
 			shot: undefined,
+			from: 0,
 			localFrame: frame,
 			durationInFrames,
 		};
@@ -156,6 +531,7 @@ function useActiveShot(
 
 	return {
 		shot: active.shot,
+		from: active.from,
 		localFrame: Math.max(0, frame - active.from),
 		durationInFrames: active.durationInFrames,
 	};
@@ -184,53 +560,58 @@ function computeShotMotion(
 	const progress = durationInFrames <= 1 ? 1 : localFrame / durationInFrames;
 	const ease = progress * progress * (3 - 2 * progress);
 	const scale = getShotScale(shot.crop, baseScale);
+	const withRig = (style: React.CSSProperties) =>
+		withAnimationRigMotion(style, shot, localFrame, durationInFrames);
 
 	switch (shot.motion) {
 		case "static":
-			return { transform: `scale(${scale})`, transformOrigin: "center center" };
+			return withRig({
+				transform: `scale(${scale})`,
+				transformOrigin: "center center",
+			});
 		case "slow_zoom_out":
-			return {
+			return withRig({
 				transform: `scale(${interpolate(ease, [0, 1], [scale * 1.08, scale])})`,
 				transformOrigin: vertical ? "center 35%" : "center center",
-			};
+			});
 		case "pan_left":
-			return {
+			return withRig({
 				transform: `scale(${scale * 1.08}) translateX(${interpolate(
 					ease,
 					[0, 1],
 					[80, -60],
 				)}px)`,
 				transformOrigin: "center center",
-			};
+			});
 		case "pan_right":
-			return {
+			return withRig({
 				transform: `scale(${scale * 1.08}) translateX(${interpolate(
 					ease,
 					[0, 1],
 					[-80, 60],
 				)}px)`,
 				transformOrigin: "center center",
-			};
+			});
 		case "drift":
-			return {
+			return withRig({
 				transform: `scale(${interpolate(ease, [0, 1], [scale, scale * 1.08])}) translate(${interpolate(
 					ease,
 					[0, 1],
 					[-18, 24],
 				)}px, ${interpolate(ease, [0, 1], [16, -18])}px)`,
 				transformOrigin: vertical ? "center 35%" : "center center",
-			};
+			});
 		case "push_in":
-			return {
+			return withRig({
 				transform: `scale(${interpolate(ease, [0, 1], [scale, scale * 1.16])})`,
 				transformOrigin: vertical ? "center 32%" : "center center",
-			};
+			});
 		default:
 			// "slow_zoom_in" 포함 — 가장 일반적인 기본 동작
-			return {
+			return withRig({
 				transform: `scale(${interpolate(ease, [0, 1], [scale, scale * 1.1])})`,
 				transformOrigin: vertical ? "center 35%" : "center center",
-			};
+			});
 	}
 }
 
@@ -401,6 +782,11 @@ type SubtitleBgStyle = "none" | "pill" | "block" | "stroke" | "glow";
 
 interface SceneProps {
 	scene: RemotionScene;
+	brand?: {
+		channelName?: string;
+		channelHandle?: string;
+		tagline?: string;
+	};
 	subtitleStyle?: Required<SubtitleStyle>;
 	fadeOutFrames?: number;
 	/** 컴포지션 레벨 연속 나레이션이 재생 중일 때 true */
@@ -413,6 +799,8 @@ interface SceneProps {
 	subtitleBgStyle?: SubtitleBgStyle;
 	/** 자막 강조색 (레퍼런스 프리셋) */
 	subtitleAccentColor?: string;
+	/** 컴포지션 레벨 레퍼런스 레이아웃 */
+	layoutVariant?: LayoutVariant;
 	/** 씬 오디오를 여기서 렌더링하지 않음 — Composition 레벨에서 J/L-cut 오버랩으로 처리 */
 	suppressAudio?: boolean;
 	/** "preview": 프록시 파일 우선. "render": 항상 원본. 기본 "render" */
@@ -485,6 +873,43 @@ function useSubtitleOpacity(durationInFrames: number, fadeOutFrames?: number) {
 		{ extrapolateLeft: "clamp", extrapolateRight: "clamp" },
 	);
 	return fadeIn * fadeOut;
+}
+
+function splitReadableLines(
+	value: string,
+	maxLineLength: number,
+	maxLines: number,
+): string[] {
+	const words = value.replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
+	if (words.length === 0) return [];
+
+	const lines: string[] = [];
+	let current = "";
+	for (const word of words) {
+		const next = current ? `${current} ${word}` : word;
+		if (next.length > maxLineLength && current) {
+			lines.push(current);
+			current = word;
+		} else {
+			current = next;
+		}
+		if (lines.length === maxLines - 1) break;
+	}
+	if (current) {
+		const remainingStart = words.findIndex((word) => current.includes(word));
+		const remaining =
+			remainingStart >= 0 && lines.length === maxLines - 1
+				? words.slice(remainingStart).join(" ")
+				: current;
+		lines.push(remaining);
+	}
+	return lines.slice(0, maxLines);
+}
+
+function compactText(value: string, maxLength: number): string {
+	const normalized = value.replace(/\s+/g, " ").trim();
+	if (normalized.length <= maxLength) return normalized;
+	return `${normalized.slice(0, Math.max(0, maxLength - 1)).trim()}…`;
 }
 
 // ─── 공통 오버레이 레이어 ───
@@ -653,16 +1078,94 @@ function ShotOverlay({
 }
 
 /** SFX 오디오 레이어 — 씬 시작/트랜지션 효과음 */
+function normalizeSfxFile(file: string) {
+	return file.replace(/^\/+/, "").replace(/^sfx\//, "");
+}
+
 function SfxCue({ file, volume }: { file: string; volume: number }) {
 	const frame = useCurrentFrame();
 	return (
 		<Audio
-			src={staticFile(`sfx/${file}`)}
+			src={staticFile(`sfx/${normalizeSfxFile(file)}`)}
 			volume={interpolate(frame, [0, 4], [0, volume], {
 				extrapolateRight: "clamp",
 			})}
 			startFrom={0}
 		/>
+	);
+}
+
+function pickShotSfx(
+	category: SfxCategory | string | undefined,
+	seed: number,
+): SfxEntry | undefined {
+	if (!category || category === "none") return undefined;
+	const matches = SFX_CATALOG.filter((entry) => entry.category === category);
+	if (matches.length === 0) return undefined;
+	return matches[Math.abs(seed) % matches.length];
+}
+
+function ShotSfxLayer({ scene }: { scene: RemotionScene }) {
+	const timeline = useMemo(
+		() =>
+			buildShotTimeline(scene.shots, scene.durationInFrames, {
+				wordTimings: scene.wordTimings,
+			}),
+		[scene.shots, scene.durationInFrames, scene.wordTimings],
+	);
+	if (timeline.length === 0) return null;
+	const maxShotSfx = scene.durationInFrames < 180 ? 3 : 6;
+	const selectedShotIds = new Set(
+		[...timeline]
+			.filter((entry) => {
+				const cue = entry.shot.sfx_cue;
+				return Boolean(cue?.category && cue.category !== "none");
+			})
+			.sort(
+				(a, b) =>
+					(b.shot.sfx_cue?.intensity ?? 0) - (a.shot.sfx_cue?.intensity ?? 0),
+			)
+			.slice(0, maxShotSfx)
+			.map((entry) => entry.shot.id),
+	);
+	return (
+		<>
+			{timeline.map((entry, index) => {
+				const cue = entry.shot.sfx_cue;
+				const sfx = pickShotSfx(cue?.category, index);
+				if (!cue || !sfx || !selectedShotIds.has(entry.shot.id)) return null;
+				const localOffset =
+					entry.shot.kind === "punch"
+						? Math.max(0, entry.durationInFrames - 8)
+						: Math.min(6, Math.max(0, entry.durationInFrames - 1));
+				const from = clamp(
+					entry.from + localOffset,
+					0,
+					Math.max(0, scene.durationInFrames - 1),
+				);
+				const durationInFrames = Math.max(
+					1,
+					Math.min(
+						Math.ceil(sfx.duration * 30),
+						Math.max(1, scene.durationInFrames - from),
+					),
+				);
+				const volume = clamp(
+					sfx.volume * (0.6 + clamp(cue.intensity, 0, 1) * 0.55),
+					0,
+					0.75,
+				);
+				return (
+					<Sequence
+						key={`${entry.shot.id}-${cue.category}-${index}`}
+						from={from}
+						durationInFrames={durationInFrames}
+					>
+						<SfxCue file={sfx.file} volume={volume} />
+					</Sequence>
+				);
+			})}
+		</>
 	);
 }
 
@@ -693,6 +1196,7 @@ function SfxLayer({ scene }: { scene: RemotionScene }) {
 
 	return (
 		<>
+			<ShotSfxLayer scene={scene} />
 			{scene.enterSfxFile && (
 				<Sequence from={enterFrom} durationInFrames={enterDuration}>
 					<SfxCue
@@ -727,12 +1231,16 @@ function NewsOverlayView({
 	suppressAudio = false,
 }: SceneProps) {
 	const frame = useCurrentFrame();
-	const { durationInFrames } = scene;
+	const { durationInFrames } = useVideoConfig();
 	const audioVolume = useAudioVolume(durationInFrames);
 	const viewOpacity = useTailFade(durationInFrames, fadeOutFrames);
 	const subtitleOpacity = useSubtitleOpacity(durationInFrames, fadeOutFrames);
 	const layout = useLayoutMode();
-	const activeShot = useActiveShot(scene.shots, durationInFrames);
+	const activeShot = useActiveShot(
+		scene.shots,
+		durationInFrames,
+		scene.wordTimings,
+	);
 
 	const cardY = interpolate(frame, [4, 20], [40, 0], {
 		extrapolateLeft: "clamp",
@@ -752,6 +1260,12 @@ function NewsOverlayView({
 		scene.narration,
 		scene.mood,
 	);
+	const speechMicro = computeAnimationSpeechStyle(
+		activeShot.shot,
+		frame,
+		scene.wordTimings,
+	);
+	const newsImageMotion = mergeMotionStyles(scaleTransform, speechMicro);
 
 	const shotImageUrl = activeShot.shot?.source_url || scene.imageUrl;
 	const hasImage = Boolean(shotImageUrl);
@@ -790,8 +1304,10 @@ function NewsOverlayView({
 							width: "100%",
 							height: "100%",
 							objectFit: "cover",
-							...scaleTransform,
-							filter: "brightness(0.4)",
+							...newsImageMotion,
+							filter: [newsImageMotion.filter, "brightness(0.4)"]
+								.filter(Boolean)
+								.join(" "),
 						}}
 					/>
 				</AbsoluteFill>
@@ -803,6 +1319,21 @@ function NewsOverlayView({
 					}}
 				/>
 			)}
+			<AnimationPerformanceOverlay
+				scene={scene}
+				shot={activeShot.shot}
+				sceneFrame={frame}
+				localFrame={activeShot.localFrame}
+				durationInFrames={activeShot.durationInFrames}
+			/>
+			<EditorialRhythmOverlay
+				scene={scene}
+				shot={activeShot.shot}
+				sceneFrame={frame}
+				localFrame={activeShot.localFrame}
+				durationInFrames={activeShot.durationInFrames}
+				isVideoShot={false}
+			/>
 
 			{/* 오버레이 스택 */}
 			<OverlayStack scene={scene} />
@@ -959,11 +1490,16 @@ function DefaultSceneView({
 	usage = "render",
 }: SceneProps) {
 	const frame = useCurrentFrame();
+	const { fps } = useVideoConfig();
 	const { durationInFrames } = scene;
 	const audioVolume = useAudioVolume(durationInFrames);
 	const viewOpacity = useTailFade(durationInFrames, fadeOutFrames);
 	const layout = useLayoutMode();
-	const activeShot = useActiveShot(scene.shots, durationInFrames);
+	const activeShot = useActiveShot(
+		scene.shots,
+		durationInFrames,
+		scene.wordTimings,
+	);
 	const { isReady: proxyReady } = useProxyAvailable(
 		scene.videoUrl ?? scene.imageUrl,
 		scene.videoUrl ?? "",
@@ -977,13 +1513,12 @@ function DefaultSceneView({
 		usage,
 		proxyAvailable: proxyReady,
 	});
-	const trimStart = Math.max(
-		0,
-		Math.floor((activeShot.shot?.trim_start ?? 0) * durationInFrames),
-	);
-	const trimEnd = Math.min(
-		durationInFrames,
-		Math.ceil((activeShot.shot?.trim_end ?? 1) * durationInFrames),
+	const trimStart = secondsToFrames(activeShot.shot?.trim_start, fps);
+	const trimEnd = shotEndAtFrame(
+		activeShot.shot,
+		fps,
+		trimStart,
+		activeShot.durationInFrames,
 	);
 
 	const kb = computeShotMotion(
@@ -1010,6 +1545,11 @@ function DefaultSceneView({
 		isVideo: hasVideo,
 		kind: activeShot.shot?.kind ?? emphasisTone,
 	});
+	const speechMicro = computeAnimationSpeechStyle(
+		activeShot.shot,
+		frame,
+		scene.wordTimings,
+	);
 
 	const subtitleOpacity = useSubtitleOpacity(durationInFrames, fadeOutFrames);
 
@@ -1019,11 +1559,6 @@ function DefaultSceneView({
 		mood: scene.mood,
 		hookBoost: scene.hookBoost,
 		tone: emphasisTone,
-	});
-	const emphasisSurfaceTheme = getTextEmphasisSurfaceTheme({
-		theme: emphasisTheme,
-		tone: emphasisTone,
-		hookBoost: scene.hookBoost,
 	});
 	const emphasisWords = useMemo(
 		() =>
@@ -1070,27 +1605,37 @@ function DefaultSceneView({
 	const hasAnyNarration = hasGlobalNarration || Boolean(scene.audioUrl);
 	const videoBaseVol = hasAnyNarration ? 0.12 : 0.55;
 	const videoVolume = videoBaseVol * audioVolume;
+	const videoObjectFit = getShotObjectFit(activeShot.shot?.crop);
 
 	return (
 		<AbsoluteFill style={{ opacity: viewOpacity }}>
 			{/* 배경 이미지 */}
 			{hasVideo ? (
 				<AbsoluteFill style={{ overflow: "hidden" }}>
-					<Video
-						src={videoSrc}
-						startFrom={trimStart}
-						endAt={Math.max(trimStart + 2, trimEnd)}
-						volume={videoVolume}
-						style={mergeMotionStyles(
-							{
-								width: "100%",
-								height: "100%",
-								objectFit: "cover",
-								...kb,
-							},
-							micro,
-						)}
-					/>
+					<Sequence
+						from={activeShot.from}
+						durationInFrames={activeShot.durationInFrames}
+					>
+						<Video
+							src={videoSrc}
+							startFrom={trimStart}
+							endAt={trimEnd}
+							volume={videoVolume}
+							style={mergeMotionStyles(
+								mergeMotionStyles(
+									{
+										width: "100%",
+										height: "100%",
+										objectFit: videoObjectFit,
+										background: "#050505",
+										...kb,
+									},
+									micro,
+								),
+								speechMicro,
+							)}
+						/>
+					</Sequence>
 				</AbsoluteFill>
 			) : shotImageUrl && !isNewsPhoto ? (
 				// 일반 이미지 — 풀스크린 Ken Burns
@@ -1098,13 +1643,16 @@ function DefaultSceneView({
 					<Img
 						src={shotImageUrl}
 						style={mergeMotionStyles(
-							{
-								width: "100%",
-								height: "100%",
-								objectFit: "cover",
-								...kb,
-							},
-							micro,
+							mergeMotionStyles(
+								{
+									width: "100%",
+									height: "100%",
+									objectFit: "cover",
+									...kb,
+								},
+								micro,
+							),
+							speechMicro,
 						)}
 					/>
 				</AbsoluteFill>
@@ -1142,17 +1690,20 @@ function DefaultSceneView({
 					>
 						<div
 							style={mergeMotionStyles(
-								{
-									position: "relative",
-									maxWidth: layout.vertical ? "85%" : "65%",
-									maxHeight: "70%",
-									boxShadow:
-										"0 8px 60px rgba(0,0,0,0.8), 0 0 0 2px rgba(255,255,255,0.1)",
-									borderRadius: 4,
-									overflow: "hidden",
-									...kb,
-								},
-								micro,
+								mergeMotionStyles(
+									{
+										position: "relative",
+										maxWidth: layout.vertical ? "85%" : "65%",
+										maxHeight: "70%",
+										boxShadow:
+											"0 8px 60px rgba(0,0,0,0.8), 0 0 0 2px rgba(255,255,255,0.1)",
+										borderRadius: 4,
+										overflow: "hidden",
+										...kb,
+									},
+									micro,
+								),
+								speechMicro,
 							)}
 						>
 							<Img
@@ -1175,6 +1726,21 @@ function DefaultSceneView({
 					}}
 				/>
 			)}
+			<AnimationPerformanceOverlay
+				scene={scene}
+				shot={activeShot.shot}
+				sceneFrame={frame}
+				localFrame={activeShot.localFrame}
+				durationInFrames={activeShot.durationInFrames}
+			/>
+			<EditorialRhythmOverlay
+				scene={scene}
+				shot={activeShot.shot}
+				sceneFrame={frame}
+				localFrame={activeShot.localFrame}
+				durationInFrames={activeShot.durationInFrames}
+				isVideoShot={hasVideo}
+			/>
 
 			{/* 어두운 오버레이 */}
 			{isEmphasis && (
@@ -1215,198 +1781,33 @@ function DefaultSceneView({
 					}}
 				>
 					{isEmphasis ? (
-						<div
-							style={{
-								...emphasisTheme.card,
-								...emphasisSurfaceTheme.card,
-								padding: layout.vertical ? "28px 24px 24px" : "36px 34px 30px",
-								maxWidth: layout.vertical ? "100%" : 980,
-								opacity: subtitleOpacity * emphasisLayerMotion.cardOpacity,
-								transform: emphasisLayerMotion.cardTransform,
-							}}
-						>
-							<div style={emphasisCueTheme.shellOverlay} />
-							<div style={emphasisCueTheme.accentOverlay} />
-							<div
-								style={{
-									position: "relative",
-									zIndex: 1,
-									display: "flex",
-									flexDirection: "column",
-								}}
-							>
-								<div
-									style={{
-										...emphasisTheme.label.style,
-										...emphasisCueTheme.labelCue,
-										transform:
-											`${emphasisLayerMotion.labelTransform} ${String(emphasisCueTheme.labelCue.transform ?? "")}`.trim(),
-										opacity: emphasisLayerMotion.labelOpacity,
-									}}
-								>
-									{emphasisTheme.label.text}
-								</div>
-								{scene.newsDate &&
-									emphasisTheme.datePlacement === "badge" &&
-									emphasisTheme.dateBadge && (
-										<div
-											style={{
-												...emphasisTheme.dateBadge,
-												transform: emphasisLayerMotion.metaTransform,
-												opacity: emphasisLayerMotion.metaOpacity,
-											}}
-										>
-											{scene.newsDate}
-										</div>
-									)}
-								{(scene.newsSource ||
-									scene.sourceAttribution ||
-									(scene.newsDate &&
-										emphasisTheme.datePlacement === "meta")) && (
-									<div
-										style={{
-											...emphasisTheme.metaRow,
-											...emphasisSurfaceTheme.metaRow,
-											transform: emphasisLayerMotion.metaTransform,
-											opacity: emphasisLayerMotion.metaOpacity,
-										}}
-									>
-										{(scene.sourceAttribution || scene.newsSource) && (
-											<span
-												style={{
-													fontFamily:
-														"'Noto Sans KR', -apple-system, sans-serif",
-													...emphasisTheme.source,
-												}}
-											>
-												{scene.sourceAttribution || scene.newsSource}
-											</span>
-										)}
-										{scene.newsDate &&
-											emphasisTheme.datePlacement === "meta" && (
-												<span
-													style={{
-														fontFamily:
-															"'Noto Sans KR', -apple-system, sans-serif",
-														...emphasisTheme.date,
-													}}
-												>
-													{scene.newsDate}
-												</span>
-											)}
-									</div>
-								)}
-								<div
-									style={{
-										transform: emphasisLayerMotion.titleTransform,
-										opacity: emphasisLayerMotion.titleOpacity,
-									}}
-								>
-									{textEffect !== "none" ? (
-										<TextEffectWrapper
-											effect={textEffect}
-											durationInFrames={durationInFrames}
-										>
-											<div
-												style={{
-													...emphasisSurfaceTheme.titleBlock,
-													gap: emphasisLayout.variant === "stacked" ? 16 : 0,
-												}}
-											>
-												{emphasisLayout.variant === "stacked" && (
-													<EmphasisWordLine
-														words={emphasisLeadWords}
-														frame={frame}
-														fontSize={Math.round(
-															sub.emphasisFontSize *
-																(layout.vertical ? 0.44 : 0.4),
-														)}
-														fontFamily={sub.fontFamily}
-														activeColor={emphasisTheme.accentColor}
-														baseColor={String(
-															emphasisTheme.excerpt.color ?? "#d1d5db",
-														)}
-														baseWeight={680}
-														align={emphasisSurfaceTheme.lineAlign}
-														tone={emphasisTone}
-													/>
-												)}
-												<EmphasisWordLine
-													words={emphasisFocusWords}
-													frame={frame}
-													fontSize={
-														emphasisLayout.variant === "stacked"
-															? Math.round(
-																	sub.emphasisFontSize *
-																		(layout.vertical ? 0.72 : 0.66),
-																)
-															: sub.emphasisFontSize
-													}
-													fontFamily={sub.fontFamily}
-													activeColor={emphasisTheme.accentColor}
-													baseColor={String(
-														emphasisTheme.title.color ?? "#ffffff",
-													)}
-													baseWeight={
-														emphasisLayout.variant === "stacked" ? 760 : 820
-													}
-													align={emphasisSurfaceTheme.lineAlign}
-													tone={emphasisTone}
-												/>
-											</div>
-										</TextEffectWrapper>
-									) : (
-										<div
-											style={{
-												...emphasisSurfaceTheme.titleBlock,
-												gap: emphasisLayout.variant === "stacked" ? 16 : 0,
-											}}
-										>
-											{emphasisLayout.variant === "stacked" && (
-												<EmphasisWordLine
-													words={emphasisLeadWords}
-													frame={frame}
-													fontSize={Math.round(
-														sub.emphasisFontSize *
-															(layout.vertical ? 0.44 : 0.4),
-													)}
-													fontFamily={sub.fontFamily}
-													activeColor={emphasisTheme.accentColor}
-													baseColor={String(
-														emphasisTheme.excerpt.color ?? "#d1d5db",
-													)}
-													baseWeight={680}
-													align={emphasisSurfaceTheme.lineAlign}
-													tone={emphasisTone}
-												/>
-											)}
-											<EmphasisWordLine
-												words={emphasisFocusWords}
-												frame={frame}
-												fontSize={
-													emphasisLayout.variant === "stacked"
-														? Math.round(
-																sub.emphasisFontSize *
-																	(layout.vertical ? 0.72 : 0.66),
-															)
-														: sub.emphasisFontSize
-												}
-												fontFamily={sub.fontFamily}
-												activeColor={emphasisTheme.accentColor}
-												baseColor={String(
-													emphasisTheme.title.color ?? "#ffffff",
-												)}
-												baseWeight={
-													emphasisLayout.variant === "stacked" ? 760 : 820
-												}
-												align={emphasisSurfaceTheme.lineAlign}
-												tone={emphasisTone}
-											/>
-										</div>
-									)}
-								</div>
-							</div>
-						</div>
+						<CinematicTextEmphasis
+							scene={scene}
+							sub={sub}
+							frame={frame}
+							durationInFrames={durationInFrames}
+							leadWords={emphasisLeadWords}
+							focusWords={emphasisFocusWords}
+							accentColor={emphasisTheme.accentColor}
+							label={emphasisTheme.label.text}
+							source={scene.sourceAttribution || scene.newsSource}
+							date={scene.newsDate}
+							tone={emphasisTone}
+							textEffect={textEffect}
+							isStacked={emphasisLayout.variant === "stacked"}
+							vertical={layout.vertical}
+							opacity={subtitleOpacity * emphasisLayerMotion.cardOpacity}
+							shellOverlay={emphasisCueTheme.shellOverlay}
+							accentOverlay={emphasisCueTheme.accentOverlay}
+							labelCue={emphasisCueTheme.labelCue}
+							labelTransform={emphasisLayerMotion.labelTransform}
+							labelOpacity={emphasisLayerMotion.labelOpacity}
+							metaTransform={emphasisLayerMotion.metaTransform}
+							metaOpacity={emphasisLayerMotion.metaOpacity}
+							titleTransform={emphasisLayerMotion.titleTransform}
+							titleOpacity={emphasisLayerMotion.titleOpacity}
+							cardTransform={emphasisLayerMotion.cardTransform}
+						/>
 					) : (
 						<NarrationCaption
 							scene={scene}
@@ -1429,6 +1830,333 @@ function DefaultSceneView({
 
 // ─── 비디오 클립 씬 ───
 
+function SocialClipCardSceneView({
+	scene,
+	brand,
+	fadeOutFrames,
+	hasGlobalNarration = false,
+	subtitleAccentColor = "#FFD64A",
+	suppressAudio = false,
+	usage = "render",
+}: SceneProps) {
+	const frame = useCurrentFrame();
+	const { durationInFrames } = scene;
+	const { width, height, fps } = useVideoConfig();
+	const audioVolume = useAudioVolume(durationInFrames);
+	const viewOpacity = useTailFade(durationInFrames, fadeOutFrames);
+	const activeShot = useActiveShot(
+		scene.shots,
+		durationInFrames,
+		scene.wordTimings,
+	);
+	const progress = clamp(frame / Math.max(1, durationInFrames - 1), 0, 1);
+		const handle = brand?.channelHandle?.trim() ?? "";
+		const title = scene.newsTitle || scene.sourceAttribution || scene.narration;
+		const titleLines = splitReadableLines(title, 13, 2);
+		const captionSource =
+			activeShot.shot?.caption || scene.newsExcerpt || scene.narration;
+		const captionLines = splitReadableLines(captionSource, 17, 2);
+		const hookPill = scene.newsExcerpt ? compactText(scene.newsExcerpt, 38) : "";
+	const mediaUrl =
+		activeShot.shot?.source_url || scene.videoUrl || scene.imageUrl || "";
+	const isVideoShot =
+		activeShot.shot?.media_type === "video" ||
+		Boolean(scene.videoUrl && mediaUrl === scene.videoUrl) ||
+		/\.(mp4|webm|mov)(\?|$)/i.test(mediaUrl);
+	const { isReady: proxyReady } = useProxyAvailable(
+		scene.videoUrl ?? scene.imageUrl,
+		scene.videoUrl ?? "",
+	);
+	const mediaSrc = resolveVideoSrc(mediaUrl, staticFile, {
+		usage,
+		proxyAvailable: proxyReady,
+	});
+	const mediaMotion = computeShotMotion(
+		activeShot.shot,
+		activeShot.localFrame,
+		activeShot.durationInFrames,
+		1,
+		height > width,
+		scene.narration,
+		scene.mood,
+	);
+	const micro = computeMicroEditStyle({
+		frame,
+		durationInFrames,
+		wordTimings: scene.wordTimings,
+		hookBoost: scene.hookBoost,
+		vertical: height > width,
+		isVideo: isVideoShot,
+	});
+	const mediaStyle = mergeMotionStyles(
+		{
+			width: "100%",
+			height: "100%",
+				objectFit: getShotObjectFit(activeShot.shot?.crop),
+				background: "#050505",
+				...mediaMotion,
+		},
+		micro,
+	);
+	const socialTrimStart = secondsToFrames(activeShot.shot?.trim_start, fps);
+	const socialEndAt = shotEndAtFrame(
+		activeShot.shot,
+		fps,
+		socialTrimStart,
+		activeShot.durationInFrames,
+	);
+	const captionColor =
+		scene.hookBoost || /[?？]|왜|제일|방법/.test(captionSource)
+			? subtitleAccentColor
+			: "#ffffff";
+	const mediaTop = Math.round(height * 0.305);
+	const mediaHeight = Math.round(height * 0.32);
+	const footerTop = mediaTop + mediaHeight;
+
+	return (
+		<AbsoluteFill
+			style={{
+				opacity: viewOpacity,
+				background:
+					"linear-gradient(180deg, #ffffff 0%, #ffffff 58%, #eeeeee 100%)",
+				overflow: "hidden",
+				fontFamily: "'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif",
+			}}
+		>
+			<div
+				style={{
+					position: "absolute",
+					inset: 0,
+					borderRadius: height > width ? 28 : 0,
+					overflow: "hidden",
+					background: "#fff",
+				}}
+			/>
+
+			<div
+				style={{
+					position: "absolute",
+					top: 132,
+					left: 62,
+					right: 62,
+					textAlign: "center",
+					fontFamily:
+						"'AppleMyungjo', 'Hiragino Mincho ProN', 'Nanum Myeongjo', serif",
+					fontWeight: 900,
+					color: "#050505",
+					letterSpacing: "-0.045em",
+					lineHeight: 1.18,
+				}}
+			>
+				{titleLines.map((line, index) => (
+					<div
+						key={`${line}-${index}`}
+						style={{
+							fontSize: index === 0 ? 76 : 82,
+							transform:
+								index === 0
+									? `translateY(${Math.sin(frame / 18) * 1.2}px)`
+									: undefined,
+						}}
+					>
+						{line}
+					</div>
+				))}
+			</div>
+
+				{hookPill && (
+					<div
+						style={{
+							position: "absolute",
+							top: 292,
+							left: "50%",
+							maxWidth: 650,
+							padding: "9px 18px",
+							borderRadius: 999,
+							transform: "translateX(-50%)",
+							background: "rgba(0,0,0,0.62)",
+							color: "#fff",
+							fontSize: 25,
+							fontWeight: 760,
+							lineHeight: 1.25,
+							textAlign: "center",
+							boxShadow: "0 6px 20px rgba(0,0,0,0.18)",
+						}}
+					>
+						{hookPill}
+					</div>
+				)}
+
+			<div
+				style={{
+					position: "absolute",
+					top: mediaTop,
+					left: 0,
+					width,
+					height: mediaHeight,
+					overflow: "hidden",
+					background: "#111",
+				}}
+			>
+				{mediaSrc ? (
+					<Sequence
+						from={activeShot.from}
+						durationInFrames={activeShot.durationInFrames}
+					>
+						{isVideoShot ? (
+							<Video
+								src={mediaSrc}
+								style={mediaStyle}
+								startFrom={socialTrimStart}
+								endAt={socialEndAt}
+								volume={hasGlobalNarration ? 0.08 : 0.42}
+							/>
+						) : (
+							<Img src={mediaSrc} style={mediaStyle} />
+						)}
+					</Sequence>
+				) : (
+					<div
+						style={{
+							width: "100%",
+							height: "100%",
+							background:
+								"radial-gradient(circle at 50% 40%, #394457 0%, #11151d 62%, #050608 100%)",
+						}}
+					/>
+				)}
+				<div
+					style={{
+						position: "absolute",
+						inset: 0,
+						background:
+							"linear-gradient(180deg, rgba(0,0,0,0.04) 0%, transparent 44%, rgba(0,0,0,0.46) 100%)",
+					}}
+				/>
+				<div
+					style={{
+						position: "absolute",
+						left: 38,
+						top: 34,
+						padding: "8px 12px",
+						borderRadius: 8,
+						background: "#ffcf21",
+						color: "#ed1b3a",
+						fontSize: 27,
+						fontWeight: 950,
+						letterSpacing: "-0.05em",
+						boxShadow: "0 4px 0 rgba(0,0,0,0.22)",
+					}}
+				>
+					핫클립
+				</div>
+				<div
+					style={{
+						position: "absolute",
+						left: 44,
+						right: 44,
+						bottom: 38,
+						textAlign: "center",
+						color: captionColor,
+						fontSize: 55,
+						fontWeight: 930,
+						lineHeight: 1.18,
+						letterSpacing: "-0.045em",
+						textShadow:
+							"0 4px 0 rgba(0,0,0,0.86), 0 0 18px rgba(0,0,0,0.72)",
+					}}
+				>
+					{captionLines.map((line, index) => (
+						<div key={`${line}-${index}`}>{line}</div>
+					))}
+				</div>
+			</div>
+
+			<div
+				style={{
+					position: "absolute",
+					top: footerTop,
+					left: 0,
+					right: 0,
+					height: height - footerTop,
+					background:
+						"linear-gradient(180deg, #ffffff 0%, #f9f9f7 48%, #d4d4d4 100%)",
+				}}
+			/>
+
+				{handle && (
+					<div
+						style={{
+							position: "absolute",
+							top: footerTop + 236,
+							left: 92,
+							display: "flex",
+							alignItems: "center",
+							gap: 16,
+						}}
+					>
+						<div
+							style={{
+								width: 62,
+								height: 62,
+								borderRadius: 999,
+								background: "#ffd21f",
+								display: "flex",
+								alignItems: "center",
+								justifyContent: "center",
+								color: "#fff",
+								fontSize: 34,
+								fontWeight: 950,
+							}}
+						>
+							♪
+						</div>
+						<div style={{ color: "#111", fontSize: 30, fontWeight: 900 }}>
+							{handle}
+						</div>
+						<div
+							style={{
+								marginLeft: 6,
+								padding: "12px 30px",
+								borderRadius: 999,
+								background: "#fff",
+								color: "#111",
+								fontSize: 29,
+								fontWeight: 900,
+								boxShadow: "0 4px 18px rgba(0,0,0,0.16)",
+							}}
+						>
+							구독
+						</div>
+					</div>
+				)}
+
+			<div
+				style={{
+					position: "absolute",
+					left: 0,
+					right: 0,
+					bottom: 0,
+					height: 8,
+					background: "rgba(0,0,0,0.15)",
+				}}
+			>
+				<div
+					style={{
+						width: `${progress * 100}%`,
+						height: "100%",
+						background: "#ff174b",
+					}}
+				/>
+			</div>
+
+			{scene.audioUrl && !hasGlobalNarration && !suppressAudio && (
+				<Audio src={scene.audioUrl} volume={audioVolume} />
+			)}
+		</AbsoluteFill>
+	);
+}
+
 function VideoSceneView({
 	scene,
 	subtitleStyle: sub = DEFAULT_SUBTITLE,
@@ -1442,16 +2170,24 @@ function VideoSceneView({
 	usage = "render",
 }: SceneProps) {
 	const frame = useCurrentFrame();
+	const { fps } = useVideoConfig();
 	const { durationInFrames } = scene;
 	const audioVolume = useAudioVolume(durationInFrames);
 	const viewOpacity = useTailFade(durationInFrames, fadeOutFrames);
 	const layout = useLayoutMode();
 
 	const shotTimeline = useMemo(
-		() => buildShotTimeline(scene.shots, durationInFrames),
-		[scene.shots, durationInFrames],
+		() =>
+			buildShotTimeline(scene.shots, durationInFrames, {
+				wordTimings: scene.wordTimings,
+			}),
+		[scene.shots, durationInFrames, scene.wordTimings],
 	);
-	const activeShot = useActiveShot(scene.shots, durationInFrames);
+	const activeShot = useActiveShot(
+		scene.shots,
+		durationInFrames,
+		scene.wordTimings,
+	);
 	const { isReady: proxyReady } = useProxyAvailable(
 		scene.videoUrl ?? scene.imageUrl,
 		scene.videoUrl ?? "",
@@ -1469,38 +2205,50 @@ function VideoSceneView({
 	const videoBaseVol = hasAnyNarration ? 0.22 : 0.8;
 	const videoVolume = videoBaseVol * audioVolume;
 
-	// 샷 경계에서 6프레임 cross-dissolve
-	const FADE = 6;
-
 	return (
 		<AbsoluteFill style={{ opacity: viewOpacity }}>
 			{shotTimeline.length > 0 ? (
 				shotTimeline.map((entry) => {
 					const localF = frame - entry.from;
-					const opacity = interpolate(
+					const fadeFrames = clamp(
+						shotBoundaryFadeFrames(entry.shot, scene),
+						1,
+						Math.max(1, Math.floor(entry.durationInFrames / 3)),
+					);
+					const fadeIn = interpolate(localF, [-fadeFrames, 0], [0, 1], {
+						extrapolateLeft: "clamp",
+						extrapolateRight: "clamp",
+					});
+					const fadeOut = interpolate(
 						localF,
-						[-FADE, 0, entry.durationInFrames - FADE, entry.durationInFrames],
-						[0, 1, 1, 0],
+						[entry.durationInFrames - fadeFrames, entry.durationInFrames],
+						[1, 0],
 						{ extrapolateLeft: "clamp", extrapolateRight: "clamp" },
 					);
+					const opacity = Math.min(fadeIn, fadeOut);
 					if (opacity <= 0) return null;
 
 					const isVideoShot = entry.shot.media_type !== "image";
-					// trim_start/trim_end은 씬 durationInFrames 기준 정규화
-					// 올바른 startFrom: 해당 샷 시작 시점에 비디오가 videoStartFrame을 재생하도록 오프셋
-					const videoStartFrame = Math.floor(
-						(entry.shot.trim_start ?? 0) * durationInFrames,
+					const sequenceFrom = Math.max(0, entry.from - fadeFrames);
+					const sequenceLeadFrames = entry.from - sequenceFrom;
+					const videoStartFrame = secondsToFrames(entry.shot.trim_start, fps);
+					const startFrom = Math.max(
+						0,
+						videoStartFrame - sequenceLeadFrames,
 					);
-					const startFrom = Math.max(0, videoStartFrame - entry.from);
+					const endAt = shotEndAtFrame(
+						entry.shot,
+						fps,
+						startFrom,
+						entry.durationInFrames + sequenceLeadFrames,
+					);
 					const shotUrl = isVideoShot
 						? entry.shot.source_url || baseVideoUrl
 						: entry.shot.source_url || scene.imageUrl;
-					const shotSrc = isVideoShot
-						? videoSrc
-						: resolveVideoSrc(shotUrl, staticFile, {
-								usage,
-								proxyAvailable: proxyReady,
-							});
+					const shotSrc = resolveVideoSrc(shotUrl, staticFile, {
+						usage,
+						proxyAvailable: proxyReady,
+					});
 					const motion = computeShotMotion(
 						entry.shot,
 						Math.max(0, localF),
@@ -1518,14 +2266,23 @@ function VideoSceneView({
 						vertical: layout.vertical,
 						isVideo: isVideoShot,
 					});
+					const speechMicro = computeAnimationSpeechStyle(
+						entry.shot,
+						frame,
+						scene.wordTimings,
+					);
 
 					const shotFilter = entry.shot.colorGraph
 						? compileColorGraphToCss(entry.shot.colorGraph).css
 						: undefined;
 
 					return (
-						<AbsoluteFill
+						<Sequence
 							key={entry.shot.id}
+							from={sequenceFrom}
+							durationInFrames={entry.durationInFrames + sequenceLeadFrames}
+						>
+						<AbsoluteFill
 							style={{
 								opacity,
 								overflow: "hidden",
@@ -1537,31 +2294,55 @@ function VideoSceneView({
 									src={shotSrc}
 									startFrom={startFrom}
 									style={mergeMotionStyles(
-										{
-											width: "100%",
-											height: "100%",
-											objectFit: "cover",
-											...motion,
-										},
-										micro,
+										mergeMotionStyles(
+											{
+												width: "100%",
+												height: "100%",
+												objectFit: getShotObjectFit(entry.shot.crop),
+												background: "#050505",
+												...motion,
+											},
+											micro,
+										),
+										speechMicro,
 									)}
 									volume={opacity * videoVolume}
+									endAt={endAt}
 								/>
 							) : shotSrc ? (
 								<Img
 									src={shotSrc}
 									style={mergeMotionStyles(
-										{
-											width: "100%",
-											height: "100%",
-											objectFit: "cover",
-											...motion,
-										},
-										micro,
+										mergeMotionStyles(
+											{
+												width: "100%",
+												height: "100%",
+												objectFit: "cover",
+												...motion,
+											},
+											micro,
+										),
+										speechMicro,
 									)}
 								/>
 							) : null}
+							<AnimationPerformanceOverlay
+								scene={scene}
+								shot={entry.shot}
+								sceneFrame={frame}
+								localFrame={Math.max(0, localF)}
+								durationInFrames={entry.durationInFrames}
+							/>
+							<EditorialRhythmOverlay
+								scene={scene}
+								shot={entry.shot}
+								sceneFrame={frame}
+								localFrame={Math.max(0, localF)}
+								durationInFrames={entry.durationInFrames}
+								isVideoShot={isVideoShot}
+							/>
 						</AbsoluteFill>
+						</Sequence>
 					);
 				})
 			) : videoSrc ? (
@@ -1576,15 +2357,24 @@ function VideoSceneView({
 							isVideo: true,
 						});
 						return (
-							<Video
-								src={videoSrc}
-								startFrom={0}
-								style={mergeMotionStyles(
-									{ width: "100%", height: "100%", objectFit: "cover" },
-									micro,
-								)}
-								volume={videoVolume}
-							/>
+							<>
+								<Video
+									src={videoSrc}
+									startFrom={0}
+									style={mergeMotionStyles(
+										{ width: "100%", height: "100%", objectFit: "cover" },
+										micro,
+									)}
+									volume={videoVolume}
+								/>
+								<EditorialRhythmOverlay
+									scene={scene}
+									sceneFrame={frame}
+									localFrame={frame}
+									durationInFrames={durationInFrames}
+									isVideoShot={true}
+								/>
+							</>
 						);
 					})()}
 				</AbsoluteFill>
@@ -1646,6 +2436,7 @@ function VideoSceneView({
 
 export function SceneView({
 	scene,
+	brand,
 	subtitleStyle,
 	fadeOutFrames,
 	hasGlobalNarration,
@@ -1653,11 +2444,13 @@ export function SceneView({
 	subtitlePosition = "bottom",
 	subtitleBgStyle = "stroke",
 	subtitleAccentColor = "#FFD700",
+	layoutVariant,
 	suppressAudio = false,
 	usage = "render",
 }: SceneProps) {
 	const props: SceneProps = {
 		scene,
+		brand,
 		subtitleStyle,
 		fadeOutFrames,
 		hasGlobalNarration,
@@ -1665,13 +2458,17 @@ export function SceneView({
 		subtitlePosition,
 		subtitleBgStyle,
 		subtitleAccentColor,
+		layoutVariant,
 		suppressAudio,
 		usage,
 	};
+	const effectiveLayout = scene.layout ?? layoutVariant;
 
 	const sceneContent = (
 		<>
-			{scene.type === "news_overlay" ? (
+			{effectiveLayout === "social_clip_card" ? (
+				<SocialClipCardSceneView {...props} />
+			) : scene.type === "news_overlay" ? (
 				<NewsOverlayView {...props} />
 			) : scene.type === "video" ? (
 				<VideoSceneView {...props} />
@@ -1767,7 +2564,11 @@ function NarrationCaption({
 		newsExcerpt: scene.newsExcerpt,
 	});
 	const effectiveBgStyle =
-		scene.hookBoost && bgStyle !== "block" ? "glow" : bgStyle;
+		scene.hookBoost && bgStyle === "none"
+			? "stroke"
+			: bgStyle === "glow"
+				? "stroke"
+				: bgStyle;
 	const effectiveCaptionStyle = captionStyle;
 
 	if (words.length > 0) {
@@ -1816,6 +2617,246 @@ function NarrationCaption({
 		>
 			{scene.narration}
 		</p>
+	);
+}
+
+function hexToRgbaLocal(hex: string, alpha: number) {
+	const normalized = hex.replace("#", "");
+	if (normalized.length !== 6) return `rgba(255,255,255,${alpha})`;
+
+	const r = Number.parseInt(normalized.slice(0, 2), 16);
+	const g = Number.parseInt(normalized.slice(2, 4), 16);
+	const b = Number.parseInt(normalized.slice(4, 6), 16);
+	return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+function CinematicTextEmphasis({
+	scene,
+	sub,
+	frame,
+	durationInFrames,
+	leadWords,
+	focusWords,
+	accentColor,
+	label,
+	source,
+	date,
+	tone,
+	textEffect,
+	isStacked,
+	vertical,
+	opacity,
+	shellOverlay,
+	accentOverlay,
+	labelCue,
+	labelTransform,
+	labelOpacity,
+	metaTransform,
+	metaOpacity,
+	titleTransform,
+	titleOpacity,
+	cardTransform,
+}: {
+	scene: RemotionScene;
+	sub: Required<SubtitleStyle>;
+	frame: number;
+	durationInFrames: number;
+	leadWords: { word: string; startFrame: number; endFrame: number }[];
+	focusWords: { word: string; startFrame: number; endFrame: number }[];
+	accentColor: string;
+	label: string;
+	source?: string;
+	date?: string;
+	tone: NewsSurfaceTone;
+	textEffect: TextEffect;
+	isStacked: boolean;
+	vertical: boolean;
+	opacity: number;
+	shellOverlay: React.CSSProperties;
+	accentOverlay: React.CSSProperties;
+	labelCue: React.CSSProperties;
+	labelTransform: string;
+	labelOpacity: number;
+	metaTransform: string;
+	metaOpacity: number;
+	titleTransform: string;
+	titleOpacity: number;
+	cardTransform: string;
+}) {
+	const leadFontSize = Math.round(sub.emphasisFontSize * (vertical ? 0.46 : 0.42));
+	const focusFontSize = isStacked
+		? Math.round(sub.emphasisFontSize * (vertical ? 0.78 : 0.7))
+		: Math.round(sub.emphasisFontSize * (vertical ? 0.92 : 0.86));
+	const topSpacing = vertical ? 22 : 26;
+	const titleBlock = (
+		<div
+			style={{
+				display: "flex",
+				flexDirection: "column",
+				alignItems: "center",
+				gap: isStacked ? (vertical ? 18 : 16) : 0,
+				textAlign: "center",
+				textShadow:
+					"0 9px 34px rgba(0,0,0,0.78), 0 1px 2px rgba(0,0,0,0.9)",
+				letterSpacing: scene.hookBoost ? "-0.035em" : "-0.02em",
+			}}
+		>
+			{isStacked && (
+				<EmphasisWordLine
+					words={leadWords}
+					frame={frame}
+					fontSize={leadFontSize}
+					fontFamily={sub.fontFamily}
+					activeColor={accentColor}
+					baseColor="rgba(235, 238, 244, 0.84)"
+					baseWeight={690}
+					align="center"
+					tone={tone}
+				/>
+			)}
+			<EmphasisWordLine
+				words={focusWords}
+				frame={frame}
+				fontSize={focusFontSize}
+				fontFamily={sub.fontFamily}
+				activeColor={accentColor}
+				baseColor="#ffffff"
+				baseWeight={scene.hookBoost ? 900 : 830}
+				align="center"
+				tone={tone}
+			/>
+		</div>
+	);
+
+	return (
+		<div
+			style={{
+				position: "relative",
+				width: vertical ? "100%" : 1100,
+				maxWidth: "100%",
+				minHeight: vertical ? 470 : 330,
+				padding: vertical ? "38px 22px 42px" : "42px 70px 48px",
+				opacity,
+				transform: cardTransform,
+				borderRadius: 0,
+				overflow: "visible",
+				background: "transparent",
+				boxShadow: "none",
+			}}
+		>
+			<div
+				style={{
+					position: "absolute",
+					inset: vertical ? "-22% -18%" : "-28% -12%",
+					background: [
+						`radial-gradient(circle at 50% 38%, ${hexToRgbaLocal(accentColor, scene.hookBoost ? 0.34 : 0.24)} 0%, transparent 48%)`,
+						"linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.36) 100%)",
+					].join(", "),
+					filter: "blur(2px)",
+					pointerEvents: "none",
+				}}
+			/>
+			<div style={{ ...shellOverlay, borderRadius: "inherit" }} />
+			<div style={{ ...accentOverlay, borderRadius: 999 }} />
+			<div
+				style={{
+					position: "absolute",
+					top: vertical ? 18 : 22,
+					left: "50%",
+					width: vertical ? "74%" : "52%",
+					height: 4,
+					borderRadius: 999,
+					background: `linear-gradient(90deg, transparent 0%, ${hexToRgbaLocal(accentColor, 0.95)} 50%, transparent 100%)`,
+					boxShadow: `0 0 28px ${hexToRgbaLocal(accentColor, 0.32)}`,
+					transform: "translateX(-50%)",
+					pointerEvents: "none",
+				}}
+			/>
+			<div
+				style={{
+					position: "relative",
+					zIndex: 1,
+					display: "flex",
+					flexDirection: "column",
+					alignItems: "center",
+				}}
+			>
+				<div
+					style={{
+						display: "inline-flex",
+						alignItems: "center",
+						gap: 8,
+						padding: vertical ? "7px 12px" : "8px 14px",
+						borderRadius: 999,
+						border: `1px solid ${hexToRgbaLocal(accentColor, 0.38)}`,
+						background: "rgba(0,0,0,0.34)",
+						color: accentColor,
+						fontFamily: "'Noto Sans KR', -apple-system, sans-serif",
+						fontSize: vertical ? 17 : 18,
+						fontWeight: 820,
+						letterSpacing: "0.11em",
+						textTransform: "uppercase",
+						boxShadow: `0 0 24px ${hexToRgbaLocal(accentColor, 0.16)}`,
+						...labelCue,
+						transform:
+							`${labelTransform} ${String(labelCue.transform ?? "")}`.trim(),
+						opacity: labelOpacity,
+					}}
+				>
+					<span
+						style={{
+							width: 7,
+							height: 7,
+							borderRadius: 999,
+							background: accentColor,
+							boxShadow: `0 0 18px ${hexToRgbaLocal(accentColor, 0.72)}`,
+						}}
+					/>
+					{label}
+				</div>
+				{(source || date) && (
+					<div
+						style={{
+							marginTop: vertical ? 14 : 16,
+							display: "flex",
+							justifyContent: "center",
+							gap: 14,
+							flexWrap: "wrap",
+							transform: metaTransform,
+							opacity: metaOpacity,
+							fontFamily: "'Noto Sans KR', -apple-system, sans-serif",
+							fontSize: vertical ? 16 : 17,
+							fontWeight: 650,
+							letterSpacing: "0.02em",
+							color: "rgba(229, 231, 235, 0.82)",
+							textShadow: "0 2px 10px rgba(0,0,0,0.8)",
+						}}
+					>
+						{source && <span>{source}</span>}
+						{source && date && <span style={{ color: accentColor }}>•</span>}
+						{date && <span>{date}</span>}
+					</div>
+				)}
+				<div
+					style={{
+						marginTop: topSpacing,
+						transform: titleTransform,
+						opacity: titleOpacity,
+					}}
+				>
+					{textEffect !== "none" ? (
+						<TextEffectWrapper
+							effect={textEffect}
+							durationInFrames={durationInFrames}
+						>
+							{titleBlock}
+						</TextEffectWrapper>
+					) : (
+						titleBlock
+					)}
+				</div>
+			</div>
+		</div>
 	);
 }
 

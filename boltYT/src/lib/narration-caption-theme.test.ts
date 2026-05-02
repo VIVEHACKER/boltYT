@@ -13,7 +13,7 @@ describe("narration-caption-theme", () => {
 		});
 
 		expect(String(style.borderLeft)).toContain("solid");
-		expect(style.paddingLeft).toBe(12);
+		expect(style.paddingLeft).toBe(10);
 	});
 
 	it("evidence tone 활성 단어는 stamp형 배경을 쓴다", () => {

@@ -46,7 +46,7 @@ describe("verifySceneQuality", () => {
 		expect(report.issues.some((i) => i.severity === "critical")).toBe(true);
 	});
 
-	it("text_emphasis는 비주얼 없어도 OK", () => {
+	it("text_emphasis 단독 카드 씬은 critical", () => {
 		const report = verifySceneQuality([
 			{
 				...baseScene,
@@ -54,10 +54,13 @@ describe("verifySceneQuality", () => {
 				scene_type: "text_emphasis",
 			},
 		]);
-		const criticals = report.issues.filter(
-			(i) => i.severity === "critical" && i.message.includes("배경"),
-		);
-		expect(criticals.length).toBe(0);
+		expect(report.passed).toBe(false);
+		expect(
+			report.issues.some(
+				(i) =>
+					i.severity === "critical" && i.message.includes("text_emphasis"),
+			),
+		).toBe(true);
 	});
 
 	it("오디오 없는 씬은 warning", () => {
@@ -98,18 +101,18 @@ describe("verifySceneQuality", () => {
 		expect(report.suggestions.some((s) => s.includes("30초 미만"))).toBe(true);
 	});
 
-	it("영상 클립 없으면 suggestion", () => {
+	it("영상 클립 없으면 모션 자료화면 보강 suggestion", () => {
 		const report = verifySceneQuality([baseScene]);
 		expect(
-			report.suggestions.some((s) => s.includes("영상 클립이 하나도 없음")),
+			report.suggestions.some((s) => s.includes("모션 자료화면")),
 		).toBe(true);
 	});
 
-	it("text_emphasis가 40% 넘으면 suggestion", () => {
+	it("text_emphasis가 있으면 단독 씬 금지 suggestion", () => {
 		const textScene = { ...baseScene, scene_type: "text_emphasis" };
 		const report = verifySceneQuality([textScene, textScene, baseScene]);
 		expect(
-			report.suggestions.some((s) => s.includes("텍스트 강조 씬이 40%")),
+			report.suggestions.some((s) => s.includes("text_emphasis 단독 씬 금지")),
 		).toBe(true);
 	});
 
@@ -124,6 +127,98 @@ describe("verifySceneQuality", () => {
 			{ ...baseScene, videoUrl: "https://v.com/v.mp4", duration_seconds: 40 },
 		]);
 		expect(r.suggestions.some((s) => s.includes("영상 클립"))).toBe(false);
+	});
+
+	it("video 씬인데 실제 영상 소스가 없으면 warning", () => {
+		const r = verifySceneQuality([
+			{
+				...baseScene,
+				scene_type: "video",
+				imageUrl: "https://img.com/fallback.jpg",
+				videoUrl: undefined,
+				shots: [{ media_type: "video" }],
+			},
+		]);
+		expect(r.issues.some((i) => i.message.includes("실제 영상 소스가 없음"))).toBe(
+			true,
+		);
+	});
+
+	it("영상 샷 연결률이 낮으면 warning", () => {
+		const r = verifySceneQuality([
+			{
+				...baseScene,
+				scene_type: "video",
+				videoUrl: "https://v.com/v.mp4",
+				shots: [
+					{ media_type: "video", source_url: "https://v.com/a.mp4" },
+					{ media_type: "video" },
+					{ media_type: "video" },
+				],
+			},
+		]);
+		expect(r.issues.some((i) => i.message.includes("영상 샷 3개 중 1개"))).toBe(
+			true,
+		);
+	});
+
+	it("저신뢰 샷 비중이 높으면 품질 편차 warning", () => {
+		const r = verifySceneQuality([
+			{
+				...baseScene,
+				shots: [
+					{
+						media_type: "image",
+						source_url: "scenes/a.png",
+						source_confidence: 42,
+						selection_provider: "pexels",
+						visual_role: "evidence",
+					},
+					{
+						media_type: "image",
+						source_url: "scenes/b.png",
+						source_confidence: 48,
+						selection_provider: "pixabay",
+						visual_role: "archive",
+					},
+					{
+						media_type: "image",
+						source_url: "scenes/c.png",
+						source_confidence: 92,
+						selection_provider: "wikimedia",
+						visual_role: "archive",
+					},
+				],
+			},
+		]);
+
+		expect(r.issues.some((i) => i.message.includes("저신뢰 시각 자료"))).toBe(
+			true,
+		);
+	});
+
+	it("소스 앵커가 부족하면 랜덤 이미지 나열 위험 suggestion", () => {
+		const r = verifySceneQuality([
+			{
+				...baseScene,
+				shots: [
+					{
+						media_type: "image",
+						source_url: "scenes/a.png",
+						selection_provider: "pexels",
+						visual_role: "reconstruction",
+					},
+					{
+						media_type: "image",
+						source_url: "scenes/b.png",
+						selection_provider: "pixabay",
+						visual_role: "context",
+					},
+				],
+			},
+		]);
+
+		expect(r.suggestions.some((s) => s.includes("소스 앵커"))).toBe(true);
 	});
 
 	it("critical × 다수 → score 0 이상", () => {

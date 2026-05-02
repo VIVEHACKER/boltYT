@@ -69,6 +69,7 @@ describe("referenceToPreset", () => {
 		const preset = referenceToPreset(makeRef(), "shorts");
 		expect(preset.composition.subtitleStyle.fontWeight).toBe(700);
 		expect(preset.script.sceneCount).toBe(8);
+		expect(preset.script.targetDuration).toBe(32);
 	});
 
 	it("longform 포맷 → fontWeight 600", () => {
@@ -115,6 +116,109 @@ describe("referenceToPreset", () => {
 	it("transition_style zoom → 'zoom'", () => {
 		const preset = referenceToPreset(makeRef({ transition_style: "zoom" }));
 		expect(preset.composition.defaultTransition).toBe("zoom");
+	});
+
+	it("인터뷰/클립 큐레이션형 레퍼런스 → social_clip_card 레이아웃", () => {
+		const preset = referenceToPreset(
+			makeRef({
+				source_url: "https://www.youtube.com/shorts/hmDt88ANJMI",
+				source_creator: "@ssulply",
+				source_title: "요즘 MZ들의 신박한 헌팅 방법",
+				visual_prompt_template:
+					"street interview footage inside a curated social clip card",
+			}),
+			"shorts",
+		);
+		expect(preset.composition.sceneLayout).toBe("social_clip_card");
+	});
+
+	it("raw_analysis.production_method.sceneLayout → 명시 레이아웃 우선 적용", () => {
+		const preset = referenceToPreset(
+			makeRef({
+				source_title: "일반 제목",
+				raw_analysis: {
+					production_method: {
+						sceneLayout: "social_clip_card",
+					},
+				},
+			}),
+			"shorts",
+		);
+		expect(preset.composition.sceneLayout).toBe("social_clip_card");
+	});
+
+	it("롱폼에서는 social_clip_card를 그대로 강제하지 않음", () => {
+		const preset = referenceToPreset(
+			makeRef({
+				raw_analysis: {
+					production_method: {
+						sceneLayout: "social_clip_card",
+					},
+				},
+			}),
+			"longform",
+		);
+		expect(preset.composition.sceneLayout).toBeUndefined();
+	});
+
+	it("format별 sceneLayouts가 있으면 롱폼 레이아웃을 우선 적용", () => {
+		const preset = referenceToPreset(
+			makeRef({
+				raw_analysis: {
+					production_method: {
+						sceneLayout: "social_clip_card",
+						sceneLayouts: {
+							shorts: "social_clip_card",
+							longform: "full",
+						},
+					},
+				},
+			}),
+			"longform",
+		);
+		expect(preset.composition.sceneLayout).toBe("full");
+	});
+
+	it("formatProfiles가 있으면 포맷별 길이/씬 힌트를 우선 적용", () => {
+		const preset = referenceToPreset(
+			makeRef({
+				raw_analysis: {
+					production_method: {
+						formatProfiles: {
+							longform: {
+								durationSeconds: 240,
+								sceneCount: 12,
+								avgSceneDuration: 20,
+								hookDuration: 10,
+							},
+						},
+					},
+				},
+			}),
+			"longform",
+		);
+		expect(preset.script.targetDuration).toBe(240);
+		expect(preset.script.sceneCount).toBe(12);
+		expect(preset.script.avgSceneDuration).toBe(20);
+		expect(preset.script.hookDuration).toBe(10);
+	});
+
+	it("raw_analysis.production_dna → 프리셋에 보존", () => {
+		const preset = referenceToPreset(
+			makeRef({
+				raw_analysis: {
+					production_dna: {
+						version: "production-dna-v1",
+						camera: { mode: "cut_driven", cutDensityPerMinute: 24 },
+					},
+				},
+			}),
+			"shorts",
+		);
+		expect(preset.productionDna?.version).toBe("production-dna-v1");
+		expect((preset.productionDna?.camera as { mode?: string }).mode).toBe(
+			"cut_driven",
+		);
 	});
 
 	it("scene_count 0 → 쇼츠 기본값 8", () => {
@@ -170,6 +274,28 @@ describe("enrichVisualPrompt", () => {
 			"natural cinematic lighting",
 		);
 	});
+
+	it("production_dna가 있으면 이미지 프롬프트에 카메라/배치 힌트 주입", () => {
+		const dnaPreset = referenceToPreset(
+			makeRef({
+				raw_analysis: {
+					production_dna: {
+						layout: {
+							compositionPattern: "rule_of_thirds",
+							subjectZone: "middle_right",
+							subtitleCollisionRisk: "high",
+						},
+						camera: { mode: "handheld", motionIntensity: 0.62 },
+						color: { temperature: "warm" },
+					},
+				},
+			}),
+		);
+		const result = enrichVisualPrompt("scene", dnaPreset);
+		expect(result).toContain("camera mode: handheld");
+		expect(result).toContain("rule_of_thirds");
+		expect(result).toContain("subtitle collision risk: high");
+	});
 });
 
 // ─── buildScriptConstraint ────────────────────────────────────────────────────
@@ -179,6 +305,11 @@ describe("buildScriptConstraint", () => {
 	it("씬 수 포함", () => {
 		const result = buildScriptConstraint(preset);
 		expect(result).toContain("씬 수: 8개");
+	});
+
+	it("목표 길이 포함", () => {
+		const result = buildScriptConstraint(preset);
+		expect(result).toContain("목표 길이: 32초");
 	});
 
 	it("훅 패턴 포함", () => {
@@ -222,5 +353,42 @@ describe("buildScriptConstraint", () => {
 		};
 		const result = buildScriptConstraint(noHookPreset);
 		expect(result).not.toContain("훅 패턴");
+	});
+
+	it("production_dna가 있으면 스크립트 제약에 컷/카메라/전환 규칙 포함", () => {
+		const dnaPreset = referenceToPreset(
+			makeRef({
+				raw_analysis: {
+					production_dna: {
+						camera: {
+							mode: "cut_driven",
+							cutDensityPerMinute: 18.5,
+							avgCutIntervalSeconds: 3.2,
+							firstCutSeconds: 1.4,
+							first3Motion: 0.58,
+						},
+						layout: {
+							compositionPattern: "top_title_card",
+							subjectZone: "center",
+							textSafeZones: ["bottom_center_with_stroke"],
+						},
+						subtitles: { collisionRisk: "medium" },
+						transitions: {
+							rules: ["첫 문장 끝에서 hard cut", "반전 전 punch zoom"],
+						},
+						audio: { bgmMood: "tense", bgmTempo: "fast", integratedLufs: -14.2 },
+					},
+				},
+			}),
+		);
+		const result = buildScriptConstraint(dnaPreset);
+		expect(result).toContain("제작 DNA");
+		expect(result).toContain("카메라 모드: cut_driven");
+		expect(result).toContain("컷 밀도: 분당 18.5컷 기준");
+		expect(result).toContain("평균 컷 간격: 3.2초");
+		expect(result).toContain("첫 컷: 1.4초");
+		expect(result).toContain("초반 3초 모션 강도: 0.58");
+		expect(result).toContain("레퍼런스 LUFS -14.2");
+		expect(result).toContain("첫 문장 끝에서 hard cut");
 	});
 });
