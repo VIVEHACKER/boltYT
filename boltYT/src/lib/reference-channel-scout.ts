@@ -22,6 +22,7 @@ export interface ReferenceChannelScoutOptions {
 	resultsPerQuery: number;
 	daysBack: number;
 	order: NicheResearchOptions["order"];
+	format?: "auto" | "shorts" | "longform";
 }
 
 export interface ReferenceChannelCandidate {
@@ -98,8 +99,9 @@ export async function fetchReferenceChannelCandidates(
 	const merged = { ...DEFAULT_OPTIONS, ...options };
 	const videos: Array<ScoredNicheVideo & { sourceQuery: string }> = [];
 	const now = new Date();
+	const queries = buildFormatQueries(category, merged.format ?? "auto");
 
-	for (const query of category.queries) {
+	for (const query of queries) {
 		const result = await fetchNicheResearch(query, {
 			maxResults: merged.resultsPerQuery,
 			daysBack: merged.daysBack,
@@ -111,15 +113,21 @@ export async function fetchReferenceChannelCandidates(
 				sourceQuery: query,
 			})),
 		);
-	}
+		}
 
-	return buildReferenceChannelCandidates(category, videos, merged.maxChannels);
+	return buildReferenceChannelCandidates(
+		category,
+		videos,
+		merged.maxChannels,
+		merged.format ?? "auto",
+	);
 }
 
 export function buildReferenceChannelCandidates(
 	category: ReferenceChannelCategory,
 	videos: Array<NicheResearchVideo | (ScoredNicheVideo & { sourceQuery?: string })>,
 	maxChannels = DEFAULT_OPTIONS.maxChannels,
+	format: ReferenceChannelScoutOptions["format"] = "auto",
 ): ReferenceChannelCandidate[] {
 	const scoredVideos = videos
 		.map((video) => {
@@ -130,9 +138,10 @@ export function buildReferenceChannelCandidates(
 				sourceQuery:
 					"sourceQuery" in video && typeof video.sourceQuery === "string"
 						? video.sourceQuery
-						: category.queries[0],
+					: category.queries[0],
 			};
 		})
+		.filter((video) => matchesReferenceFormat(video.durationSeconds, format))
 		.filter((video) => video.channelId && video.videoId);
 
 	const groups = new Map<string, typeof scoredVideos>();
@@ -143,13 +152,13 @@ export function buildReferenceChannelCandidates(
 	}
 
 	return [...groups.entries()]
-		.map(([channelId, group]) => buildCandidate(category, channelId, group))
+		.map(([channelId, group]) => buildCandidate(category, channelId, group, format))
 		.filter((candidate) =>
-			category.modeHint === "longform"
+			format === "longform" || (format === "auto" && category.modeHint === "longform")
 				? candidate.representativeVideo.durationSeconds >= 8 * 60
 				: true,
 		)
-		.sort((a, b) => b.score - a.score)
+		.sort((a, b) => scoreForFormat(b, format) - scoreForFormat(a, format))
 		.slice(0, maxChannels);
 }
 
@@ -176,11 +185,12 @@ function buildCandidate(
 	category: ReferenceChannelCategory,
 	channelId: string,
 	group: Array<ScoredNicheVideo & { sourceQuery: string }>,
+	format: ReferenceChannelScoutOptions["format"] = "auto",
 ): ReferenceChannelCandidate {
 	const sorted = [...group].sort((a, b) => b.score - a.score);
 	const topVideos = sorted.slice(0, 4);
 	const representativeVideo =
-		pickRepresentativeVideo(category, sorted) ?? sorted[0];
+		pickRepresentativeVideo(category, sorted, format) ?? sorted[0];
 	const totalViews = group.reduce((sum, video) => sum + video.viewCount, 0);
 	const avgViewsPerDay =
 		group.reduce((sum, video) => sum + video.viewsPerDay, 0) / group.length;
@@ -218,16 +228,22 @@ function buildCandidate(
 		representativeVideo,
 		topVideos,
 		representativeUrl: `https://www.youtube.com/watch?v=${representativeVideo.videoId}`,
-		suggestedMode: suggestedMode(category, representativeVideo),
+		suggestedMode: suggestedMode(category, representativeVideo, format),
 	};
 }
 
 function pickRepresentativeVideo(
 	category: ReferenceChannelCategory,
 	videos: ScoredNicheVideo[],
+	format: ReferenceChannelScoutOptions["format"] = "auto",
 ): ScoredNicheVideo | undefined {
+	if (format === "shorts") {
+		return videos
+			.filter((video) => video.durationSeconds <= 180)
+			.sort((a, b) => shortformScore(b) - shortformScore(a))[0];
+	}
 	const longformPreferred =
-		category.modeHint === "longform"
+		format === "longform" || (format === "auto" && category.modeHint === "longform")
 			? videos.filter((video) => video.durationSeconds >= 8 * 60)
 			: [];
 	return (longformPreferred.length > 0 ? longformPreferred : videos).sort(
@@ -238,9 +254,67 @@ function pickRepresentativeVideo(
 function suggestedMode(
 	category: ReferenceChannelCategory,
 	video: ScoredNicheVideo,
+	format: ReferenceChannelScoutOptions["format"] = "auto",
 ): ReferenceAnalysisMode {
+	if (format === "shorts") return "shortform";
+	if (format === "longform") return "longform";
 	if (video.durationSeconds <= 180) return "shortform";
 	if (category.modeHint === "longform") return "longform";
 	if (category.modeHint === "shortform") return "shortform";
 	return video.durationSeconds > 180 ? "longform" : "shortform";
+}
+
+function buildFormatQueries(
+	category: ReferenceChannelCategory,
+	format: ReferenceChannelScoutOptions["format"],
+): string[] {
+	if (format === "shorts") {
+		return [
+			...category.queries.map((query) => `${query} 쇼츠`),
+			...category.queries.map((query) => `${query} shorts`),
+			...category.queries.map((query) => `${query} #shorts`),
+		];
+	}
+	if (format === "longform") {
+		return [
+			...category.queries,
+			...category.queries.map((query) => `${query} 롱폼`),
+			...category.queries.map((query) => `${query} 몰아보기`),
+		];
+	}
+	return category.queries;
+}
+
+function matchesReferenceFormat(
+	durationSeconds: number,
+	format: ReferenceChannelScoutOptions["format"],
+) {
+	if (format === "shorts") return durationSeconds > 0 && durationSeconds <= 180;
+	if (format === "longform") return durationSeconds >= 8 * 60;
+	return true;
+}
+
+function scoreForFormat(
+	candidate: ReferenceChannelCandidate,
+	format: ReferenceChannelScoutOptions["format"],
+) {
+	if (format !== "shorts") return candidate.score;
+	return shortformScore(candidate.representativeVideo);
+}
+
+function shortformScore(video: ScoredNicheVideo) {
+	const durationFit =
+		video.durationSeconds <= 75
+			? 1
+			: video.durationSeconds <= 120
+				? 0.82
+				: 0.58;
+	return Math.round(
+		(video.scoreParts.velocity * 0.44 +
+			video.scoreParts.leverage * 0.18 +
+			video.scoreParts.engagement * 0.22 +
+			video.scoreParts.freshness * 0.1 +
+			durationFit * 0.06) *
+			100,
+	);
 }

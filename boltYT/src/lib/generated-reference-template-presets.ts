@@ -4,6 +4,439 @@ import type { BuiltInReferenceTemplateInput } from "./reference-template-presets
 // Keep this file committed so analyzed reference DNA is available beyond browser localStorage.
 export const GENERATED_REFERENCE_TEMPLATES: BuiltInReferenceTemplateInput[] = [
 	{
+		"id": "builtin-auto-drama-recap-zceezngf1xu",
+		"channel_id": "__builtin_reference__",
+		"name": "드라마/영화 몰아보기 · 굿플릭스 · 도경장이 계획한 완벽한 설계",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=zCeeZNgF1XU",
+		"source_title": "도경장이 계획한 완벽한 설계",
+		"source_creator": "굿플릭스",
+		"thumbnail_url": "https://i.ytimg.com/vi/zCeeZNgF1XU/maxresdefault.jpg",
+		"duration_seconds": 57,
+		"dominant_colors": [
+			"#15110f",
+			"#d7b98c",
+			"#f5eee3"
+		],
+		"visual_mood": "neutral",
+		"visual_prompt_template": "드라마/영화 몰아보기 쇼츠 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "bottom",
+		"subtitle_size_preset": "lg",
+		"subtitle_bg_style": "stroke",
+		"subtitle_accent_color": "#d7b98c",
+		"scene_count": 24,
+		"avg_scene_duration": 2.4,
+		"hook_duration": 2.5,
+		"transition_style": "hardcut",
+		"pacing_preset": "fast",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 1.08,
+		"tts_tone_keywords": [
+			"압축",
+			"강한 훅",
+			"몰입형",
+			"감정선",
+			"스포일러 정리"
+		],
+		"bgm_mood": "cinematic recap",
+		"bgm_keywords": [
+			"strings",
+			"tension bed",
+			"fast cuts"
+		],
+		"bgm_tempo": "fast",
+		"bgm_reference_url": "",
+		"hook_pattern": "story",
+		"script_structure": [
+			{
+				"role": "hook",
+				"duration": 3,
+				"note": "story 훅으로 제목 약속 즉시 제시"
+			},
+			{
+				"role": "proof",
+				"duration": 22,
+				"note": "근거/장면을 빠르게 2-3개 제시"
+			},
+			{
+				"role": "turn",
+				"duration": 16,
+				"note": "반전 또는 핵심 정보 회수"
+			},
+			{
+				"role": "payoff",
+				"duration": 11,
+				"note": "결론과 다음 궁금증 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_shorts",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "drama_recap",
+			"reference_category_label": "드라마/영화 몰아보기",
+			"reference_format": "shorts",
+			"source_metrics": {
+				"videoId": "zCeeZNgF1XU",
+				"viewCount": 1673045,
+				"likeCount": 14503,
+				"commentCount": 241
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-drama_recap-shorts",
+				"label": "드라마/영화 몰아보기 쇼츠 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"shorts"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=zCeeZNgF1XU",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"shorts": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "neutral",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#15110f",
+						"#d7b98c",
+						"#f5eee3"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "cut_driven",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 25.26,
+					"avgCutIntervalSeconds": 2.4,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "hardcut",
+					"density": "dense",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "bottom",
+					"sizePreset": "lg",
+					"backgroundStyle": "stroke",
+					"accentColor": "#d7b98c",
+					"safeZone": "bottom_safe_area",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"압축",
+						"강한 훅",
+						"몰입형",
+						"감정선",
+						"스포일러 정리"
+					],
+					"ttsSpeed": 1.08,
+					"bgmMood": "cinematic recap",
+					"bgmKeywords": [
+						"strings",
+						"tension bed",
+						"fast cuts"
+					],
+					"bgmTempo": "fast",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777759651613-w0aui8"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:07:31.613Z",
+		"updated_at": "2026-05-02T22:07:31.613Z"
+	},
+	{
+		"id": "builtin-auto-drama-recap-lqh6kvhsy54",
+		"channel_id": "__builtin_reference__",
+		"name": "드라마/영화 몰아보기 · 디글 :Diggle · [#나의아저씨] 5시간 동안 내 삶을 위로해 주는 인생 드라마",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=lqh6KvHsy54",
+		"source_title": "[#나의아저씨] 5시간 동안 내 삶을 위로해 주는 인생 드라마",
+		"source_creator": "디글 :Diggle",
+		"thumbnail_url": "https://i.ytimg.com/vi/lqh6KvHsy54/hq720.jpg?sqp=-oaymwEcCNAFEJQDSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLA8Oaj0RFi4qRUtlJsj7re8cJKDbA",
+		"duration_seconds": 18287,
+		"dominant_colors": [
+			"#15110f",
+			"#d7b98c",
+			"#f5eee3"
+		],
+		"visual_mood": "neutral",
+		"visual_prompt_template": "드라마/영화 몰아보기 롱폼 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "dynamic",
+		"subtitle_size_preset": "md",
+		"subtitle_bg_style": "glow",
+		"subtitle_accent_color": "#d7b98c",
+		"scene_count": 2151,
+		"avg_scene_duration": 8.5,
+		"hook_duration": 8,
+		"transition_style": "mixed",
+		"pacing_preset": "medium",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 0.98,
+		"tts_tone_keywords": [
+			"몰입형",
+			"감정선",
+			"스포일러 정리"
+		],
+		"bgm_mood": "cinematic recap",
+		"bgm_keywords": [
+			"strings",
+			"tension bed",
+			"chaptered pacing"
+		],
+		"bgm_tempo": "mid",
+		"bgm_reference_url": "",
+		"hook_pattern": "story",
+		"script_structure": [
+			{
+				"role": "cold_open",
+				"duration": 12,
+				"note": "story 훅으로 핵심 갈등 선공개"
+			},
+			{
+				"role": "setup",
+				"duration": 2926,
+				"note": "인물/사건/자료 배경 정리"
+			},
+			{
+				"role": "development",
+				"duration": 8229,
+				"note": "챕터 단위 근거와 장면 전개"
+			},
+			{
+				"role": "turning_point",
+				"duration": 4023,
+				"note": "반전, 쟁점, 해석 전환"
+			},
+			{
+				"role": "resolution",
+				"duration": 1829,
+				"note": "결론, 시청자 질문 회수, 다음 편 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_longform",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "drama_recap",
+			"reference_category_label": "드라마/영화 몰아보기",
+			"reference_format": "longform",
+			"source_metrics": {
+				"videoId": "lqh6KvHsy54",
+				"viewCount": 9082339,
+				"likeCount": 0,
+				"commentCount": 0
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-drama_recap-longform",
+				"label": "드라마/영화 몰아보기 롱폼 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"longform"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=lqh6KvHsy54",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"longform": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "neutral",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#15110f",
+						"#d7b98c",
+						"#f5eee3"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "slow_push",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 7.06,
+					"avgCutIntervalSeconds": 8.5,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "mixed",
+					"density": "medium",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "dynamic",
+					"sizePreset": "md",
+					"backgroundStyle": "glow",
+					"accentColor": "#d7b98c",
+					"safeZone": "avoid_subject_zone_per_scene",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"몰입형",
+						"감정선",
+						"스포일러 정리"
+					],
+					"ttsSpeed": 0.98,
+					"bgmMood": "cinematic recap",
+					"bgmKeywords": [
+						"strings",
+						"tension bed",
+						"chaptered pacing"
+					],
+					"bgmTempo": "mid",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777759983003-xwwiqr"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:13:02.999Z",
+		"updated_at": "2026-05-02T22:13:02.999Z"
+	},
+	{
 		"id": "builtin-auto-drama-recap-2ntue0npx5a",
 		"channel_id": "__builtin_reference__",
 		"name": "드라마/영화 몰아보기 · 라떼한편 - latte's movie · 82개국 1위🔥 엄청난 스케일로 전세계를 강타한 시간순삭 블록버스터",
@@ -2341,8 +2774,656 @@ export const GENERATED_REFERENCE_TEMPLATES: BuiltInReferenceTemplateInput[] = [
 		},
 		"analysis_status": "complete",
 		"analysis_error": "",
-		"created_at": "2026-05-02T16:45:01.595Z",
-		"updated_at": "2026-05-02T20:11:39.198Z"
+		"created_at": "2026-05-02T20:11:38.204Z",
+		"updated_at": "2026-05-02T20:11:38.204Z"
+	},
+	{
+		"id": "builtin-auto-drama-recap-yvrh9n1zbyw",
+		"channel_id": "__builtin_reference__",
+		"name": "드라마/영화 몰아보기 · 라마의드라마 · 그 시절 맞는게 당연한 동생들 #메이드인코리아",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=yvrh9n1zByw",
+		"source_title": "그 시절 맞는게 당연한 동생들 #메이드인코리아",
+		"source_creator": "라마의드라마",
+		"thumbnail_url": "https://i.ytimg.com/vi/yvrh9n1zByw/maxresdefault.jpg",
+		"duration_seconds": 54,
+		"dominant_colors": [
+			"#15110f",
+			"#d7b98c",
+			"#f5eee3"
+		],
+		"visual_mood": "neutral",
+		"visual_prompt_template": "드라마/영화 몰아보기 쇼츠 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "bottom",
+		"subtitle_size_preset": "lg",
+		"subtitle_bg_style": "stroke",
+		"subtitle_accent_color": "#d7b98c",
+		"scene_count": 23,
+		"avg_scene_duration": 2.3,
+		"hook_duration": 2.5,
+		"transition_style": "hardcut",
+		"pacing_preset": "fast",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 1.08,
+		"tts_tone_keywords": [
+			"압축",
+			"강한 훅",
+			"몰입형",
+			"감정선",
+			"스포일러 정리"
+		],
+		"bgm_mood": "cinematic recap",
+		"bgm_keywords": [
+			"strings",
+			"tension bed",
+			"fast cuts"
+		],
+		"bgm_tempo": "fast",
+		"bgm_reference_url": "",
+		"hook_pattern": "story",
+		"script_structure": [
+			{
+				"role": "hook",
+				"duration": 3,
+				"note": "story 훅으로 제목 약속 즉시 제시"
+			},
+			{
+				"role": "proof",
+				"duration": 21,
+				"note": "근거/장면을 빠르게 2-3개 제시"
+			},
+			{
+				"role": "turn",
+				"duration": 15,
+				"note": "반전 또는 핵심 정보 회수"
+			},
+			{
+				"role": "payoff",
+				"duration": 11,
+				"note": "결론과 다음 궁금증 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_shorts",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "drama_recap",
+			"reference_category_label": "드라마/영화 몰아보기",
+			"reference_format": "shorts",
+			"source_metrics": {
+				"videoId": "yvrh9n1zByw",
+				"viewCount": 16558917,
+				"likeCount": 108769,
+				"commentCount": 3430
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-drama_recap-shorts",
+				"label": "드라마/영화 몰아보기 쇼츠 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"shorts"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=yvrh9n1zByw",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"shorts": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "neutral",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#15110f",
+						"#d7b98c",
+						"#f5eee3"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "cut_driven",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 25.56,
+					"avgCutIntervalSeconds": 2.3,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "hardcut",
+					"density": "dense",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "bottom",
+					"sizePreset": "lg",
+					"backgroundStyle": "stroke",
+					"accentColor": "#d7b98c",
+					"safeZone": "bottom_safe_area",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"압축",
+						"강한 훅",
+						"몰입형",
+						"감정선",
+						"스포일러 정리"
+					],
+					"ttsSpeed": 1.08,
+					"bgmMood": "cinematic recap",
+					"bgmKeywords": [
+						"strings",
+						"tension bed",
+						"fast cuts"
+					],
+					"bgmTempo": "fast",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777759651661-qqs2qk"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:07:31.661Z",
+		"updated_at": "2026-05-02T22:07:31.661Z"
+	},
+	{
+		"id": "builtin-auto-drama-recap-tznxremvs4q",
+		"channel_id": "__builtin_reference__",
+		"name": "드라마/영화 몰아보기 · 라면무비 · 15년을 기다린 복수",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=TZNxreMVS4Q",
+		"source_title": "15년을 기다린 복수",
+		"source_creator": "라면무비",
+		"thumbnail_url": "https://i.ytimg.com/vi/TZNxreMVS4Q/maxresdefault.jpg",
+		"duration_seconds": 38,
+		"dominant_colors": [
+			"#15110f",
+			"#d7b98c",
+			"#f5eee3"
+		],
+		"visual_mood": "neutral",
+		"visual_prompt_template": "드라마/영화 몰아보기 쇼츠 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "bottom",
+		"subtitle_size_preset": "lg",
+		"subtitle_bg_style": "stroke",
+		"subtitle_accent_color": "#d7b98c",
+		"scene_count": 16,
+		"avg_scene_duration": 2.4,
+		"hook_duration": 2.5,
+		"transition_style": "hardcut",
+		"pacing_preset": "fast",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 1.08,
+		"tts_tone_keywords": [
+			"압축",
+			"강한 훅",
+			"몰입형",
+			"감정선",
+			"스포일러 정리"
+		],
+		"bgm_mood": "cinematic recap",
+		"bgm_keywords": [
+			"strings",
+			"tension bed",
+			"fast cuts"
+		],
+		"bgm_tempo": "fast",
+		"bgm_reference_url": "",
+		"hook_pattern": "story",
+		"script_structure": [
+			{
+				"role": "hook",
+				"duration": 3,
+				"note": "story 훅으로 제목 약속 즉시 제시"
+			},
+			{
+				"role": "proof",
+				"duration": 14,
+				"note": "근거/장면을 빠르게 2-3개 제시"
+			},
+			{
+				"role": "turn",
+				"duration": 11,
+				"note": "반전 또는 핵심 정보 회수"
+			},
+			{
+				"role": "payoff",
+				"duration": 8,
+				"note": "결론과 다음 궁금증 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_shorts",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "drama_recap",
+			"reference_category_label": "드라마/영화 몰아보기",
+			"reference_format": "shorts",
+			"source_metrics": {
+				"videoId": "TZNxreMVS4Q",
+				"viewCount": 7433585,
+				"likeCount": 50151,
+				"commentCount": 341
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-drama_recap-shorts",
+				"label": "드라마/영화 몰아보기 쇼츠 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"shorts"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=TZNxreMVS4Q",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"shorts": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "neutral",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#15110f",
+						"#d7b98c",
+						"#f5eee3"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "cut_driven",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 25.26,
+					"avgCutIntervalSeconds": 2.4,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "hardcut",
+					"density": "dense",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "bottom",
+					"sizePreset": "lg",
+					"backgroundStyle": "stroke",
+					"accentColor": "#d7b98c",
+					"safeZone": "bottom_safe_area",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"압축",
+						"강한 훅",
+						"몰입형",
+						"감정선",
+						"스포일러 정리"
+					],
+					"ttsSpeed": 1.08,
+					"bgmMood": "cinematic recap",
+					"bgmKeywords": [
+						"strings",
+						"tension bed",
+						"fast cuts"
+					],
+					"bgmTempo": "fast",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777759651708-2439p0"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:07:31.708Z",
+		"updated_at": "2026-05-02T22:07:31.708Z"
+	},
+	{
+		"id": "builtin-auto-drama-recap-4nvlhx0r11u",
+		"channel_id": "__builtin_reference__",
+		"name": "드라마/영화 몰아보기 · 루나틱 무비 · 영화 \"업\"에 숨겨진 디테일 ㄷㄷ.. #shorts",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=4NvlHX0r11U",
+		"source_title": "영화 \"업\"에 숨겨진 디테일 ㄷㄷ.. #shorts",
+		"source_creator": "루나틱 무비",
+		"thumbnail_url": "https://i.ytimg.com/vi/4NvlHX0r11U/maxresdefault.jpg",
+		"duration_seconds": 30,
+		"dominant_colors": [
+			"#15110f",
+			"#d7b98c",
+			"#f5eee3"
+		],
+		"visual_mood": "neutral",
+		"visual_prompt_template": "드라마/영화 몰아보기 쇼츠 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "bottom",
+		"subtitle_size_preset": "lg",
+		"subtitle_bg_style": "stroke",
+		"subtitle_accent_color": "#d7b98c",
+		"scene_count": 13,
+		"avg_scene_duration": 2.3,
+		"hook_duration": 2.5,
+		"transition_style": "hardcut",
+		"pacing_preset": "fast",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 1.08,
+		"tts_tone_keywords": [
+			"압축",
+			"강한 훅",
+			"몰입형",
+			"감정선",
+			"스포일러 정리"
+		],
+		"bgm_mood": "cinematic recap",
+		"bgm_keywords": [
+			"strings",
+			"tension bed",
+			"fast cuts"
+		],
+		"bgm_tempo": "fast",
+		"bgm_reference_url": "",
+		"hook_pattern": "story",
+		"script_structure": [
+			{
+				"role": "hook",
+				"duration": 3,
+				"note": "story 훅으로 제목 약속 즉시 제시"
+			},
+			{
+				"role": "proof",
+				"duration": 11,
+				"note": "근거/장면을 빠르게 2-3개 제시"
+			},
+			{
+				"role": "turn",
+				"duration": 8,
+				"note": "반전 또는 핵심 정보 회수"
+			},
+			{
+				"role": "payoff",
+				"duration": 6,
+				"note": "결론과 다음 궁금증 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_shorts",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "drama_recap",
+			"reference_category_label": "드라마/영화 몰아보기",
+			"reference_format": "shorts",
+			"source_metrics": {
+				"videoId": "4NvlHX0r11U",
+				"viewCount": 1103856,
+				"likeCount": 44690,
+				"commentCount": 153
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-drama_recap-shorts",
+				"label": "드라마/영화 몰아보기 쇼츠 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"shorts"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=4NvlHX0r11U",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"shorts": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "neutral",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#15110f",
+						"#d7b98c",
+						"#f5eee3"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "cut_driven",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 26,
+					"avgCutIntervalSeconds": 2.3,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "hardcut",
+					"density": "dense",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "bottom",
+					"sizePreset": "lg",
+					"backgroundStyle": "stroke",
+					"accentColor": "#d7b98c",
+					"safeZone": "bottom_safe_area",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"압축",
+						"강한 훅",
+						"몰입형",
+						"감정선",
+						"스포일러 정리"
+					],
+					"ttsSpeed": 1.08,
+					"bgmMood": "cinematic recap",
+					"bgmKeywords": [
+						"strings",
+						"tension bed",
+						"fast cuts"
+					],
+					"bgmTempo": "fast",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777759651757-vamtgd"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:07:31.757Z",
+		"updated_at": "2026-05-02T22:07:31.757Z"
 	},
 	{
 		"id": "builtin-auto-drama-recap-v4fjkapaana",
@@ -4687,8 +5768,8 @@ export const GENERATED_REFERENCE_TEMPLATES: BuiltInReferenceTemplateInput[] = [
 		},
 		"analysis_status": "complete",
 		"analysis_error": "",
-		"created_at": "2026-05-02T16:00:32.833Z",
-		"updated_at": "2026-05-02T21:07:54.381Z"
+		"created_at": "2026-05-02T21:07:53.557Z",
+		"updated_at": "2026-05-02T21:07:53.557Z"
 	},
 	{
 		"id": "builtin-auto-drama-recap-obi-2fpalt0",
@@ -7117,8 +8198,224 @@ export const GENERATED_REFERENCE_TEMPLATES: BuiltInReferenceTemplateInput[] = [
 		},
 		"analysis_status": "complete",
 		"analysis_error": "",
-		"created_at": "2026-05-02T16:46:43.616Z",
-		"updated_at": "2026-05-02T19:48:47.636Z"
+		"created_at": "2026-05-02T19:48:00.844Z",
+		"updated_at": "2026-05-02T19:48:00.844Z"
+	},
+	{
+		"id": "builtin-auto-drama-recap-orcyyd3gg44",
+		"channel_id": "__builtin_reference__",
+		"name": "드라마/영화 몰아보기 · 무드씬 · 마음 독하게 먹어라, 아버지의 마지막 당부",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=oRCYyD3gg44",
+		"source_title": "마음 독하게 먹어라, 아버지의 마지막 당부",
+		"source_creator": "무드씬",
+		"thumbnail_url": "https://i.ytimg.com/vi/oRCYyD3gg44/maxresdefault.jpg",
+		"duration_seconds": 50,
+		"dominant_colors": [
+			"#15110f",
+			"#d7b98c",
+			"#f5eee3"
+		],
+		"visual_mood": "neutral",
+		"visual_prompt_template": "드라마/영화 몰아보기 쇼츠 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "bottom",
+		"subtitle_size_preset": "lg",
+		"subtitle_bg_style": "stroke",
+		"subtitle_accent_color": "#d7b98c",
+		"scene_count": 21,
+		"avg_scene_duration": 2.4,
+		"hook_duration": 2.5,
+		"transition_style": "hardcut",
+		"pacing_preset": "fast",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 1.08,
+		"tts_tone_keywords": [
+			"압축",
+			"강한 훅",
+			"몰입형",
+			"감정선",
+			"스포일러 정리"
+		],
+		"bgm_mood": "cinematic recap",
+		"bgm_keywords": [
+			"strings",
+			"tension bed",
+			"fast cuts"
+		],
+		"bgm_tempo": "fast",
+		"bgm_reference_url": "",
+		"hook_pattern": "story",
+		"script_structure": [
+			{
+				"role": "hook",
+				"duration": 3,
+				"note": "story 훅으로 제목 약속 즉시 제시"
+			},
+			{
+				"role": "proof",
+				"duration": 19,
+				"note": "근거/장면을 빠르게 2-3개 제시"
+			},
+			{
+				"role": "turn",
+				"duration": 14,
+				"note": "반전 또는 핵심 정보 회수"
+			},
+			{
+				"role": "payoff",
+				"duration": 10,
+				"note": "결론과 다음 궁금증 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_shorts",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "drama_recap",
+			"reference_category_label": "드라마/영화 몰아보기",
+			"reference_format": "shorts",
+			"source_metrics": {
+				"videoId": "oRCYyD3gg44",
+				"viewCount": 4246585,
+				"likeCount": 39590,
+				"commentCount": 1732
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-drama_recap-shorts",
+				"label": "드라마/영화 몰아보기 쇼츠 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"shorts"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=oRCYyD3gg44",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"shorts": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "neutral",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#15110f",
+						"#d7b98c",
+						"#f5eee3"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "cut_driven",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 25.2,
+					"avgCutIntervalSeconds": 2.4,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "hardcut",
+					"density": "dense",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "bottom",
+					"sizePreset": "lg",
+					"backgroundStyle": "stroke",
+					"accentColor": "#d7b98c",
+					"safeZone": "bottom_safe_area",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"압축",
+						"강한 훅",
+						"몰입형",
+						"감정선",
+						"스포일러 정리"
+					],
+					"ttsSpeed": 1.08,
+					"bgmMood": "cinematic recap",
+					"bgmKeywords": [
+						"strings",
+						"tension bed",
+						"fast cuts"
+					],
+					"bgmTempo": "fast",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777759651589-lbqs5x"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:07:31.589Z",
+		"updated_at": "2026-05-02T22:07:31.589Z"
 	},
 	{
 		"id": "builtin-auto-drama-recap-riyzzug7kbi",
@@ -9475,8 +10772,440 @@ export const GENERATED_REFERENCE_TEMPLATES: BuiltInReferenceTemplateInput[] = [
 		},
 		"analysis_status": "complete",
 		"analysis_error": "",
-		"created_at": "2026-05-02T15:35:45.754Z",
-		"updated_at": "2026-05-02T21:15:11.063Z"
+		"created_at": "2026-05-02T21:15:08.829Z",
+		"updated_at": "2026-05-02T21:15:08.829Z"
+	},
+	{
+		"id": "builtin-auto-drama-recap-kgyb1stmmvc",
+		"channel_id": "__builtin_reference__",
+		"name": "드라마/영화 몰아보기 · 무비콕 (Movie cok) · 내 동생 건드리면 작살 난다 #현빈 #메이드인코리아 #디즈니플러스",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=KGYb1STmmvc",
+		"source_title": "내 동생 건드리면 작살 난다 #현빈 #메이드인코리아 #디즈니플러스",
+		"source_creator": "무비콕 (Movie cok)",
+		"thumbnail_url": "https://i.ytimg.com/vi/KGYb1STmmvc/maxresdefault.jpg",
+		"duration_seconds": 58,
+		"dominant_colors": [
+			"#15110f",
+			"#d7b98c",
+			"#f5eee3"
+		],
+		"visual_mood": "neutral",
+		"visual_prompt_template": "드라마/영화 몰아보기 쇼츠 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "bottom",
+		"subtitle_size_preset": "lg",
+		"subtitle_bg_style": "stroke",
+		"subtitle_accent_color": "#d7b98c",
+		"scene_count": 24,
+		"avg_scene_duration": 2.4,
+		"hook_duration": 2.5,
+		"transition_style": "hardcut",
+		"pacing_preset": "fast",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 1.08,
+		"tts_tone_keywords": [
+			"압축",
+			"강한 훅",
+			"몰입형",
+			"감정선",
+			"스포일러 정리"
+		],
+		"bgm_mood": "cinematic recap",
+		"bgm_keywords": [
+			"strings",
+			"tension bed",
+			"fast cuts"
+		],
+		"bgm_tempo": "fast",
+		"bgm_reference_url": "",
+		"hook_pattern": "story",
+		"script_structure": [
+			{
+				"role": "hook",
+				"duration": 3,
+				"note": "story 훅으로 제목 약속 즉시 제시"
+			},
+			{
+				"role": "proof",
+				"duration": 22,
+				"note": "근거/장면을 빠르게 2-3개 제시"
+			},
+			{
+				"role": "turn",
+				"duration": 16,
+				"note": "반전 또는 핵심 정보 회수"
+			},
+			{
+				"role": "payoff",
+				"duration": 12,
+				"note": "결론과 다음 궁금증 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_shorts",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "drama_recap",
+			"reference_category_label": "드라마/영화 몰아보기",
+			"reference_format": "shorts",
+			"source_metrics": {
+				"videoId": "KGYb1STmmvc",
+				"viewCount": 9127608,
+				"likeCount": 59954,
+				"commentCount": 1740
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-drama_recap-shorts",
+				"label": "드라마/영화 몰아보기 쇼츠 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"shorts"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=KGYb1STmmvc",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"shorts": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "neutral",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#15110f",
+						"#d7b98c",
+						"#f5eee3"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "cut_driven",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 24.83,
+					"avgCutIntervalSeconds": 2.4,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "hardcut",
+					"density": "dense",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "bottom",
+					"sizePreset": "lg",
+					"backgroundStyle": "stroke",
+					"accentColor": "#d7b98c",
+					"safeZone": "bottom_safe_area",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"압축",
+						"강한 훅",
+						"몰입형",
+						"감정선",
+						"스포일러 정리"
+					],
+					"ttsSpeed": 1.08,
+					"bgmMood": "cinematic recap",
+					"bgmKeywords": [
+						"strings",
+						"tension bed",
+						"fast cuts"
+					],
+					"bgmTempo": "fast",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777759651685-x3a6yb"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:07:31.685Z",
+		"updated_at": "2026-05-02T22:07:31.685Z"
+	},
+	{
+		"id": "builtin-auto-drama-recap-sbfqtmisvcu",
+		"channel_id": "__builtin_reference__",
+		"name": "드라마/영화 몰아보기 · 무비파이 · 아이가 이쁘면 마녀도 요정이 되는 이유",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=sbFQTmiSVcU",
+		"source_title": "아이가 이쁘면 마녀도 요정이 되는 이유",
+		"source_creator": "무비파이",
+		"thumbnail_url": "https://i.ytimg.com/vi/sbFQTmiSVcU/maxresdefault.jpg",
+		"duration_seconds": 48,
+		"dominant_colors": [
+			"#15110f",
+			"#d7b98c",
+			"#f5eee3"
+		],
+		"visual_mood": "neutral",
+		"visual_prompt_template": "드라마/영화 몰아보기 쇼츠 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "bottom",
+		"subtitle_size_preset": "lg",
+		"subtitle_bg_style": "stroke",
+		"subtitle_accent_color": "#d7b98c",
+		"scene_count": 20,
+		"avg_scene_duration": 2.4,
+		"hook_duration": 2.5,
+		"transition_style": "hardcut",
+		"pacing_preset": "fast",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 1.08,
+		"tts_tone_keywords": [
+			"압축",
+			"강한 훅",
+			"몰입형",
+			"감정선",
+			"스포일러 정리"
+		],
+		"bgm_mood": "cinematic recap",
+		"bgm_keywords": [
+			"strings",
+			"tension bed",
+			"fast cuts"
+		],
+		"bgm_tempo": "fast",
+		"bgm_reference_url": "",
+		"hook_pattern": "claim",
+		"script_structure": [
+			{
+				"role": "hook",
+				"duration": 3,
+				"note": "claim 훅으로 제목 약속 즉시 제시"
+			},
+			{
+				"role": "proof",
+				"duration": 18,
+				"note": "근거/장면을 빠르게 2-3개 제시"
+			},
+			{
+				"role": "turn",
+				"duration": 13,
+				"note": "반전 또는 핵심 정보 회수"
+			},
+			{
+				"role": "payoff",
+				"duration": 10,
+				"note": "결론과 다음 궁금증 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_shorts",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "drama_recap",
+			"reference_category_label": "드라마/영화 몰아보기",
+			"reference_format": "shorts",
+			"source_metrics": {
+				"videoId": "sbFQTmiSVcU",
+				"viewCount": 21923564,
+				"likeCount": 278135,
+				"commentCount": 1359
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-drama_recap-shorts",
+				"label": "드라마/영화 몰아보기 쇼츠 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"shorts"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=sbFQTmiSVcU",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"shorts": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "neutral",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#15110f",
+						"#d7b98c",
+						"#f5eee3"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "cut_driven",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 25,
+					"avgCutIntervalSeconds": 2.4,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "hardcut",
+					"density": "dense",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "bottom",
+					"sizePreset": "lg",
+					"backgroundStyle": "stroke",
+					"accentColor": "#d7b98c",
+					"safeZone": "bottom_safe_area",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"압축",
+						"강한 훅",
+						"몰입형",
+						"감정선",
+						"스포일러 정리"
+					],
+					"ttsSpeed": 1.08,
+					"bgmMood": "cinematic recap",
+					"bgmKeywords": [
+						"strings",
+						"tension bed",
+						"fast cuts"
+					],
+					"bgmTempo": "fast",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777759651780-sj0wsv"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:07:31.780Z",
+		"updated_at": "2026-05-02T22:07:31.780Z"
 	},
 	{
 		"id": "builtin-auto-drama-recap-zoyihemjgvo",
@@ -11968,8 +13697,440 @@ export const GENERATED_REFERENCE_TEMPLATES: BuiltInReferenceTemplateInput[] = [
 		},
 		"analysis_status": "complete",
 		"analysis_error": "",
-		"created_at": "2026-05-02T16:00:29.659Z",
-		"updated_at": "2026-05-02T20:31:54.945Z"
+		"created_at": "2026-05-02T20:31:50.140Z",
+		"updated_at": "2026-05-02T20:31:50.140Z"
+	},
+	{
+		"id": "builtin-auto-drama-recap-jabymsbxbqm",
+		"channel_id": "__builtin_reference__",
+		"name": "드라마/영화 몰아보기 · 영샷추 · 흑인 가정부를 울려버린 백인부부의 충격적인 발언",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=JABYMsBxbQM",
+		"source_title": "흑인 가정부를 울려버린 백인부부의 충격적인 발언",
+		"source_creator": "영샷추",
+		"thumbnail_url": "https://i.ytimg.com/vi/JABYMsBxbQM/maxresdefault.jpg",
+		"duration_seconds": 52,
+		"dominant_colors": [
+			"#15110f",
+			"#d7b98c",
+			"#f5eee3"
+		],
+		"visual_mood": "neutral",
+		"visual_prompt_template": "드라마/영화 몰아보기 쇼츠 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "bottom",
+		"subtitle_size_preset": "lg",
+		"subtitle_bg_style": "stroke",
+		"subtitle_accent_color": "#d7b98c",
+		"scene_count": 22,
+		"avg_scene_duration": 2.4,
+		"hook_duration": 2.5,
+		"transition_style": "hardcut",
+		"pacing_preset": "fast",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 1.08,
+		"tts_tone_keywords": [
+			"압축",
+			"강한 훅",
+			"몰입형",
+			"감정선",
+			"스포일러 정리"
+		],
+		"bgm_mood": "cinematic recap",
+		"bgm_keywords": [
+			"strings",
+			"tension bed",
+			"fast cuts"
+		],
+		"bgm_tempo": "fast",
+		"bgm_reference_url": "",
+		"hook_pattern": "shock",
+		"script_structure": [
+			{
+				"role": "hook",
+				"duration": 3,
+				"note": "shock 훅으로 제목 약속 즉시 제시"
+			},
+			{
+				"role": "proof",
+				"duration": 20,
+				"note": "근거/장면을 빠르게 2-3개 제시"
+			},
+			{
+				"role": "turn",
+				"duration": 15,
+				"note": "반전 또는 핵심 정보 회수"
+			},
+			{
+				"role": "payoff",
+				"duration": 10,
+				"note": "결론과 다음 궁금증 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_shorts",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "drama_recap",
+			"reference_category_label": "드라마/영화 몰아보기",
+			"reference_format": "shorts",
+			"source_metrics": {
+				"videoId": "JABYMsBxbQM",
+				"viewCount": 7828472,
+				"likeCount": 201217,
+				"commentCount": 1320
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-drama_recap-shorts",
+				"label": "드라마/영화 몰아보기 쇼츠 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"shorts"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=JABYMsBxbQM",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"shorts": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "neutral",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#15110f",
+						"#d7b98c",
+						"#f5eee3"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "cut_driven",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 25.38,
+					"avgCutIntervalSeconds": 2.4,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "hardcut",
+					"density": "dense",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "bottom",
+					"sizePreset": "lg",
+					"backgroundStyle": "stroke",
+					"accentColor": "#d7b98c",
+					"safeZone": "bottom_safe_area",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"압축",
+						"강한 훅",
+						"몰입형",
+						"감정선",
+						"스포일러 정리"
+					],
+					"ttsSpeed": 1.08,
+					"bgmMood": "cinematic recap",
+					"bgmKeywords": [
+						"strings",
+						"tension bed",
+						"fast cuts"
+					],
+					"bgmTempo": "fast",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777759651559-p4kl20"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:07:31.557Z",
+		"updated_at": "2026-05-02T22:07:31.557Z"
+	},
+	{
+		"id": "builtin-auto-drama-recap-r3nyp1olemm",
+		"channel_id": "__builtin_reference__",
+		"name": "드라마/영화 몰아보기 · 폭스토리 · 같은 아파트 불륜의 충격적인 반전",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=R3nYP1olEmM",
+		"source_title": "같은 아파트 불륜의 충격적인 반전",
+		"source_creator": "폭스토리",
+		"thumbnail_url": "https://i.ytimg.com/vi/R3nYP1olEmM/maxresdefault.jpg",
+		"duration_seconds": 58,
+		"dominant_colors": [
+			"#15110f",
+			"#d7b98c",
+			"#f5eee3"
+		],
+		"visual_mood": "neutral",
+		"visual_prompt_template": "드라마/영화 몰아보기 쇼츠 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "bottom",
+		"subtitle_size_preset": "lg",
+		"subtitle_bg_style": "stroke",
+		"subtitle_accent_color": "#d7b98c",
+		"scene_count": 24,
+		"avg_scene_duration": 2.4,
+		"hook_duration": 2.5,
+		"transition_style": "hardcut",
+		"pacing_preset": "fast",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 1.08,
+		"tts_tone_keywords": [
+			"압축",
+			"강한 훅",
+			"몰입형",
+			"감정선",
+			"스포일러 정리"
+		],
+		"bgm_mood": "cinematic recap",
+		"bgm_keywords": [
+			"strings",
+			"tension bed",
+			"fast cuts"
+		],
+		"bgm_tempo": "fast",
+		"bgm_reference_url": "",
+		"hook_pattern": "shock",
+		"script_structure": [
+			{
+				"role": "hook",
+				"duration": 3,
+				"note": "shock 훅으로 제목 약속 즉시 제시"
+			},
+			{
+				"role": "proof",
+				"duration": 22,
+				"note": "근거/장면을 빠르게 2-3개 제시"
+			},
+			{
+				"role": "turn",
+				"duration": 16,
+				"note": "반전 또는 핵심 정보 회수"
+			},
+			{
+				"role": "payoff",
+				"duration": 12,
+				"note": "결론과 다음 궁금증 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_shorts",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "drama_recap",
+			"reference_category_label": "드라마/영화 몰아보기",
+			"reference_format": "shorts",
+			"source_metrics": {
+				"videoId": "R3nYP1olEmM",
+				"viewCount": 11848789,
+				"likeCount": 121816,
+				"commentCount": 1127
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-drama_recap-shorts",
+				"label": "드라마/영화 몰아보기 쇼츠 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"shorts"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=R3nYP1olEmM",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"shorts": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "neutral",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#15110f",
+						"#d7b98c",
+						"#f5eee3"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "cut_driven",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 24.83,
+					"avgCutIntervalSeconds": 2.4,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "hardcut",
+					"density": "dense",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "bottom",
+					"sizePreset": "lg",
+					"backgroundStyle": "stroke",
+					"accentColor": "#d7b98c",
+					"safeZone": "bottom_safe_area",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"압축",
+						"강한 훅",
+						"몰입형",
+						"감정선",
+						"스포일러 정리"
+					],
+					"ttsSpeed": 1.08,
+					"bgmMood": "cinematic recap",
+					"bgmKeywords": [
+						"strings",
+						"tension bed",
+						"fast cuts"
+					],
+					"bgmTempo": "fast",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777759651734-suaojf"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:07:31.734Z",
+		"updated_at": "2026-05-02T22:07:31.734Z"
 	},
 	{
 		"id": "builtin-auto-drama-recap-51u1vi3vr8",
@@ -14519,8 +16680,8 @@ export const GENERATED_REFERENCE_TEMPLATES: BuiltInReferenceTemplateInput[] = [
 		},
 		"analysis_status": "complete",
 		"analysis_error": "",
-		"created_at": "2026-05-02T16:42:47.814Z",
-		"updated_at": "2026-05-02T20:17:18.845Z"
+		"created_at": "2026-05-02T20:17:17.294Z",
+		"updated_at": "2026-05-02T20:17:17.294Z"
 	},
 	{
 		"id": "builtin-auto-drama-recap-zmlvcnegtmg",
@@ -17015,8 +19176,8 @@ export const GENERATED_REFERENCE_TEMPLATES: BuiltInReferenceTemplateInput[] = [
 		},
 		"analysis_status": "complete",
 		"analysis_error": "",
-		"created_at": "2026-05-02T16:44:57.643Z",
-		"updated_at": "2026-05-02T21:24:12.861Z"
+		"created_at": "2026-05-02T21:24:08.718Z",
+		"updated_at": "2026-05-02T21:24:08.718Z"
 	},
 	{
 		"id": "builtin-auto-drama-recap-vxuly1setlm",
@@ -19393,8 +21554,657 @@ export const GENERATED_REFERENCE_TEMPLATES: BuiltInReferenceTemplateInput[] = [
 		},
 		"analysis_status": "complete",
 		"analysis_error": "",
-		"created_at": "2026-05-02T16:46:47.565Z",
-		"updated_at": "2026-05-02T21:00:50.018Z"
+		"created_at": "2026-05-02T21:00:45.474Z",
+		"updated_at": "2026-05-02T21:00:45.474Z"
+	},
+	{
+		"id": "builtin-auto-drama-recap-eysh7klgtgo",
+		"channel_id": "__builtin_reference__",
+		"name": "드라마/영화 몰아보기 · SBS 스브스 Drama · 질투의 화신 홍홍홍🔥 | 닥터스(The Doctors) | SBS ",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=eYSH7kLGtGo",
+		"source_title": "질투의 화신 홍홍홍🔥 | 닥터스(The Doctors) | SBS DRAMA",
+		"source_creator": "SBS 스브스 Drama",
+		"thumbnail_url": "https://i.ytimg.com/vi/eYSH7kLGtGo/hq720.jpg?sqp=-oaymwEcCNAFEJQDSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLCE_7vmdCtHJvUjyPb-8MbpOiVSiQ",
+		"duration_seconds": 65,
+		"dominant_colors": [
+			"#15110f",
+			"#d7b98c",
+			"#f5eee3"
+		],
+		"visual_mood": "neutral",
+		"visual_prompt_template": "드라마/영화 몰아보기 쇼츠 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "bottom",
+		"subtitle_size_preset": "lg",
+		"subtitle_bg_style": "stroke",
+		"subtitle_accent_color": "#d7b98c",
+		"scene_count": 27,
+		"avg_scene_duration": 2.4,
+		"hook_duration": 2.5,
+		"transition_style": "hardcut",
+		"pacing_preset": "fast",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 1.08,
+		"tts_tone_keywords": [
+			"압축",
+			"강한 훅",
+			"몰입형",
+			"감정선",
+			"스포일러 정리"
+		],
+		"bgm_mood": "cinematic recap",
+		"bgm_keywords": [
+			"strings",
+			"tension bed",
+			"fast cuts"
+		],
+		"bgm_tempo": "fast",
+		"bgm_reference_url": "",
+		"hook_pattern": "story",
+		"script_structure": [
+			{
+				"role": "hook",
+				"duration": 3,
+				"note": "story 훅으로 제목 약속 즉시 제시"
+			},
+			{
+				"role": "proof",
+				"duration": 25,
+				"note": "근거/장면을 빠르게 2-3개 제시"
+			},
+			{
+				"role": "turn",
+				"duration": 18,
+				"note": "반전 또는 핵심 정보 회수"
+			},
+			{
+				"role": "payoff",
+				"duration": 13,
+				"note": "결론과 다음 궁금증 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_shorts",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "drama_recap",
+			"reference_category_label": "드라마/영화 몰아보기",
+			"reference_format": "shorts",
+			"source_metrics": {
+				"videoId": "eYSH7kLGtGo",
+				"viewCount": 10078314,
+				"likeCount": 0,
+				"commentCount": 0
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-drama_recap-shorts",
+				"label": "드라마/영화 몰아보기 쇼츠 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"shorts"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=eYSH7kLGtGo",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"shorts": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "neutral",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#15110f",
+						"#d7b98c",
+						"#f5eee3"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "cut_driven",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 24.92,
+					"avgCutIntervalSeconds": 2.4,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "hardcut",
+					"density": "dense",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "bottom",
+					"sizePreset": "lg",
+					"backgroundStyle": "stroke",
+					"accentColor": "#d7b98c",
+					"safeZone": "bottom_safe_area",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"압축",
+						"강한 훅",
+						"몰입형",
+						"감정선",
+						"스포일러 정리"
+					],
+					"ttsSpeed": 1.08,
+					"bgmMood": "cinematic recap",
+					"bgmKeywords": [
+						"strings",
+						"tension bed",
+						"fast cuts"
+					],
+					"bgmTempo": "fast",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777759972267-7cu317"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:12:52.266Z",
+		"updated_at": "2026-05-02T22:12:52.266Z"
+	},
+	{
+		"id": "builtin-auto-drama-recap-1qb-vkzg9ny",
+		"channel_id": "__builtin_reference__",
+		"name": "드라마/영화 몰아보기 · SBS 옛날 드라마 - 빽드 · 현실보다 더한 드라마🔥90분 순삭🔥 남궁민 미친 연기력 ㄷㄷ S급",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=1qB-vKzG9nY",
+		"source_title": "현실보다 더한 드라마🔥90분 순삭🔥 남궁민 미친 연기력 ㄷㄷ S급 전투력으로 대한민국 조작 세력을 쓸어버리는 참교육 전문 기레기 👊 #조작 #출근후리뷰",
+		"source_creator": "SBS 옛날 드라마 - 빽드",
+		"thumbnail_url": "https://i.ytimg.com/vi/1qB-vKzG9nY/maxresdefault.jpg",
+		"duration_seconds": 5800,
+		"dominant_colors": [
+			"#15110f",
+			"#d7b98c",
+			"#f5eee3"
+		],
+		"visual_mood": "neutral",
+		"visual_prompt_template": "드라마/영화 몰아보기 롱폼 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "dynamic",
+		"subtitle_size_preset": "md",
+		"subtitle_bg_style": "glow",
+		"subtitle_accent_color": "#d7b98c",
+		"scene_count": 682,
+		"avg_scene_duration": 8.5,
+		"hook_duration": 8,
+		"transition_style": "mixed",
+		"pacing_preset": "medium",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 0.98,
+		"tts_tone_keywords": [
+			"몰입형",
+			"감정선",
+			"스포일러 정리"
+		],
+		"bgm_mood": "cinematic recap",
+		"bgm_keywords": [
+			"strings",
+			"tension bed",
+			"chaptered pacing"
+		],
+		"bgm_tempo": "mid",
+		"bgm_reference_url": "",
+		"hook_pattern": "shock",
+		"script_structure": [
+			{
+				"role": "cold_open",
+				"duration": 12,
+				"note": "shock 훅으로 핵심 갈등 선공개"
+			},
+			{
+				"role": "setup",
+				"duration": 928,
+				"note": "인물/사건/자료 배경 정리"
+			},
+			{
+				"role": "development",
+				"duration": 2610,
+				"note": "챕터 단위 근거와 장면 전개"
+			},
+			{
+				"role": "turning_point",
+				"duration": 1276,
+				"note": "반전, 쟁점, 해석 전환"
+			},
+			{
+				"role": "resolution",
+				"duration": 580,
+				"note": "결론, 시청자 질문 회수, 다음 편 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_longform",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "drama_recap",
+			"reference_category_label": "드라마/영화 몰아보기",
+			"reference_format": "longform",
+			"source_metrics": {
+				"videoId": "1qB-vKzG9nY",
+				"viewCount": 2993519,
+				"likeCount": 10867,
+				"commentCount": 408
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-drama_recap-longform",
+				"label": "드라마/영화 몰아보기 롱폼 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"longform"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=1qB-vKzG9nY",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"longform": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "neutral",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#15110f",
+						"#d7b98c",
+						"#f5eee3"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "slow_push",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 7.06,
+					"avgCutIntervalSeconds": 8.5,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "mixed",
+					"density": "medium",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "dynamic",
+					"sizePreset": "md",
+					"backgroundStyle": "glow",
+					"accentColor": "#d7b98c",
+					"safeZone": "avoid_subject_zone_per_scene",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"몰입형",
+						"감정선",
+						"스포일러 정리"
+					],
+					"ttsSpeed": 0.98,
+					"bgmMood": "cinematic recap",
+					"bgmKeywords": [
+						"strings",
+						"tension bed",
+						"chaptered pacing"
+					],
+					"bgmTempo": "mid",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777759655652-gg2xxr"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:07:35.652Z",
+		"updated_at": "2026-05-02T22:07:35.652Z"
+	},
+	{
+		"id": "builtin-auto-drama-recap-e96og0tnnli",
+		"channel_id": "__builtin_reference__",
+		"name": "드라마/영화 몰아보기 · shortequis · 결혼 생활 내내 쌩얼 공개안한 아내",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=e96OG0tnnLI",
+		"source_title": "결혼 생활 내내 쌩얼 공개안한 아내",
+		"source_creator": "shortequis",
+		"thumbnail_url": "https://i.ytimg.com/vi/e96OG0tnnLI/maxresdefault.jpg",
+		"duration_seconds": 59,
+		"dominant_colors": [
+			"#15110f",
+			"#d7b98c",
+			"#f5eee3"
+		],
+		"visual_mood": "neutral",
+		"visual_prompt_template": "드라마/영화 몰아보기 쇼츠 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "bottom",
+		"subtitle_size_preset": "lg",
+		"subtitle_bg_style": "stroke",
+		"subtitle_accent_color": "#d7b98c",
+		"scene_count": 25,
+		"avg_scene_duration": 2.4,
+		"hook_duration": 2.5,
+		"transition_style": "hardcut",
+		"pacing_preset": "fast",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 1.08,
+		"tts_tone_keywords": [
+			"압축",
+			"강한 훅",
+			"몰입형",
+			"감정선",
+			"스포일러 정리"
+		],
+		"bgm_mood": "cinematic recap",
+		"bgm_keywords": [
+			"strings",
+			"tension bed",
+			"fast cuts"
+		],
+		"bgm_tempo": "fast",
+		"bgm_reference_url": "",
+		"hook_pattern": "story",
+		"script_structure": [
+			{
+				"role": "hook",
+				"duration": 3,
+				"note": "story 훅으로 제목 약속 즉시 제시"
+			},
+			{
+				"role": "proof",
+				"duration": 22,
+				"note": "근거/장면을 빠르게 2-3개 제시"
+			},
+			{
+				"role": "turn",
+				"duration": 17,
+				"note": "반전 또는 핵심 정보 회수"
+			},
+			{
+				"role": "payoff",
+				"duration": 12,
+				"note": "결론과 다음 궁금증 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_shorts",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "drama_recap",
+			"reference_category_label": "드라마/영화 몰아보기",
+			"reference_format": "shorts",
+			"source_metrics": {
+				"videoId": "e96OG0tnnLI",
+				"viewCount": 8006983,
+				"likeCount": 117643,
+				"commentCount": 1143
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-drama_recap-shorts",
+				"label": "드라마/영화 몰아보기 쇼츠 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"shorts"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=e96OG0tnnLI",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"shorts": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "neutral",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#15110f",
+						"#d7b98c",
+						"#f5eee3"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "cut_driven",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 25.42,
+					"avgCutIntervalSeconds": 2.4,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "hardcut",
+					"density": "dense",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "bottom",
+					"sizePreset": "lg",
+					"backgroundStyle": "stroke",
+					"accentColor": "#d7b98c",
+					"safeZone": "bottom_safe_area",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"압축",
+						"강한 훅",
+						"몰입형",
+						"감정선",
+						"스포일러 정리"
+					],
+					"ttsSpeed": 1.08,
+					"bgmMood": "cinematic recap",
+					"bgmKeywords": [
+						"strings",
+						"tension bed",
+						"fast cuts"
+					],
+					"bgmTempo": "fast",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777759651637-b0mblg"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:07:31.637Z",
+		"updated_at": "2026-05-02T22:07:31.637Z"
 	},
 	{
 		"id": "builtin-auto-drama-recap-wgagba2oxjg",
@@ -21667,8 +24477,224 @@ export const GENERATED_REFERENCE_TEMPLATES: BuiltInReferenceTemplateInput[] = [
 		},
 		"analysis_status": "complete",
 		"analysis_error": "",
-		"created_at": "2026-05-02T16:00:36.964Z",
-		"updated_at": "2026-05-02T20:24:37.918Z"
+		"created_at": "2026-05-02T20:24:37.539Z",
+		"updated_at": "2026-05-02T20:24:37.539Z"
+	},
+	{
+		"id": "builtin-auto-mystery-doc-prdyk-6eaaa",
+		"channel_id": "__builtin_reference__",
+		"name": "미스터리/사건 다큐 · 그것이 알고싶다 · 1차 살인이 있기 전, 이춘재를 알아본 소녀가 있었다?#shorts",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=pRdyk-6EaAA",
+		"source_title": "1차 살인이 있기 전, 이춘재를 알아본 소녀가 있었다?#shorts",
+		"source_creator": "그것이 알고싶다",
+		"thumbnail_url": "https://i.ytimg.com/vi/pRdyk-6EaAA/maxresdefault.jpg",
+		"duration_seconds": 45,
+		"dominant_colors": [
+			"#080b10",
+			"#6f8aa6",
+			"#d8e0e8"
+		],
+		"visual_mood": "mystery",
+		"visual_prompt_template": "미스터리/사건 다큐 쇼츠 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "bottom",
+		"subtitle_size_preset": "lg",
+		"subtitle_bg_style": "stroke",
+		"subtitle_accent_color": "#6f8aa6",
+		"scene_count": 19,
+		"avg_scene_duration": 2.4,
+		"hook_duration": 2.5,
+		"transition_style": "hardcut",
+		"pacing_preset": "fast",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 1.08,
+		"tts_tone_keywords": [
+			"압축",
+			"강한 훅",
+			"긴장감",
+			"차분한 추적",
+			"사실 확인"
+		],
+		"bgm_mood": "tense pulse",
+		"bgm_keywords": [
+			"low drone",
+			"pulse",
+			"fast cuts"
+		],
+		"bgm_tempo": "fast",
+		"bgm_reference_url": "",
+		"hook_pattern": "question",
+		"script_structure": [
+			{
+				"role": "hook",
+				"duration": 3,
+				"note": "question 훅으로 제목 약속 즉시 제시"
+			},
+			{
+				"role": "proof",
+				"duration": 17,
+				"note": "근거/장면을 빠르게 2-3개 제시"
+			},
+			{
+				"role": "turn",
+				"duration": 13,
+				"note": "반전 또는 핵심 정보 회수"
+			},
+			{
+				"role": "payoff",
+				"duration": 9,
+				"note": "결론과 다음 궁금증 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_shorts",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "mystery_doc",
+			"reference_category_label": "미스터리/사건 다큐",
+			"reference_format": "shorts",
+			"source_metrics": {
+				"videoId": "pRdyk-6EaAA",
+				"viewCount": 478491,
+				"likeCount": 3907,
+				"commentCount": 190
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-mystery_doc-shorts",
+				"label": "미스터리/사건 다큐 쇼츠 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"shorts"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=pRdyk-6EaAA",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"shorts": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "mystery",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#080b10",
+						"#6f8aa6",
+						"#d8e0e8"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "cut_driven",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 25.33,
+					"avgCutIntervalSeconds": 2.4,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "hardcut",
+					"density": "dense",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "bottom",
+					"sizePreset": "lg",
+					"backgroundStyle": "stroke",
+					"accentColor": "#6f8aa6",
+					"safeZone": "bottom_safe_area",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"압축",
+						"강한 훅",
+						"긴장감",
+						"차분한 추적",
+						"사실 확인"
+					],
+					"ttsSpeed": 1.08,
+					"bgmMood": "tense pulse",
+					"bgmKeywords": [
+						"low drone",
+						"pulse",
+						"fast cuts"
+					],
+					"bgmTempo": "fast",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777759660485-65gcsp"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:07:40.485Z",
+		"updated_at": "2026-05-02T22:07:40.485Z"
 	},
 	{
 		"id": "builtin-auto-mystery-doc-jpflqyd1zoq",
@@ -24080,8 +27106,224 @@ export const GENERATED_REFERENCE_TEMPLATES: BuiltInReferenceTemplateInput[] = [
 		},
 		"analysis_status": "complete",
 		"analysis_error": "",
-		"created_at": "2026-05-02T16:46:55.930Z",
-		"updated_at": "2026-05-02T20:33:40.022Z"
+		"created_at": "2026-05-02T20:33:38.748Z",
+		"updated_at": "2026-05-02T20:33:38.748Z"
+	},
+	{
+		"id": "builtin-auto-mystery-doc-m2lgfqs7-ia",
+		"channel_id": "__builtin_reference__",
+		"name": "미스터리/사건 다큐 · 깡깡필름 · [그날의 범죄 목소리] EP.61 공주에서 반복된 실종, 공주를 뒤흔",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=M2lGfqs7_IA",
+		"source_title": "[그날의 범죄 목소리] EP.61 공주에서 반복된 실종, 공주를 뒤흔든 사건｜#그날의범죄목소리 #한국실제사건 #실제범죄 #한국범죄 #AI쇼츠 #공주연쇄살인사건 #공주사건",
+		"source_creator": "깡깡필름",
+		"thumbnail_url": "https://i.ytimg.com/vi/M2lGfqs7_IA/maxresdefault.jpg",
+		"duration_seconds": 35,
+		"dominant_colors": [
+			"#080b10",
+			"#6f8aa6",
+			"#d8e0e8"
+		],
+		"visual_mood": "mystery",
+		"visual_prompt_template": "미스터리/사건 다큐 쇼츠 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "bottom",
+		"subtitle_size_preset": "lg",
+		"subtitle_bg_style": "stroke",
+		"subtitle_accent_color": "#6f8aa6",
+		"scene_count": 15,
+		"avg_scene_duration": 2.3,
+		"hook_duration": 2.5,
+		"transition_style": "hardcut",
+		"pacing_preset": "fast",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 1.08,
+		"tts_tone_keywords": [
+			"압축",
+			"강한 훅",
+			"긴장감",
+			"차분한 추적",
+			"사실 확인"
+		],
+		"bgm_mood": "tense pulse",
+		"bgm_keywords": [
+			"low drone",
+			"pulse",
+			"fast cuts"
+		],
+		"bgm_tempo": "fast",
+		"bgm_reference_url": "",
+		"hook_pattern": "story",
+		"script_structure": [
+			{
+				"role": "hook",
+				"duration": 3,
+				"note": "story 훅으로 제목 약속 즉시 제시"
+			},
+			{
+				"role": "proof",
+				"duration": 13,
+				"note": "근거/장면을 빠르게 2-3개 제시"
+			},
+			{
+				"role": "turn",
+				"duration": 10,
+				"note": "반전 또는 핵심 정보 회수"
+			},
+			{
+				"role": "payoff",
+				"duration": 7,
+				"note": "결론과 다음 궁금증 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_shorts",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "mystery_doc",
+			"reference_category_label": "미스터리/사건 다큐",
+			"reference_format": "shorts",
+			"source_metrics": {
+				"videoId": "M2lGfqs7_IA",
+				"viewCount": 2714,
+				"likeCount": 40,
+				"commentCount": 0
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-mystery_doc-shorts",
+				"label": "미스터리/사건 다큐 쇼츠 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"shorts"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=M2lGfqs7_IA",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"shorts": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "mystery",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#080b10",
+						"#6f8aa6",
+						"#d8e0e8"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "cut_driven",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 25.71,
+					"avgCutIntervalSeconds": 2.3,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "hardcut",
+					"density": "dense",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "bottom",
+					"sizePreset": "lg",
+					"backgroundStyle": "stroke",
+					"accentColor": "#6f8aa6",
+					"safeZone": "bottom_safe_area",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"압축",
+						"강한 훅",
+						"긴장감",
+						"차분한 추적",
+						"사실 확인"
+					],
+					"ttsSpeed": 1.08,
+					"bgmMood": "tense pulse",
+					"bgmKeywords": [
+						"low drone",
+						"pulse",
+						"fast cuts"
+					],
+					"bgmTempo": "fast",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777759660392-d3ibiq"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:07:40.392Z",
+		"updated_at": "2026-05-02T22:07:40.392Z"
 	},
 	{
 		"id": "builtin-auto-mystery-doc-hn2hll3iwgo",
@@ -26321,8 +29563,8 @@ export const GENERATED_REFERENCE_TEMPLATES: BuiltInReferenceTemplateInput[] = [
 		},
 		"analysis_status": "complete",
 		"analysis_error": "",
-		"created_at": "2026-05-02T16:02:09.807Z",
-		"updated_at": "2026-05-02T21:09:24.437Z"
+		"created_at": "2026-05-02T21:09:22.033Z",
+		"updated_at": "2026-05-02T21:09:22.033Z"
 	},
 	{
 		"id": "builtin-auto-mystery-doc-mzpv3y4bwfk",
@@ -28639,8 +31881,873 @@ export const GENERATED_REFERENCE_TEMPLATES: BuiltInReferenceTemplateInput[] = [
 		},
 		"analysis_status": "complete",
 		"analysis_error": "",
-		"created_at": "2026-05-02T16:46:51.695Z",
-		"updated_at": "2026-05-02T20:12:34.228Z"
+		"created_at": "2026-05-02T20:12:32.203Z",
+		"updated_at": "2026-05-02T20:12:32.203Z"
+	},
+	{
+		"id": "builtin-auto-mystery-doc-ylslnh5roao",
+		"channel_id": "__builtin_reference__",
+		"name": "미스터리/사건 다큐 · 미스터리 사건 탐구소 · 연예계를 흔들었던 실종 사건 #배병수 #실종사건 #한국범죄 #미제사건",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=ylSLnh5rOao",
+		"source_title": "연예계를 흔들었던 실종 사건 #배병수 #실종사건 #한국범죄 #미제사건 #연예계사건 #강력범죄 #사건사고 #실제사건 #쇼츠 #truecrime #shorts #뉴스 #실화사건",
+		"source_creator": "미스터리 사건 탐구소",
+		"thumbnail_url": "https://i.ytimg.com/vi/ylSLnh5rOao/maxresdefault.jpg",
+		"duration_seconds": 44,
+		"dominant_colors": [
+			"#080b10",
+			"#6f8aa6",
+			"#d8e0e8"
+		],
+		"visual_mood": "mystery",
+		"visual_prompt_template": "미스터리/사건 다큐 쇼츠 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "bottom",
+		"subtitle_size_preset": "lg",
+		"subtitle_bg_style": "stroke",
+		"subtitle_accent_color": "#6f8aa6",
+		"scene_count": 18,
+		"avg_scene_duration": 2.4,
+		"hook_duration": 2.5,
+		"transition_style": "hardcut",
+		"pacing_preset": "fast",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 1.08,
+		"tts_tone_keywords": [
+			"압축",
+			"강한 훅",
+			"긴장감",
+			"차분한 추적",
+			"사실 확인"
+		],
+		"bgm_mood": "tense pulse",
+		"bgm_keywords": [
+			"low drone",
+			"pulse",
+			"fast cuts"
+		],
+		"bgm_tempo": "fast",
+		"bgm_reference_url": "",
+		"hook_pattern": "story",
+		"script_structure": [
+			{
+				"role": "hook",
+				"duration": 3,
+				"note": "story 훅으로 제목 약속 즉시 제시"
+			},
+			{
+				"role": "proof",
+				"duration": 17,
+				"note": "근거/장면을 빠르게 2-3개 제시"
+			},
+			{
+				"role": "turn",
+				"duration": 12,
+				"note": "반전 또는 핵심 정보 회수"
+			},
+			{
+				"role": "payoff",
+				"duration": 9,
+				"note": "결론과 다음 궁금증 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_shorts",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "mystery_doc",
+			"reference_category_label": "미스터리/사건 다큐",
+			"reference_format": "shorts",
+			"source_metrics": {
+				"videoId": "ylSLnh5rOao",
+				"viewCount": 636628,
+				"likeCount": 8311,
+				"commentCount": 115
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-mystery_doc-shorts",
+				"label": "미스터리/사건 다큐 쇼츠 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"shorts"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=ylSLnh5rOao",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"shorts": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "mystery",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#080b10",
+						"#6f8aa6",
+						"#d8e0e8"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "cut_driven",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 24.55,
+					"avgCutIntervalSeconds": 2.4,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "hardcut",
+					"density": "dense",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "bottom",
+					"sizePreset": "lg",
+					"backgroundStyle": "stroke",
+					"accentColor": "#6f8aa6",
+					"safeZone": "bottom_safe_area",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"압축",
+						"강한 훅",
+						"긴장감",
+						"차분한 추적",
+						"사실 확인"
+					],
+					"ttsSpeed": 1.08,
+					"bgmMood": "tense pulse",
+					"bgmKeywords": [
+						"low drone",
+						"pulse",
+						"fast cuts"
+					],
+					"bgmTempo": "fast",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777759660346-p6zs76"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:07:40.346Z",
+		"updated_at": "2026-05-02T22:07:40.346Z"
+	},
+	{
+		"id": "builtin-auto-mystery-doc-dbzjz83ipnu",
+		"channel_id": "__builtin_reference__",
+		"name": "미스터리/사건 다큐 · 미스터리 탐험대 - 세상의 모든 미스터리 모음 · 700년 후 미래를 여행한 시간여행자 #미스터리 #shorts #시간",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=dBZjz83ipnU",
+		"source_title": "700년 후 미래를 여행한 시간여행자 #미스터리 #shorts #시간여행자",
+		"source_creator": "미스터리 탐험대 - 세상의 모든 미스터리 모음",
+		"thumbnail_url": "https://i.ytimg.com/vi/dBZjz83ipnU/maxresdefault.jpg",
+		"duration_seconds": 58,
+		"dominant_colors": [
+			"#080b10",
+			"#6f8aa6",
+			"#d8e0e8"
+		],
+		"visual_mood": "mystery",
+		"visual_prompt_template": "미스터리/사건 다큐 쇼츠 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "bottom",
+		"subtitle_size_preset": "lg",
+		"subtitle_bg_style": "stroke",
+		"subtitle_accent_color": "#6f8aa6",
+		"scene_count": 24,
+		"avg_scene_duration": 2.4,
+		"hook_duration": 2.5,
+		"transition_style": "hardcut",
+		"pacing_preset": "fast",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 1.08,
+		"tts_tone_keywords": [
+			"압축",
+			"강한 훅",
+			"긴장감",
+			"차분한 추적",
+			"사실 확인"
+		],
+		"bgm_mood": "tense pulse",
+		"bgm_keywords": [
+			"low drone",
+			"pulse",
+			"fast cuts"
+		],
+		"bgm_tempo": "fast",
+		"bgm_reference_url": "",
+		"hook_pattern": "story",
+		"script_structure": [
+			{
+				"role": "hook",
+				"duration": 3,
+				"note": "story 훅으로 제목 약속 즉시 제시"
+			},
+			{
+				"role": "proof",
+				"duration": 22,
+				"note": "근거/장면을 빠르게 2-3개 제시"
+			},
+			{
+				"role": "turn",
+				"duration": 16,
+				"note": "반전 또는 핵심 정보 회수"
+			},
+			{
+				"role": "payoff",
+				"duration": 12,
+				"note": "결론과 다음 궁금증 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_shorts",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "mystery_doc",
+			"reference_category_label": "미스터리/사건 다큐",
+			"reference_format": "shorts",
+			"source_metrics": {
+				"videoId": "dBZjz83ipnU",
+				"viewCount": 1170253,
+				"likeCount": 8811,
+				"commentCount": 585
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-mystery_doc-shorts",
+				"label": "미스터리/사건 다큐 쇼츠 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"shorts"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=dBZjz83ipnU",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"shorts": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "mystery",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#080b10",
+						"#6f8aa6",
+						"#d8e0e8"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "cut_driven",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 24.83,
+					"avgCutIntervalSeconds": 2.4,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "hardcut",
+					"density": "dense",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "bottom",
+					"sizePreset": "lg",
+					"backgroundStyle": "stroke",
+					"accentColor": "#6f8aa6",
+					"safeZone": "bottom_safe_area",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"압축",
+						"강한 훅",
+						"긴장감",
+						"차분한 추적",
+						"사실 확인"
+					],
+					"ttsSpeed": 1.08,
+					"bgmMood": "tense pulse",
+					"bgmKeywords": [
+						"low drone",
+						"pulse",
+						"fast cuts"
+					],
+					"bgmTempo": "fast",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777759660416-h27agd"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:07:40.416Z",
+		"updated_at": "2026-05-02T22:07:40.416Z"
+	},
+	{
+		"id": "builtin-auto-mystery-doc-rvnsgjkxpje",
+		"channel_id": "__builtin_reference__",
+		"name": "미스터리/사건 다큐 · 보다 BODA · 현대 과학으로 설명 못하는 고대의 미친 기술력 (피라미드의 소름돋는 ",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=rvnSGjkxpJE",
+		"source_title": "현대 과학으로 설명 못하는 고대의 미친 기술력 (피라미드의 소름돋는 비밀ㄷㄷ) ㅣ과학을 보다 EP.46",
+		"source_creator": "보다 BODA",
+		"thumbnail_url": "https://i.ytimg.com/vi/rvnSGjkxpJE/hq720.jpg?sqp=-oaymwEcCNAFEJQDSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLBibg6dKl-X50vGyJG8-41SyP6VAg",
+		"duration_seconds": 2976,
+		"dominant_colors": [
+			"#080b10",
+			"#6f8aa6",
+			"#d8e0e8"
+		],
+		"visual_mood": "mystery",
+		"visual_prompt_template": "미스터리/사건 다큐 롱폼 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "dynamic",
+		"subtitle_size_preset": "md",
+		"subtitle_bg_style": "glow",
+		"subtitle_accent_color": "#6f8aa6",
+		"scene_count": 350,
+		"avg_scene_duration": 8.5,
+		"hook_duration": 8,
+		"transition_style": "mixed",
+		"pacing_preset": "medium",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 0.98,
+		"tts_tone_keywords": [
+			"긴장감",
+			"차분한 추적",
+			"사실 확인"
+		],
+		"bgm_mood": "dark investigative",
+		"bgm_keywords": [
+			"low drone",
+			"pulse",
+			"chaptered pacing"
+		],
+		"bgm_tempo": "mid",
+		"bgm_reference_url": "",
+		"hook_pattern": "shock",
+		"script_structure": [
+			{
+				"role": "cold_open",
+				"duration": 12,
+				"note": "shock 훅으로 핵심 갈등 선공개"
+			},
+			{
+				"role": "setup",
+				"duration": 476,
+				"note": "인물/사건/자료 배경 정리"
+			},
+			{
+				"role": "development",
+				"duration": 1339,
+				"note": "챕터 단위 근거와 장면 전개"
+			},
+			{
+				"role": "turning_point",
+				"duration": 655,
+				"note": "반전, 쟁점, 해석 전환"
+			},
+			{
+				"role": "resolution",
+				"duration": 298,
+				"note": "결론, 시청자 질문 회수, 다음 편 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_longform",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "mystery_doc",
+			"reference_category_label": "미스터리/사건 다큐",
+			"reference_format": "longform",
+			"source_metrics": {
+				"videoId": "rvnSGjkxpJE",
+				"viewCount": 6261563,
+				"likeCount": 0,
+				"commentCount": 0
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-mystery_doc-longform",
+				"label": "미스터리/사건 다큐 롱폼 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"longform"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=rvnSGjkxpJE",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"longform": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "mystery",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#080b10",
+						"#6f8aa6",
+						"#d8e0e8"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "slow_push",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 7.06,
+					"avgCutIntervalSeconds": 8.5,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "mixed",
+					"density": "medium",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "dynamic",
+					"sizePreset": "md",
+					"backgroundStyle": "glow",
+					"accentColor": "#6f8aa6",
+					"safeZone": "avoid_subject_zone_per_scene",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"긴장감",
+						"차분한 추적",
+						"사실 확인"
+					],
+					"ttsSpeed": 0.98,
+					"bgmMood": "dark investigative",
+					"bgmKeywords": [
+						"low drone",
+						"pulse",
+						"chaptered pacing"
+					],
+					"bgmTempo": "mid",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777760008311-yip2li"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:13:28.310Z",
+		"updated_at": "2026-05-02T22:13:28.310Z"
+	},
+	{
+		"id": "builtin-auto-mystery-doc-l82dglf7iss",
+		"channel_id": "__builtin_reference__",
+		"name": "미스터리/사건 다큐 · 비밀 뽀개기 · 당신이 모르는 몽유도원도의 진짜 의미 #역사미스터리 #조선왕실 #sh",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=L82DgLf7iss",
+		"source_title": "당신이 모르는 몽유도원도의 진짜 의미 #역사미스터리 #조선왕실 #shorts",
+		"source_creator": "비밀 뽀개기",
+		"thumbnail_url": "https://i.ytimg.com/vi/L82DgLf7iss/maxresdefault.jpg",
+		"duration_seconds": 48,
+		"dominant_colors": [
+			"#080b10",
+			"#6f8aa6",
+			"#d8e0e8"
+		],
+		"visual_mood": "mystery",
+		"visual_prompt_template": "미스터리/사건 다큐 쇼츠 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "bottom",
+		"subtitle_size_preset": "lg",
+		"subtitle_bg_style": "stroke",
+		"subtitle_accent_color": "#6f8aa6",
+		"scene_count": 20,
+		"avg_scene_duration": 2.4,
+		"hook_duration": 2.5,
+		"transition_style": "hardcut",
+		"pacing_preset": "fast",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 1.08,
+		"tts_tone_keywords": [
+			"압축",
+			"강한 훅",
+			"긴장감",
+			"차분한 추적",
+			"사실 확인"
+		],
+		"bgm_mood": "tense pulse",
+		"bgm_keywords": [
+			"low drone",
+			"pulse",
+			"fast cuts"
+		],
+		"bgm_tempo": "fast",
+		"bgm_reference_url": "",
+		"hook_pattern": "story",
+		"script_structure": [
+			{
+				"role": "hook",
+				"duration": 3,
+				"note": "story 훅으로 제목 약속 즉시 제시"
+			},
+			{
+				"role": "proof",
+				"duration": 18,
+				"note": "근거/장면을 빠르게 2-3개 제시"
+			},
+			{
+				"role": "turn",
+				"duration": 13,
+				"note": "반전 또는 핵심 정보 회수"
+			},
+			{
+				"role": "payoff",
+				"duration": 10,
+				"note": "결론과 다음 궁금증 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_shorts",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "mystery_doc",
+			"reference_category_label": "미스터리/사건 다큐",
+			"reference_format": "shorts",
+			"source_metrics": {
+				"videoId": "L82DgLf7iss",
+				"viewCount": 4873,
+				"likeCount": 13,
+				"commentCount": 3
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-mystery_doc-shorts",
+				"label": "미스터리/사건 다큐 쇼츠 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"shorts"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=L82DgLf7iss",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"shorts": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "mystery",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#080b10",
+						"#6f8aa6",
+						"#d8e0e8"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "cut_driven",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 25,
+					"avgCutIntervalSeconds": 2.4,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "hardcut",
+					"density": "dense",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "bottom",
+					"sizePreset": "lg",
+					"backgroundStyle": "stroke",
+					"accentColor": "#6f8aa6",
+					"safeZone": "bottom_safe_area",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"압축",
+						"강한 훅",
+						"긴장감",
+						"차분한 추적",
+						"사실 확인"
+					],
+					"ttsSpeed": 1.08,
+					"bgmMood": "tense pulse",
+					"bgmKeywords": [
+						"low drone",
+						"pulse",
+						"fast cuts"
+					],
+					"bgmTempo": "fast",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777759660462-u3ysam"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:07:40.462Z",
+		"updated_at": "2026-05-02T22:07:40.462Z"
 	},
 	{
 		"id": "builtin-auto-mystery-doc-1xev3-etfoi",
@@ -30847,8 +34954,8 @@ export const GENERATED_REFERENCE_TEMPLATES: BuiltInReferenceTemplateInput[] = [
 		},
 		"analysis_status": "complete",
 		"analysis_error": "",
-		"created_at": "2026-05-02T16:42:53.452Z",
-		"updated_at": "2026-05-02T21:25:47.936Z"
+		"created_at": "2026-05-02T21:25:47.696Z",
+		"updated_at": "2026-05-02T21:25:47.696Z"
 	},
 	{
 		"id": "builtin-auto-mystery-doc-9cuq8w3oqjs",
@@ -33224,8 +37331,440 @@ export const GENERATED_REFERENCE_TEMPLATES: BuiltInReferenceTemplateInput[] = [
 		},
 		"analysis_status": "complete",
 		"analysis_error": "",
-		"created_at": "2026-05-02T16:45:12.038Z",
-		"updated_at": "2026-05-02T21:02:30.073Z"
+		"created_at": "2026-05-02T21:02:30.038Z",
+		"updated_at": "2026-05-02T21:02:30.038Z"
+	},
+	{
+		"id": "builtin-auto-mystery-doc-celd4nwyo2s",
+		"channel_id": "__builtin_reference__",
+		"name": "미스터리/사건 다큐 · 어쩌다 마주친 역사 · 선장님 미쳤어요? 정원 60명 배에 1만 4천 명을 태우다니.. (흥",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=cELD4NWyO2s",
+		"source_title": "선장님 미쳤어요? 정원 60명 배에 1만 4천 명을 태우다니.. (흥남철수)",
+		"source_creator": "어쩌다 마주친 역사",
+		"thumbnail_url": "https://i.ytimg.com/vi/cELD4NWyO2s/maxresdefault.jpg",
+		"duration_seconds": 130,
+		"dominant_colors": [
+			"#080b10",
+			"#6f8aa6",
+			"#d8e0e8"
+		],
+		"visual_mood": "mystery",
+		"visual_prompt_template": "미스터리/사건 다큐 쇼츠 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "bottom",
+		"subtitle_size_preset": "lg",
+		"subtitle_bg_style": "stroke",
+		"subtitle_accent_color": "#6f8aa6",
+		"scene_count": 54,
+		"avg_scene_duration": 2.4,
+		"hook_duration": 2.5,
+		"transition_style": "hardcut",
+		"pacing_preset": "fast",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 1.08,
+		"tts_tone_keywords": [
+			"압축",
+			"강한 훅",
+			"긴장감",
+			"차분한 추적",
+			"사실 확인"
+		],
+		"bgm_mood": "tense pulse",
+		"bgm_keywords": [
+			"low drone",
+			"pulse",
+			"fast cuts"
+		],
+		"bgm_tempo": "fast",
+		"bgm_reference_url": "",
+		"hook_pattern": "question",
+		"script_structure": [
+			{
+				"role": "hook",
+				"duration": 3,
+				"note": "question 훅으로 제목 약속 즉시 제시"
+			},
+			{
+				"role": "proof",
+				"duration": 49,
+				"note": "근거/장면을 빠르게 2-3개 제시"
+			},
+			{
+				"role": "turn",
+				"duration": 36,
+				"note": "반전 또는 핵심 정보 회수"
+			},
+			{
+				"role": "payoff",
+				"duration": 26,
+				"note": "결론과 다음 궁금증 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_shorts",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "mystery_doc",
+			"reference_category_label": "미스터리/사건 다큐",
+			"reference_format": "shorts",
+			"source_metrics": {
+				"videoId": "cELD4NWyO2s",
+				"viewCount": 7471,
+				"likeCount": 349,
+				"commentCount": 8
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-mystery_doc-shorts",
+				"label": "미스터리/사건 다큐 쇼츠 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"shorts"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=cELD4NWyO2s",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"shorts": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "mystery",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#080b10",
+						"#6f8aa6",
+						"#d8e0e8"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "cut_driven",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 24.92,
+					"avgCutIntervalSeconds": 2.4,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "hardcut",
+					"density": "dense",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "bottom",
+					"sizePreset": "lg",
+					"backgroundStyle": "stroke",
+					"accentColor": "#6f8aa6",
+					"safeZone": "bottom_safe_area",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"압축",
+						"강한 훅",
+						"긴장감",
+						"차분한 추적",
+						"사실 확인"
+					],
+					"ttsSpeed": 1.08,
+					"bgmMood": "tense pulse",
+					"bgmKeywords": [
+						"low drone",
+						"pulse",
+						"fast cuts"
+					],
+					"bgmTempo": "fast",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777759660295-i2wefi"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:07:40.295Z",
+		"updated_at": "2026-05-02T22:07:40.295Z"
+	},
+	{
+		"id": "builtin-auto-mystery-doc-fj1zdr-6iym",
+		"channel_id": "__builtin_reference__",
+		"name": "미스터리/사건 다큐 · 인터스토리텔라 · 봉대산 불다람쥐의 17년간의 방화",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=fj1zDr_6IYM",
+		"source_title": "봉대산 불다람쥐의 17년간의 방화",
+		"source_creator": "인터스토리텔라",
+		"thumbnail_url": "https://i.ytimg.com/vi/fj1zDr_6IYM/maxresdefault.jpg",
+		"duration_seconds": 49,
+		"dominant_colors": [
+			"#080b10",
+			"#6f8aa6",
+			"#d8e0e8"
+		],
+		"visual_mood": "mystery",
+		"visual_prompt_template": "미스터리/사건 다큐 쇼츠 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "bottom",
+		"subtitle_size_preset": "lg",
+		"subtitle_bg_style": "stroke",
+		"subtitle_accent_color": "#6f8aa6",
+		"scene_count": 20,
+		"avg_scene_duration": 2.5,
+		"hook_duration": 2.5,
+		"transition_style": "hardcut",
+		"pacing_preset": "fast",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 1.08,
+		"tts_tone_keywords": [
+			"압축",
+			"강한 훅",
+			"긴장감",
+			"차분한 추적",
+			"사실 확인"
+		],
+		"bgm_mood": "tense pulse",
+		"bgm_keywords": [
+			"low drone",
+			"pulse",
+			"fast cuts"
+		],
+		"bgm_tempo": "fast",
+		"bgm_reference_url": "",
+		"hook_pattern": "story",
+		"script_structure": [
+			{
+				"role": "hook",
+				"duration": 3,
+				"note": "story 훅으로 제목 약속 즉시 제시"
+			},
+			{
+				"role": "proof",
+				"duration": 19,
+				"note": "근거/장면을 빠르게 2-3개 제시"
+			},
+			{
+				"role": "turn",
+				"duration": 14,
+				"note": "반전 또는 핵심 정보 회수"
+			},
+			{
+				"role": "payoff",
+				"duration": 10,
+				"note": "결론과 다음 궁금증 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_shorts",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "mystery_doc",
+			"reference_category_label": "미스터리/사건 다큐",
+			"reference_format": "shorts",
+			"source_metrics": {
+				"videoId": "fj1zDr_6IYM",
+				"viewCount": 46695,
+				"likeCount": 456,
+				"commentCount": 31
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-mystery_doc-shorts",
+				"label": "미스터리/사건 다큐 쇼츠 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"shorts"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=fj1zDr_6IYM",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"shorts": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "mystery",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#080b10",
+						"#6f8aa6",
+						"#d8e0e8"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "cut_driven",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 24.49,
+					"avgCutIntervalSeconds": 2.5,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "hardcut",
+					"density": "dense",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "bottom",
+					"sizePreset": "lg",
+					"backgroundStyle": "stroke",
+					"accentColor": "#6f8aa6",
+					"safeZone": "bottom_safe_area",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"압축",
+						"강한 훅",
+						"긴장감",
+						"차분한 추적",
+						"사실 확인"
+					],
+					"ttsSpeed": 1.08,
+					"bgmMood": "tense pulse",
+					"bgmKeywords": [
+						"low drone",
+						"pulse",
+						"fast cuts"
+					],
+					"bgmTempo": "fast",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777759660439-j7rril"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:07:40.439Z",
+		"updated_at": "2026-05-02T22:07:40.439Z"
 	},
 	{
 		"id": "builtin-auto-mystery-doc-2a5ykyy7ytq",
@@ -35437,8 +39976,8 @@ export const GENERATED_REFERENCE_TEMPLATES: BuiltInReferenceTemplateInput[] = [
 		},
 		"analysis_status": "complete",
 		"analysis_error": "",
-		"created_at": "2026-05-02T16:45:07.757Z",
-		"updated_at": "2026-05-02T21:16:56.150Z"
+		"created_at": "2026-05-02T21:16:53.333Z",
+		"updated_at": "2026-05-02T21:16:53.333Z"
 	},
 	{
 		"id": "builtin-auto-mystery-doc-aukyaprdjc",
@@ -37907,8 +42446,8 @@ export const GENERATED_REFERENCE_TEMPLATES: BuiltInReferenceTemplateInput[] = [
 		},
 		"analysis_status": "complete",
 		"analysis_error": "",
-		"created_at": "2026-05-02T16:02:13.549Z",
-		"updated_at": "2026-05-02T19:50:37.897Z"
+		"created_at": "2026-05-02T19:50:36.899Z",
+		"updated_at": "2026-05-02T19:50:36.899Z"
 	},
 	{
 		"id": "builtin-auto-mystery-doc-pqj5rwxea",
@@ -40213,8 +44752,1089 @@ export const GENERATED_REFERENCE_TEMPLATES: BuiltInReferenceTemplateInput[] = [
 		},
 		"analysis_status": "complete",
 		"analysis_error": "",
-		"created_at": "2026-05-02T16:42:57.465Z",
-		"updated_at": "2026-05-02T20:19:08.901Z"
+		"created_at": "2026-05-02T20:19:05.558Z",
+		"updated_at": "2026-05-02T20:19:05.558Z"
+	},
+	{
+		"id": "builtin-auto-mystery-doc-4puxek5k3pe",
+		"channel_id": "__builtin_reference__",
+		"name": "미스터리/사건 다큐 · 콩도치랜드 · 한국 호랑이의 소름 돋는 진실 TOP 10 #한국호랑이 #Korean",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=4PUXEK5k3PE",
+		"source_title": "한국 호랑이의 소름 돋는 진실 TOP 10 #한국호랑이 #KoreanTiger #미스터리 #TOP10 #조선범 #착호갑사 #멸종동물 #역사다큐 #공포 #쇼츠",
+		"source_creator": "콩도치랜드",
+		"thumbnail_url": "https://i.ytimg.com/vi/4PUXEK5k3PE/maxresdefault.jpg",
+		"duration_seconds": 107,
+		"dominant_colors": [
+			"#080b10",
+			"#6f8aa6",
+			"#d8e0e8"
+		],
+		"visual_mood": "mystery",
+		"visual_prompt_template": "미스터리/사건 다큐 쇼츠 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "bottom",
+		"subtitle_size_preset": "lg",
+		"subtitle_bg_style": "stroke",
+		"subtitle_accent_color": "#6f8aa6",
+		"scene_count": 45,
+		"avg_scene_duration": 2.4,
+		"hook_duration": 2.5,
+		"transition_style": "hardcut",
+		"pacing_preset": "fast",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 1.08,
+		"tts_tone_keywords": [
+			"압축",
+			"강한 훅",
+			"긴장감",
+			"차분한 추적",
+			"사실 확인"
+		],
+		"bgm_mood": "tense pulse",
+		"bgm_keywords": [
+			"low drone",
+			"pulse",
+			"fast cuts"
+		],
+		"bgm_tempo": "fast",
+		"bgm_reference_url": "",
+		"hook_pattern": "shock",
+		"script_structure": [
+			{
+				"role": "hook",
+				"duration": 3,
+				"note": "shock 훅으로 제목 약속 즉시 제시"
+			},
+			{
+				"role": "proof",
+				"duration": 41,
+				"note": "근거/장면을 빠르게 2-3개 제시"
+			},
+			{
+				"role": "turn",
+				"duration": 30,
+				"note": "반전 또는 핵심 정보 회수"
+			},
+			{
+				"role": "payoff",
+				"duration": 21,
+				"note": "결론과 다음 궁금증 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_shorts",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "mystery_doc",
+			"reference_category_label": "미스터리/사건 다큐",
+			"reference_format": "shorts",
+			"source_metrics": {
+				"videoId": "4PUXEK5k3PE",
+				"viewCount": 112140,
+				"likeCount": 1246,
+				"commentCount": 89
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-mystery_doc-shorts",
+				"label": "미스터리/사건 다큐 쇼츠 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"shorts"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=4PUXEK5k3PE",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"shorts": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "mystery",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#080b10",
+						"#6f8aa6",
+						"#d8e0e8"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "cut_driven",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 25.23,
+					"avgCutIntervalSeconds": 2.4,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "hardcut",
+					"density": "dense",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "bottom",
+					"sizePreset": "lg",
+					"backgroundStyle": "stroke",
+					"accentColor": "#6f8aa6",
+					"safeZone": "bottom_safe_area",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"압축",
+						"강한 훅",
+						"긴장감",
+						"차분한 추적",
+						"사실 확인"
+					],
+					"ttsSpeed": 1.08,
+					"bgmMood": "tense pulse",
+					"bgmKeywords": [
+						"low drone",
+						"pulse",
+						"fast cuts"
+					],
+					"bgmTempo": "fast",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777759660321-5yci92"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:07:40.321Z",
+		"updated_at": "2026-05-02T22:07:40.321Z"
+	},
+	{
+		"id": "builtin-auto-mystery-doc-apv0xlsgvpu",
+		"channel_id": "__builtin_reference__",
+		"name": "미스터리/사건 다큐 · 팩트조선 · 🎉400만🎉 충격적인 연산군 얼굴 #역사 #shorts",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=apv0XlSgvpU",
+		"source_title": "🎉400만🎉 충격적인 연산군 얼굴 #역사 #shorts",
+		"source_creator": "팩트조선",
+		"thumbnail_url": "https://i.ytimg.com/vi/apv0XlSgvpU/maxresdefault.jpg",
+		"duration_seconds": 48,
+		"dominant_colors": [
+			"#080b10",
+			"#6f8aa6",
+			"#d8e0e8"
+		],
+		"visual_mood": "mystery",
+		"visual_prompt_template": "미스터리/사건 다큐 쇼츠 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "bottom",
+		"subtitle_size_preset": "lg",
+		"subtitle_bg_style": "stroke",
+		"subtitle_accent_color": "#6f8aa6",
+		"scene_count": 20,
+		"avg_scene_duration": 2.4,
+		"hook_duration": 2.5,
+		"transition_style": "hardcut",
+		"pacing_preset": "fast",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 1.08,
+		"tts_tone_keywords": [
+			"압축",
+			"강한 훅",
+			"긴장감",
+			"차분한 추적",
+			"사실 확인"
+		],
+		"bgm_mood": "tense pulse",
+		"bgm_keywords": [
+			"low drone",
+			"pulse",
+			"fast cuts"
+		],
+		"bgm_tempo": "fast",
+		"bgm_reference_url": "",
+		"hook_pattern": "shock",
+		"script_structure": [
+			{
+				"role": "hook",
+				"duration": 3,
+				"note": "shock 훅으로 제목 약속 즉시 제시"
+			},
+			{
+				"role": "proof",
+				"duration": 18,
+				"note": "근거/장면을 빠르게 2-3개 제시"
+			},
+			{
+				"role": "turn",
+				"duration": 13,
+				"note": "반전 또는 핵심 정보 회수"
+			},
+			{
+				"role": "payoff",
+				"duration": 10,
+				"note": "결론과 다음 궁금증 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_shorts",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "mystery_doc",
+			"reference_category_label": "미스터리/사건 다큐",
+			"reference_format": "shorts",
+			"source_metrics": {
+				"videoId": "apv0XlSgvpU",
+				"viewCount": 4367014,
+				"likeCount": 32651,
+				"commentCount": 1426
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-mystery_doc-shorts",
+				"label": "미스터리/사건 다큐 쇼츠 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"shorts"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=apv0XlSgvpU",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"shorts": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "mystery",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#080b10",
+						"#6f8aa6",
+						"#d8e0e8"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "cut_driven",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 25,
+					"avgCutIntervalSeconds": 2.4,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "hardcut",
+					"density": "dense",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "bottom",
+					"sizePreset": "lg",
+					"backgroundStyle": "stroke",
+					"accentColor": "#6f8aa6",
+					"safeZone": "bottom_safe_area",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"압축",
+						"강한 훅",
+						"긴장감",
+						"차분한 추적",
+						"사실 확인"
+					],
+					"ttsSpeed": 1.08,
+					"bgmMood": "tense pulse",
+					"bgmKeywords": [
+						"low drone",
+						"pulse",
+						"fast cuts"
+					],
+					"bgmTempo": "fast",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777759660264-05l3bb"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:07:40.264Z",
+		"updated_at": "2026-05-02T22:07:40.264Z"
+	},
+	{
+		"id": "builtin-auto-mystery-doc-udkqwnqnjxo",
+		"channel_id": "__builtin_reference__",
+		"name": "미스터리/사건 다큐 · 히스토리 · Sleep Documentary🪐 From the Birth of ",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=UdKqwnqnJXo",
+		"source_title": "Sleep Documentary🪐 From the Birth of the Universe to the Present (Narration: Won Ho-seop) [Big Hi...",
+		"source_creator": "히스토리",
+		"thumbnail_url": "https://i.ytimg.com/vi/UdKqwnqnJXo/hq720.jpg?sqp=-oaymwEcCNAFEJQDSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLCER-Eo1kl08okmgq4NVwnAZJ1prQ",
+		"duration_seconds": 5262,
+		"dominant_colors": [
+			"#080b10",
+			"#6f8aa6",
+			"#d8e0e8"
+		],
+		"visual_mood": "mystery",
+		"visual_prompt_template": "미스터리/사건 다큐 롱폼 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "dynamic",
+		"subtitle_size_preset": "md",
+		"subtitle_bg_style": "glow",
+		"subtitle_accent_color": "#6f8aa6",
+		"scene_count": 619,
+		"avg_scene_duration": 8.5,
+		"hook_duration": 8,
+		"transition_style": "mixed",
+		"pacing_preset": "medium",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 0.98,
+		"tts_tone_keywords": [
+			"긴장감",
+			"차분한 추적",
+			"사실 확인"
+		],
+		"bgm_mood": "dark investigative",
+		"bgm_keywords": [
+			"low drone",
+			"pulse",
+			"chaptered pacing"
+		],
+		"bgm_tempo": "mid",
+		"bgm_reference_url": "",
+		"hook_pattern": "story",
+		"script_structure": [
+			{
+				"role": "cold_open",
+				"duration": 12,
+				"note": "story 훅으로 핵심 갈등 선공개"
+			},
+			{
+				"role": "setup",
+				"duration": 842,
+				"note": "인물/사건/자료 배경 정리"
+			},
+			{
+				"role": "development",
+				"duration": 2368,
+				"note": "챕터 단위 근거와 장면 전개"
+			},
+			{
+				"role": "turning_point",
+				"duration": 1158,
+				"note": "반전, 쟁점, 해석 전환"
+			},
+			{
+				"role": "resolution",
+				"duration": 526,
+				"note": "결론, 시청자 질문 회수, 다음 편 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_longform",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "mystery_doc",
+			"reference_category_label": "미스터리/사건 다큐",
+			"reference_format": "longform",
+			"source_metrics": {
+				"videoId": "UdKqwnqnJXo",
+				"viewCount": 9233611,
+				"likeCount": 0,
+				"commentCount": 0
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-mystery_doc-longform",
+				"label": "미스터리/사건 다큐 롱폼 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"longform"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=UdKqwnqnJXo",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"longform": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "mystery",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#080b10",
+						"#6f8aa6",
+						"#d8e0e8"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "slow_push",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 7.06,
+					"avgCutIntervalSeconds": 8.5,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "mixed",
+					"density": "medium",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "dynamic",
+					"sizePreset": "md",
+					"backgroundStyle": "glow",
+					"accentColor": "#6f8aa6",
+					"safeZone": "avoid_subject_zone_per_scene",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"긴장감",
+						"차분한 추적",
+						"사실 확인"
+					],
+					"ttsSpeed": 0.98,
+					"bgmMood": "dark investigative",
+					"bgmKeywords": [
+						"low drone",
+						"pulse",
+						"chaptered pacing"
+					],
+					"bgmTempo": "mid",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777759867791-n9tvmc"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:11:07.789Z",
+		"updated_at": "2026-05-02T22:11:07.789Z"
+	},
+	{
+		"id": "builtin-auto-mystery-doc-5a7ipmfqase",
+		"channel_id": "__builtin_reference__",
+		"name": "미스터리/사건 다큐 · After 60 · 1990년 오키나와 여대생 미사키 살해 미제 사건 #미스터리 #이슈 ",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=5a7ipMFQasE",
+		"source_title": "1990년 오키나와 여대생 미사키 살해 미제 사건     #미스터리 #이슈 #실종사건#다큐쇼츠 #스토리쇼츠 #시네마틱쇼츠",
+		"source_creator": "After 60",
+		"thumbnail_url": "https://i.ytimg.com/vi/5a7ipMFQasE/maxresdefault.jpg",
+		"duration_seconds": 51,
+		"dominant_colors": [
+			"#080b10",
+			"#6f8aa6",
+			"#d8e0e8"
+		],
+		"visual_mood": "mystery",
+		"visual_prompt_template": "미스터리/사건 다큐 쇼츠 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "bottom",
+		"subtitle_size_preset": "lg",
+		"subtitle_bg_style": "stroke",
+		"subtitle_accent_color": "#6f8aa6",
+		"scene_count": 21,
+		"avg_scene_duration": 2.4,
+		"hook_duration": 2.5,
+		"transition_style": "hardcut",
+		"pacing_preset": "fast",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 1.08,
+		"tts_tone_keywords": [
+			"압축",
+			"강한 훅",
+			"긴장감",
+			"차분한 추적",
+			"사실 확인"
+		],
+		"bgm_mood": "tense pulse",
+		"bgm_keywords": [
+			"low drone",
+			"pulse",
+			"fast cuts"
+		],
+		"bgm_tempo": "fast",
+		"bgm_reference_url": "",
+		"hook_pattern": "story",
+		"script_structure": [
+			{
+				"role": "hook",
+				"duration": 3,
+				"note": "story 훅으로 제목 약속 즉시 제시"
+			},
+			{
+				"role": "proof",
+				"duration": 19,
+				"note": "근거/장면을 빠르게 2-3개 제시"
+			},
+			{
+				"role": "turn",
+				"duration": 14,
+				"note": "반전 또는 핵심 정보 회수"
+			},
+			{
+				"role": "payoff",
+				"duration": 10,
+				"note": "결론과 다음 궁금증 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_shorts",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "mystery_doc",
+			"reference_category_label": "미스터리/사건 다큐",
+			"reference_format": "shorts",
+			"source_metrics": {
+				"videoId": "5a7ipMFQasE",
+				"viewCount": 5123,
+				"likeCount": 192,
+				"commentCount": 3
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-mystery_doc-shorts",
+				"label": "미스터리/사건 다큐 쇼츠 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"shorts"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=5a7ipMFQasE",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"shorts": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "mystery",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#080b10",
+						"#6f8aa6",
+						"#d8e0e8"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "cut_driven",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 24.71,
+					"avgCutIntervalSeconds": 2.4,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "hardcut",
+					"density": "dense",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "bottom",
+					"sizePreset": "lg",
+					"backgroundStyle": "stroke",
+					"accentColor": "#6f8aa6",
+					"safeZone": "bottom_safe_area",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"압축",
+						"강한 훅",
+						"긴장감",
+						"차분한 추적",
+						"사실 확인"
+					],
+					"ttsSpeed": 1.08,
+					"bgmMood": "tense pulse",
+					"bgmKeywords": [
+						"low drone",
+						"pulse",
+						"fast cuts"
+					],
+					"bgmTempo": "fast",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777759660369-fcccke"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:07:40.369Z",
+		"updated_at": "2026-05-02T22:07:40.369Z"
+	},
+	{
+		"id": "builtin-auto-mystery-doc-502ltgk70fm",
+		"channel_id": "__builtin_reference__",
+		"name": "미스터리/사건 다큐 · SBS 뉴스 · 한주 사고 한주 팔고…뭐하나 했더니 '수십억' / SBS / 스브스픽",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=502LTGK70fM",
+		"source_title": "한주 사고 한주 팔고…뭐하나 했더니 '수십억' / SBS / 스브스픽",
+		"source_creator": "SBS 뉴스",
+		"thumbnail_url": "https://i.ytimg.com/vi/502LTGK70fM/hq720.jpg?sqp=-oaymwEcCNAFEJQDSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLA_tMI5M-HaxT869wmm2_peoGwytQ",
+		"duration_seconds": 99,
+		"dominant_colors": [
+			"#080b10",
+			"#6f8aa6",
+			"#d8e0e8"
+		],
+		"visual_mood": "mystery",
+		"visual_prompt_template": "미스터리/사건 다큐 쇼츠 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "bottom",
+		"subtitle_size_preset": "lg",
+		"subtitle_bg_style": "stroke",
+		"subtitle_accent_color": "#6f8aa6",
+		"scene_count": 41,
+		"avg_scene_duration": 2.4,
+		"hook_duration": 2.5,
+		"transition_style": "hardcut",
+		"pacing_preset": "fast",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 1.08,
+		"tts_tone_keywords": [
+			"압축",
+			"강한 훅",
+			"긴장감",
+			"차분한 추적",
+			"사실 확인"
+		],
+		"bgm_mood": "tense pulse",
+		"bgm_keywords": [
+			"low drone",
+			"pulse",
+			"fast cuts"
+		],
+		"bgm_tempo": "fast",
+		"bgm_reference_url": "",
+		"hook_pattern": "story",
+		"script_structure": [
+			{
+				"role": "hook",
+				"duration": 3,
+				"note": "story 훅으로 제목 약속 즉시 제시"
+			},
+			{
+				"role": "proof",
+				"duration": 38,
+				"note": "근거/장면을 빠르게 2-3개 제시"
+			},
+			{
+				"role": "turn",
+				"duration": 28,
+				"note": "반전 또는 핵심 정보 회수"
+			},
+			{
+				"role": "payoff",
+				"duration": 20,
+				"note": "결론과 다음 궁금증 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_shorts",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "mystery_doc",
+			"reference_category_label": "미스터리/사건 다큐",
+			"reference_format": "shorts",
+			"source_metrics": {
+				"videoId": "502LTGK70fM",
+				"viewCount": 4030308,
+				"likeCount": 0,
+				"commentCount": 0
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-mystery_doc-shorts",
+				"label": "미스터리/사건 다큐 쇼츠 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"shorts"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=502LTGK70fM",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"shorts": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "mystery",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#080b10",
+						"#6f8aa6",
+						"#d8e0e8"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "cut_driven",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 24.85,
+					"avgCutIntervalSeconds": 2.4,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "hardcut",
+					"density": "dense",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "bottom",
+					"sizePreset": "lg",
+					"backgroundStyle": "stroke",
+					"accentColor": "#6f8aa6",
+					"safeZone": "bottom_safe_area",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"압축",
+						"강한 훅",
+						"긴장감",
+						"차분한 추적",
+						"사실 확인"
+					],
+					"ttsSpeed": 1.08,
+					"bgmMood": "tense pulse",
+					"bgmKeywords": [
+						"low drone",
+						"pulse",
+						"fast cuts"
+					],
+					"bgmTempo": "fast",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777759997669-kvfwv8"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:13:17.669Z",
+		"updated_at": "2026-05-02T22:13:17.669Z"
 	},
 	{
 		"id": "builtin-auto-mystery-doc-hilhdp6dklo",
@@ -42566,8 +48186,8 @@ export const GENERATED_REFERENCE_TEMPLATES: BuiltInReferenceTemplateInput[] = [
 		},
 		"analysis_status": "complete",
 		"analysis_error": "",
-		"created_at": "2026-05-02T16:02:17.856Z",
-		"updated_at": "2026-05-02T20:26:32.981Z"
+		"created_at": "2026-05-02T20:26:28.149Z",
+		"updated_at": "2026-05-02T20:26:28.149Z"
 	},
 	{
 		"id": "builtin-auto-news-issue-kdwdto-pdpe",
@@ -44165,8 +49785,225 @@ export const GENERATED_REFERENCE_TEMPLATES: BuiltInReferenceTemplateInput[] = [
 		},
 		"analysis_status": "complete",
 		"analysis_error": "",
-		"created_at": "2026-05-02T16:47:03.957Z",
-		"updated_at": "2026-05-02T21:02:55.084Z"
+		"created_at": "2026-05-02T21:02:51.031Z",
+		"updated_at": "2026-05-02T21:02:51.031Z"
+	},
+	{
+		"id": "builtin-auto-news-issue-qtxr8qi7tau",
+		"channel_id": "__builtin_reference__",
+		"name": "뉴스/이슈 해설 · 김어준의 겸손은힘들다 뉴스공장 · [더살롱 몰아보기] 첫 방송부터 다이너마이트! 변호사가 먼저 연락오는",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=QTxR8qI7taU",
+		"source_title": "[더살롱 몰아보기] 첫 방송부터 다이너마이트! 변호사가 먼저 연락오는 코너: THE살롱 상반기 결산!",
+		"source_creator": "김어준의 겸손은힘들다 뉴스공장",
+		"thumbnail_url": "https://i.ytimg.com/vi/QTxR8qI7taU/hq720.jpg?sqp=-oaymwEcCNAFEJQDSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLBS4dDsnBM1JIIItFvUK0PXVaBaHA",
+		"duration_seconds": 22625,
+		"dominant_colors": [
+			"#101820",
+			"#e93f33",
+			"#f6f2e8"
+		],
+		"visual_mood": "news",
+		"visual_prompt_template": "뉴스/이슈 해설 롱폼 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "dynamic",
+		"subtitle_size_preset": "md",
+		"subtitle_bg_style": "glow",
+		"subtitle_accent_color": "#e93f33",
+		"scene_count": 2662,
+		"avg_scene_duration": 8.5,
+		"hook_duration": 8,
+		"transition_style": "mixed",
+		"pacing_preset": "medium",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 0.98,
+		"tts_tone_keywords": [
+			"명확한",
+			"긴박한",
+			"근거 중심"
+		],
+		"bgm_mood": "urgent editorial",
+		"bgm_keywords": [
+			"ticker",
+			"percussion",
+			"chaptered pacing"
+		],
+		"bgm_tempo": "mid",
+		"bgm_reference_url": "",
+		"hook_pattern": "story",
+		"script_structure": [
+			{
+				"role": "cold_open",
+				"duration": 12,
+				"note": "story 훅으로 핵심 갈등 선공개"
+			},
+			{
+				"role": "setup",
+				"duration": 3620,
+				"note": "인물/사건/자료 배경 정리"
+			},
+			{
+				"role": "development",
+				"duration": 10181,
+				"note": "챕터 단위 근거와 장면 전개"
+			},
+			{
+				"role": "turning_point",
+				"duration": 4978,
+				"note": "반전, 쟁점, 해석 전환"
+			},
+			{
+				"role": "resolution",
+				"duration": 2263,
+				"note": "결론, 시청자 질문 회수, 다음 편 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_longform",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "news_issue",
+			"reference_category_label": "뉴스/이슈 해설",
+			"reference_format": "longform",
+			"source_metrics": {
+				"videoId": "QTxR8qI7taU",
+				"viewCount": 839641,
+				"likeCount": 0,
+				"commentCount": 0
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-news_issue-longform",
+				"label": "뉴스/이슈 해설 롱폼 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"longform"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=QTxR8qI7taU",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"longform": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "news",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#101820",
+						"#e93f33",
+						"#f6f2e8"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "slow_push",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 7.06,
+					"avgCutIntervalSeconds": 8.5,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "mixed",
+					"density": "medium",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "dynamic",
+					"sizePreset": "md",
+					"backgroundStyle": "glow",
+					"accentColor": "#e93f33",
+					"safeZone": "avoid_subject_zone_per_scene",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"명확한",
+						"긴박한",
+						"근거 중심"
+					],
+					"ttsSpeed": 0.98,
+					"bgmMood": "urgent editorial",
+					"bgmKeywords": [
+						"ticker",
+						"percussion",
+						"chaptered pacing"
+					],
+					"bgmTempo": "mid",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777760037833-pl2o33"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:13:57.833Z",
+		"updated_at": "2026-05-02T22:13:57.833Z"
 	},
 	{
 		"id": "builtin-auto-news-issue-yxfwdle85oc",
@@ -46417,8 +52254,8 @@ export const GENERATED_REFERENCE_TEMPLATES: BuiltInReferenceTemplateInput[] = [
 		},
 		"analysis_status": "complete",
 		"analysis_error": "",
-		"created_at": "2026-05-02T16:45:48.428Z",
-		"updated_at": "2026-05-02T20:35:05.047Z"
+		"created_at": "2026-05-02T20:35:04.079Z",
+		"updated_at": "2026-05-02T20:35:04.079Z"
 	},
 	{
 		"id": "builtin-auto-news-issue-x99omcrgxnw",
@@ -48653,8 +54490,8 @@ export const GENERATED_REFERENCE_TEMPLATES: BuiltInReferenceTemplateInput[] = [
 		},
 		"analysis_status": "complete",
 		"analysis_error": "",
-		"created_at": "2026-05-02T16:43:12.965Z",
-		"updated_at": "2026-05-02T20:13:44.268Z"
+		"created_at": "2026-05-02T20:13:44.213Z",
+		"updated_at": "2026-05-02T20:13:44.213Z"
 	},
 	{
 		"id": "builtin-auto-news-issue-mvwgnuavbvq",
@@ -50213,8 +56050,8 @@ export const GENERATED_REFERENCE_TEMPLATES: BuiltInReferenceTemplateInput[] = [
 		},
 		"analysis_status": "complete",
 		"analysis_error": "",
-		"created_at": "2026-05-02T16:46:59.642Z",
-		"updated_at": "2026-05-02T21:26:07.949Z"
+		"created_at": "2026-05-02T21:26:07.645Z",
+		"updated_at": "2026-05-02T21:26:07.645Z"
 	},
 	{
 		"id": "builtin-auto-news-issue-7ahjdhw-d94",
@@ -51856,8 +57693,224 @@ export const GENERATED_REFERENCE_TEMPLATES: BuiltInReferenceTemplateInput[] = [
 		},
 		"analysis_status": "complete",
 		"analysis_error": "",
-		"created_at": "2026-05-02T16:02:26.564Z",
-		"updated_at": "2026-05-02T20:26:52.995Z"
+		"created_at": "2026-05-02T20:26:48.005Z",
+		"updated_at": "2026-05-02T20:26:48.005Z"
+	},
+	{
+		"id": "builtin-auto-news-issue-9xqbhxcewa",
+		"channel_id": "__builtin_reference__",
+		"name": "뉴스/이슈 해설 · 채널A News · All three brothers die in motorcycle a",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=-9xqbhxCeWA",
+		"source_title": "All three brothers die in motorcycle accident while filming shorts / Channel A / News A",
+		"source_creator": "채널A News",
+		"thumbnail_url": "https://i.ytimg.com/vi/-9xqbhxCeWA/hq720.jpg?sqp=-oaymwEcCNAFEJQDSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLD_jJry0S1JCDEz99GtdJOS68HZwQ",
+		"duration_seconds": 147,
+		"dominant_colors": [
+			"#101820",
+			"#e93f33",
+			"#f6f2e8"
+		],
+		"visual_mood": "news",
+		"visual_prompt_template": "뉴스/이슈 해설 쇼츠 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "bottom",
+		"subtitle_size_preset": "lg",
+		"subtitle_bg_style": "stroke",
+		"subtitle_accent_color": "#e93f33",
+		"scene_count": 61,
+		"avg_scene_duration": 2.4,
+		"hook_duration": 2.5,
+		"transition_style": "hardcut",
+		"pacing_preset": "fast",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 1.08,
+		"tts_tone_keywords": [
+			"압축",
+			"강한 훅",
+			"명확한",
+			"긴박한",
+			"근거 중심"
+		],
+		"bgm_mood": "urgent editorial",
+		"bgm_keywords": [
+			"ticker",
+			"percussion",
+			"fast cuts"
+		],
+		"bgm_tempo": "fast",
+		"bgm_reference_url": "",
+		"hook_pattern": "story",
+		"script_structure": [
+			{
+				"role": "hook",
+				"duration": 3,
+				"note": "story 훅으로 제목 약속 즉시 제시"
+			},
+			{
+				"role": "proof",
+				"duration": 56,
+				"note": "근거/장면을 빠르게 2-3개 제시"
+			},
+			{
+				"role": "turn",
+				"duration": 41,
+				"note": "반전 또는 핵심 정보 회수"
+			},
+			{
+				"role": "payoff",
+				"duration": 29,
+				"note": "결론과 다음 궁금증 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_shorts",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "news_issue",
+			"reference_category_label": "뉴스/이슈 해설",
+			"reference_format": "shorts",
+			"source_metrics": {
+				"videoId": "-9xqbhxCeWA",
+				"viewCount": 181966,
+				"likeCount": 0,
+				"commentCount": 0
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-news_issue-shorts",
+				"label": "뉴스/이슈 해설 쇼츠 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"shorts"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=-9xqbhxCeWA",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"shorts": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "news",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#101820",
+						"#e93f33",
+						"#f6f2e8"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "cut_driven",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 24.9,
+					"avgCutIntervalSeconds": 2.4,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "hardcut",
+					"density": "dense",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "bottom",
+					"sizePreset": "lg",
+					"backgroundStyle": "stroke",
+					"accentColor": "#e93f33",
+					"safeZone": "bottom_safe_area",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"압축",
+						"강한 훅",
+						"명확한",
+						"긴박한",
+						"근거 중심"
+					],
+					"ttsSpeed": 1.08,
+					"bgmMood": "urgent editorial",
+					"bgmKeywords": [
+						"ticker",
+						"percussion",
+						"fast cuts"
+					],
+					"bgmTempo": "fast",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777759883498-55hvhg"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:11:23.498Z",
+		"updated_at": "2026-05-02T22:11:23.498Z"
 	},
 	{
 		"id": "builtin-auto-news-issue-1isbk4nu2wy",
@@ -54155,8 +60208,8 @@ export const GENERATED_REFERENCE_TEMPLATES: BuiltInReferenceTemplateInput[] = [
 		},
 		"analysis_status": "complete",
 		"analysis_error": "",
-		"created_at": "2026-05-02T16:24:01.225Z",
-		"updated_at": "2026-05-02T19:51:02.918Z"
+		"created_at": "2026-05-02T19:50:59.493Z",
+		"updated_at": "2026-05-02T19:50:59.493Z"
 	},
 	{
 		"id": "builtin-auto-news-issue-5kfdeqwbuns",
@@ -56374,8 +62427,8 @@ export const GENERATED_REFERENCE_TEMPLATES: BuiltInReferenceTemplateInput[] = [
 		},
 		"analysis_status": "complete",
 		"analysis_error": "",
-		"created_at": "2026-05-02T16:24:04.886Z",
-		"updated_at": "2026-05-02T20:19:48.933Z"
+		"created_at": "2026-05-02T20:19:43.950Z",
+		"updated_at": "2026-05-02T20:19:43.950Z"
 	},
 	{
 		"id": "builtin-auto-news-issue-v15qzgtuxyq",
@@ -58707,8 +64760,1088 @@ export const GENERATED_REFERENCE_TEMPLATES: BuiltInReferenceTemplateInput[] = [
 		},
 		"analysis_status": "complete",
 		"analysis_error": "",
-		"created_at": "2026-05-02T16:43:17.386Z",
-		"updated_at": "2026-05-02T21:18:26.243Z"
+		"created_at": "2026-05-02T21:18:21.919Z",
+		"updated_at": "2026-05-02T21:18:21.919Z"
+	},
+	{
+		"id": "builtin-auto-news-issue-ydm-hqe77yk",
+		"channel_id": "__builtin_reference__",
+		"name": "뉴스/이슈 해설 · JTBC News · '아!' 억울한 한국 쇼트트랙, 항의했는데 왜 소용없었나? / JTB",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=ydM_hQE77yk",
+		"source_title": "'아!' 억울한 한국 쇼트트랙, 항의했는데 왜 소용없었나? / JTBC 뉴스룸",
+		"source_creator": "JTBC News",
+		"thumbnail_url": "https://i.ytimg.com/vi/ydM_hQE77yk/hq720.jpg?sqp=-oaymwEcCNAFEJQDSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLDgwb9gaArZ7JaKH4Qm5GlE6ceteQ",
+		"duration_seconds": 113,
+		"dominant_colors": [
+			"#101820",
+			"#e93f33",
+			"#f6f2e8"
+		],
+		"visual_mood": "news",
+		"visual_prompt_template": "뉴스/이슈 해설 쇼츠 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "bottom",
+		"subtitle_size_preset": "lg",
+		"subtitle_bg_style": "stroke",
+		"subtitle_accent_color": "#e93f33",
+		"scene_count": 47,
+		"avg_scene_duration": 2.4,
+		"hook_duration": 2.5,
+		"transition_style": "hardcut",
+		"pacing_preset": "fast",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 1.08,
+		"tts_tone_keywords": [
+			"압축",
+			"강한 훅",
+			"명확한",
+			"긴박한",
+			"근거 중심"
+		],
+		"bgm_mood": "urgent editorial",
+		"bgm_keywords": [
+			"ticker",
+			"percussion",
+			"fast cuts"
+		],
+		"bgm_tempo": "fast",
+		"bgm_reference_url": "",
+		"hook_pattern": "question",
+		"script_structure": [
+			{
+				"role": "hook",
+				"duration": 3,
+				"note": "question 훅으로 제목 약속 즉시 제시"
+			},
+			{
+				"role": "proof",
+				"duration": 43,
+				"note": "근거/장면을 빠르게 2-3개 제시"
+			},
+			{
+				"role": "turn",
+				"duration": 32,
+				"note": "반전 또는 핵심 정보 회수"
+			},
+			{
+				"role": "payoff",
+				"duration": 23,
+				"note": "결론과 다음 궁금증 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_shorts",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "news_issue",
+			"reference_category_label": "뉴스/이슈 해설",
+			"reference_format": "shorts",
+			"source_metrics": {
+				"videoId": "ydM_hQE77yk",
+				"viewCount": 567521,
+				"likeCount": 0,
+				"commentCount": 0
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-news_issue-shorts",
+				"label": "뉴스/이슈 해설 쇼츠 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"shorts"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=ydM_hQE77yk",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"shorts": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "news",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#101820",
+						"#e93f33",
+						"#f6f2e8"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "cut_driven",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 24.96,
+					"avgCutIntervalSeconds": 2.4,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "hardcut",
+					"density": "dense",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "bottom",
+					"sizePreset": "lg",
+					"backgroundStyle": "stroke",
+					"accentColor": "#e93f33",
+					"safeZone": "bottom_safe_area",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"압축",
+						"강한 훅",
+						"명확한",
+						"긴박한",
+						"근거 중심"
+					],
+					"ttsSpeed": 1.08,
+					"bgmMood": "urgent editorial",
+					"bgmKeywords": [
+						"ticker",
+						"percussion",
+						"fast cuts"
+					],
+					"bgmTempo": "fast",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777759883397-obm7pb"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:11:23.397Z",
+		"updated_at": "2026-05-02T22:11:23.397Z"
+	},
+	{
+		"id": "builtin-auto-news-issue-ggfzjswxljq",
+		"channel_id": "__builtin_reference__",
+		"name": "뉴스/이슈 해설 · JTBC News · '한국 실격' 덕에 메달 땄던 그 선수였다…분노한 쇼트트랙 팬들 / ",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=GGFzjSWXLJQ",
+		"source_title": "'한국 실격' 덕에 메달 땄던 그 선수였다…분노한 쇼트트랙 팬들 / JTBC 뉴스룸",
+		"source_creator": "JTBC News",
+		"thumbnail_url": "https://i.ytimg.com/vi/GGFzjSWXLJQ/hq720.jpg?sqp=-oaymwEcCNAFEJQDSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLC87r0IxwDGhlK4YqZBId4mWi4zQg",
+		"duration_seconds": 134,
+		"dominant_colors": [
+			"#101820",
+			"#e93f33",
+			"#f6f2e8"
+		],
+		"visual_mood": "news",
+		"visual_prompt_template": "뉴스/이슈 해설 쇼츠 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "bottom",
+		"subtitle_size_preset": "lg",
+		"subtitle_bg_style": "stroke",
+		"subtitle_accent_color": "#e93f33",
+		"scene_count": 56,
+		"avg_scene_duration": 2.4,
+		"hook_duration": 2.5,
+		"transition_style": "hardcut",
+		"pacing_preset": "fast",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 1.08,
+		"tts_tone_keywords": [
+			"압축",
+			"강한 훅",
+			"명확한",
+			"긴박한",
+			"근거 중심"
+		],
+		"bgm_mood": "urgent editorial",
+		"bgm_keywords": [
+			"ticker",
+			"percussion",
+			"fast cuts"
+		],
+		"bgm_tempo": "fast",
+		"bgm_reference_url": "",
+		"hook_pattern": "story",
+		"script_structure": [
+			{
+				"role": "hook",
+				"duration": 3,
+				"note": "story 훅으로 제목 약속 즉시 제시"
+			},
+			{
+				"role": "proof",
+				"duration": 51,
+				"note": "근거/장면을 빠르게 2-3개 제시"
+			},
+			{
+				"role": "turn",
+				"duration": 38,
+				"note": "반전 또는 핵심 정보 회수"
+			},
+			{
+				"role": "payoff",
+				"duration": 27,
+				"note": "결론과 다음 궁금증 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_shorts",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "news_issue",
+			"reference_category_label": "뉴스/이슈 해설",
+			"reference_format": "shorts",
+			"source_metrics": {
+				"videoId": "GGFzjSWXLJQ",
+				"viewCount": 91213,
+				"likeCount": 0,
+				"commentCount": 0
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-news_issue-shorts",
+				"label": "뉴스/이슈 해설 쇼츠 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"shorts"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=GGFzjSWXLJQ",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"shorts": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "news",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#101820",
+						"#e93f33",
+						"#f6f2e8"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "cut_driven",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 25.07,
+					"avgCutIntervalSeconds": 2.4,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "hardcut",
+					"density": "dense",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "bottom",
+					"sizePreset": "lg",
+					"backgroundStyle": "stroke",
+					"accentColor": "#e93f33",
+					"safeZone": "bottom_safe_area",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"압축",
+						"강한 훅",
+						"명확한",
+						"긴박한",
+						"근거 중심"
+					],
+					"ttsSpeed": 1.08,
+					"bgmMood": "urgent editorial",
+					"bgmKeywords": [
+						"ticker",
+						"percussion",
+						"fast cuts"
+					],
+					"bgmTempo": "fast",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777759883547-vvtu8w"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:11:23.547Z",
+		"updated_at": "2026-05-02T22:11:23.547Z"
+	},
+	{
+		"id": "builtin-auto-news-issue-mzfe4dfrd5g",
+		"channel_id": "__builtin_reference__",
+		"name": "뉴스/이슈 해설 · JTBC News · [이슈체크] 해명할수록 논란 커졌다…민주 \"외교라인 경질을\" / JT",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=MZFE4DFRD5g",
+		"source_title": "[이슈체크] 해명할수록 논란 커졌다…민주 \"외교라인 경질을\" / JTBC 뉴스룸",
+		"source_creator": "JTBC News",
+		"thumbnail_url": "https://i.ytimg.com/vi/MZFE4DFRD5g/hq720.jpg?sqp=-oaymwEcCNAFEJQDSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLCChiZT79x00ERq5ucwMot13Eb1gQ",
+		"duration_seconds": 176,
+		"dominant_colors": [
+			"#101820",
+			"#e93f33",
+			"#f6f2e8"
+		],
+		"visual_mood": "news",
+		"visual_prompt_template": "뉴스/이슈 해설 쇼츠 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "bottom",
+		"subtitle_size_preset": "lg",
+		"subtitle_bg_style": "stroke",
+		"subtitle_accent_color": "#e93f33",
+		"scene_count": 73,
+		"avg_scene_duration": 2.4,
+		"hook_duration": 2.5,
+		"transition_style": "hardcut",
+		"pacing_preset": "fast",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 1.08,
+		"tts_tone_keywords": [
+			"압축",
+			"강한 훅",
+			"명확한",
+			"긴박한",
+			"근거 중심"
+		],
+		"bgm_mood": "urgent editorial",
+		"bgm_keywords": [
+			"ticker",
+			"percussion",
+			"fast cuts"
+		],
+		"bgm_tempo": "fast",
+		"bgm_reference_url": "",
+		"hook_pattern": "shock",
+		"script_structure": [
+			{
+				"role": "hook",
+				"duration": 3,
+				"note": "shock 훅으로 제목 약속 즉시 제시"
+			},
+			{
+				"role": "proof",
+				"duration": 67,
+				"note": "근거/장면을 빠르게 2-3개 제시"
+			},
+			{
+				"role": "turn",
+				"duration": 49,
+				"note": "반전 또는 핵심 정보 회수"
+			},
+			{
+				"role": "payoff",
+				"duration": 35,
+				"note": "결론과 다음 궁금증 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_shorts",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "news_issue",
+			"reference_category_label": "뉴스/이슈 해설",
+			"reference_format": "shorts",
+			"source_metrics": {
+				"videoId": "MZFE4DFRD5g",
+				"viewCount": 53715,
+				"likeCount": 0,
+				"commentCount": 0
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-news_issue-shorts",
+				"label": "뉴스/이슈 해설 쇼츠 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"shorts"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=MZFE4DFRD5g",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"shorts": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "news",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#101820",
+						"#e93f33",
+						"#f6f2e8"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "cut_driven",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 24.89,
+					"avgCutIntervalSeconds": 2.4,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "hardcut",
+					"density": "dense",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "bottom",
+					"sizePreset": "lg",
+					"backgroundStyle": "stroke",
+					"accentColor": "#e93f33",
+					"safeZone": "bottom_safe_area",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"압축",
+						"강한 훅",
+						"명확한",
+						"긴박한",
+						"근거 중심"
+					],
+					"ttsSpeed": 1.08,
+					"bgmMood": "urgent editorial",
+					"bgmKeywords": [
+						"ticker",
+						"percussion",
+						"fast cuts"
+					],
+					"bgmTempo": "fast",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777759883571-fw3ecg"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:11:23.571Z",
+		"updated_at": "2026-05-02T22:11:23.571Z"
+	},
+	{
+		"id": "builtin-auto-news-issue-rdi9zyg39ns",
+		"channel_id": "__builtin_reference__",
+		"name": "뉴스/이슈 해설 · JTBC News · 뇌사 중학생 부모 찾아간 체육회 \"한밑천 잡으려고\" 막말 파문｜지금 ",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=rDi9zyG39Ns",
+		"source_title": "뇌사 중학생 부모 찾아간 체육회 \"한밑천 잡으려고\" 막말 파문｜지금 이 쇼츠",
+		"source_creator": "JTBC News",
+		"thumbnail_url": "https://i.ytimg.com/vi/rDi9zyG39Ns/hq720.jpg?sqp=-oaymwEcCNAFEJQDSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLBU-Cszo5Ct0q9T-Gt2iYCQziVLAg",
+		"duration_seconds": 61,
+		"dominant_colors": [
+			"#101820",
+			"#e93f33",
+			"#f6f2e8"
+		],
+		"visual_mood": "news",
+		"visual_prompt_template": "뉴스/이슈 해설 쇼츠 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "bottom",
+		"subtitle_size_preset": "lg",
+		"subtitle_bg_style": "stroke",
+		"subtitle_accent_color": "#e93f33",
+		"scene_count": 25,
+		"avg_scene_duration": 2.4,
+		"hook_duration": 2.5,
+		"transition_style": "hardcut",
+		"pacing_preset": "fast",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 1.08,
+		"tts_tone_keywords": [
+			"압축",
+			"강한 훅",
+			"명확한",
+			"긴박한",
+			"근거 중심"
+		],
+		"bgm_mood": "urgent editorial",
+		"bgm_keywords": [
+			"ticker",
+			"percussion",
+			"fast cuts"
+		],
+		"bgm_tempo": "fast",
+		"bgm_reference_url": "",
+		"hook_pattern": "story",
+		"script_structure": [
+			{
+				"role": "hook",
+				"duration": 3,
+				"note": "story 훅으로 제목 약속 즉시 제시"
+			},
+			{
+				"role": "proof",
+				"duration": 23,
+				"note": "근거/장면을 빠르게 2-3개 제시"
+			},
+			{
+				"role": "turn",
+				"duration": 17,
+				"note": "반전 또는 핵심 정보 회수"
+			},
+			{
+				"role": "payoff",
+				"duration": 12,
+				"note": "결론과 다음 궁금증 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_shorts",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "news_issue",
+			"reference_category_label": "뉴스/이슈 해설",
+			"reference_format": "shorts",
+			"source_metrics": {
+				"videoId": "rDi9zyG39Ns",
+				"viewCount": 7696,
+				"likeCount": 0,
+				"commentCount": 0
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-news_issue-shorts",
+				"label": "뉴스/이슈 해설 쇼츠 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"shorts"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=rDi9zyG39Ns",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"shorts": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "news",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#101820",
+						"#e93f33",
+						"#f6f2e8"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "cut_driven",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 24.59,
+					"avgCutIntervalSeconds": 2.4,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "hardcut",
+					"density": "dense",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "bottom",
+					"sizePreset": "lg",
+					"backgroundStyle": "stroke",
+					"accentColor": "#e93f33",
+					"safeZone": "bottom_safe_area",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"압축",
+						"강한 훅",
+						"명확한",
+						"긴박한",
+						"근거 중심"
+					],
+					"ttsSpeed": 1.08,
+					"bgmMood": "urgent editorial",
+					"bgmKeywords": [
+						"ticker",
+						"percussion",
+						"fast cuts"
+					],
+					"bgmTempo": "fast",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777760025148-nuko5q"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:13:45.148Z",
+		"updated_at": "2026-05-02T22:13:45.148Z"
+	},
+	{
+		"id": "builtin-auto-news-issue-lnlqqrqdlby",
+		"channel_id": "__builtin_reference__",
+		"name": "뉴스/이슈 해설 · KBS News · [뉴스해설] 세계적 ‘코로나 인플레’ 가시화? 유비무환 / KBS 2",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=lnLqqrQDLbY",
+		"source_title": "[뉴스해설] 세계적 ‘코로나 인플레’ 가시화? 유비무환 / KBS 2021.03.08.",
+		"source_creator": "KBS News",
+		"thumbnail_url": "https://i.ytimg.com/vi/lnLqqrQDLbY/hq720.jpg?sqp=-oaymwEcCNAFEJQDSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLBuwm2uiUw4maW57Rc7vzaslDMe1Q",
+		"duration_seconds": 131,
+		"dominant_colors": [
+			"#101820",
+			"#e93f33",
+			"#f6f2e8"
+		],
+		"visual_mood": "news",
+		"visual_prompt_template": "뉴스/이슈 해설 쇼츠 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "bottom",
+		"subtitle_size_preset": "lg",
+		"subtitle_bg_style": "stroke",
+		"subtitle_accent_color": "#e93f33",
+		"scene_count": 55,
+		"avg_scene_duration": 2.4,
+		"hook_duration": 2.5,
+		"transition_style": "hardcut",
+		"pacing_preset": "fast",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 1.08,
+		"tts_tone_keywords": [
+			"압축",
+			"강한 훅",
+			"명확한",
+			"긴박한",
+			"근거 중심"
+		],
+		"bgm_mood": "urgent editorial",
+		"bgm_keywords": [
+			"ticker",
+			"percussion",
+			"fast cuts"
+		],
+		"bgm_tempo": "fast",
+		"bgm_reference_url": "",
+		"hook_pattern": "question",
+		"script_structure": [
+			{
+				"role": "hook",
+				"duration": 3,
+				"note": "question 훅으로 제목 약속 즉시 제시"
+			},
+			{
+				"role": "proof",
+				"duration": 50,
+				"note": "근거/장면을 빠르게 2-3개 제시"
+			},
+			{
+				"role": "turn",
+				"duration": 37,
+				"note": "반전 또는 핵심 정보 회수"
+			},
+			{
+				"role": "payoff",
+				"duration": 26,
+				"note": "결론과 다음 궁금증 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_shorts",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "news_issue",
+			"reference_category_label": "뉴스/이슈 해설",
+			"reference_format": "shorts",
+			"source_metrics": {
+				"videoId": "lnLqqrQDLbY",
+				"viewCount": 10027,
+				"likeCount": 0,
+				"commentCount": 0
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-news_issue-shorts",
+				"label": "뉴스/이슈 해설 쇼츠 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"shorts"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=lnLqqrQDLbY",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"shorts": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "news",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#101820",
+						"#e93f33",
+						"#f6f2e8"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "cut_driven",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 25.19,
+					"avgCutIntervalSeconds": 2.4,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "hardcut",
+					"density": "dense",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "bottom",
+					"sizePreset": "lg",
+					"backgroundStyle": "stroke",
+					"accentColor": "#e93f33",
+					"safeZone": "bottom_safe_area",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"압축",
+						"강한 훅",
+						"명확한",
+						"긴박한",
+						"근거 중심"
+					],
+					"ttsSpeed": 1.08,
+					"bgmMood": "urgent editorial",
+					"bgmKeywords": [
+						"ticker",
+						"percussion",
+						"fast cuts"
+					],
+					"bgmTempo": "fast",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777759883620-p1s0dx"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:11:23.620Z",
+		"updated_at": "2026-05-02T22:11:23.620Z"
 	},
 	{
 		"id": "builtin-auto-news-issue-aiip-rgalgq",
@@ -60706,8 +67839,1738 @@ export const GENERATED_REFERENCE_TEMPLATES: BuiltInReferenceTemplateInput[] = [
 		},
 		"analysis_status": "complete",
 		"analysis_error": "",
-		"created_at": "2026-05-02T16:45:31.951Z",
-		"updated_at": "2026-05-02T21:10:14.466Z"
+		"created_at": "2026-05-02T21:10:11.711Z",
+		"updated_at": "2026-05-02T21:10:11.711Z"
+	},
+	{
+		"id": "builtin-auto-news-issue-hpmcodni71e",
+		"channel_id": "__builtin_reference__",
+		"name": "뉴스/이슈 해설 · MBCNEWS · 쇼츠와 릴스의 시대, 청년들의 독서열풍 '텍스트 힙'이 뭐길래? (2",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=hpMcodni71E",
+		"source_title": "쇼츠와 릴스의 시대, 청년들의 독서열풍 '텍스트 힙'이 뭐길래? (2024.08.09/뉴스데스크/MBC)",
+		"source_creator": "MBCNEWS",
+		"thumbnail_url": "https://i.ytimg.com/vi/hpMcodni71E/hq720.jpg?sqp=-oaymwEcCNAFEJQDSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLCdepGYCFBqCrpvJn0au6C1QZcP-g",
+		"duration_seconds": 163,
+		"dominant_colors": [
+			"#101820",
+			"#e93f33",
+			"#f6f2e8"
+		],
+		"visual_mood": "news",
+		"visual_prompt_template": "뉴스/이슈 해설 쇼츠 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "bottom",
+		"subtitle_size_preset": "lg",
+		"subtitle_bg_style": "stroke",
+		"subtitle_accent_color": "#e93f33",
+		"scene_count": 68,
+		"avg_scene_duration": 2.4,
+		"hook_duration": 2.5,
+		"transition_style": "hardcut",
+		"pacing_preset": "fast",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 1.08,
+		"tts_tone_keywords": [
+			"압축",
+			"강한 훅",
+			"명확한",
+			"긴박한",
+			"근거 중심"
+		],
+		"bgm_mood": "urgent editorial",
+		"bgm_keywords": [
+			"ticker",
+			"percussion",
+			"fast cuts"
+		],
+		"bgm_tempo": "fast",
+		"bgm_reference_url": "",
+		"hook_pattern": "question",
+		"script_structure": [
+			{
+				"role": "hook",
+				"duration": 3,
+				"note": "question 훅으로 제목 약속 즉시 제시"
+			},
+			{
+				"role": "proof",
+				"duration": 62,
+				"note": "근거/장면을 빠르게 2-3개 제시"
+			},
+			{
+				"role": "turn",
+				"duration": 46,
+				"note": "반전 또는 핵심 정보 회수"
+			},
+			{
+				"role": "payoff",
+				"duration": 33,
+				"note": "결론과 다음 궁금증 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_shorts",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "news_issue",
+			"reference_category_label": "뉴스/이슈 해설",
+			"reference_format": "shorts",
+			"source_metrics": {
+				"videoId": "hpMcodni71E",
+				"viewCount": 294654,
+				"likeCount": 0,
+				"commentCount": 0
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-news_issue-shorts",
+				"label": "뉴스/이슈 해설 쇼츠 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"shorts"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=hpMcodni71E",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"shorts": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "news",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#101820",
+						"#e93f33",
+						"#f6f2e8"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "cut_driven",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 25.03,
+					"avgCutIntervalSeconds": 2.4,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "hardcut",
+					"density": "dense",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "bottom",
+					"sizePreset": "lg",
+					"backgroundStyle": "stroke",
+					"accentColor": "#e93f33",
+					"safeZone": "bottom_safe_area",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"압축",
+						"강한 훅",
+						"명확한",
+						"긴박한",
+						"근거 중심"
+					],
+					"ttsSpeed": 1.08,
+					"bgmMood": "urgent editorial",
+					"bgmKeywords": [
+						"ticker",
+						"percussion",
+						"fast cuts"
+					],
+					"bgmTempo": "fast",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777759883423-ppf29c"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:11:23.423Z",
+		"updated_at": "2026-05-02T22:11:23.423Z"
+	},
+	{
+		"id": "builtin-auto-news-issue-tyutmw7xqps",
+		"channel_id": "__builtin_reference__",
+		"name": "뉴스/이슈 해설 · MBCNEWS · Literacy Lost to 'Shorts' and 'Reels'.",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=TYUtMw7XqPs",
+		"source_title": "Literacy Lost to 'Shorts' and 'Reels'... \"Can't Understand Even Textbooks\" (March 18, 2026 / News...",
+		"source_creator": "MBCNEWS",
+		"thumbnail_url": "https://i.ytimg.com/vi/TYUtMw7XqPs/hq720.jpg?sqp=-oaymwEcCNAFEJQDSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLChZoKjF5K7IeA2nfMdQPpupv0dkg",
+		"duration_seconds": 164,
+		"dominant_colors": [
+			"#101820",
+			"#e93f33",
+			"#f6f2e8"
+		],
+		"visual_mood": "news",
+		"visual_prompt_template": "뉴스/이슈 해설 쇼츠 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "bottom",
+		"subtitle_size_preset": "lg",
+		"subtitle_bg_style": "stroke",
+		"subtitle_accent_color": "#e93f33",
+		"scene_count": 68,
+		"avg_scene_duration": 2.4,
+		"hook_duration": 2.5,
+		"transition_style": "hardcut",
+		"pacing_preset": "fast",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 1.08,
+		"tts_tone_keywords": [
+			"압축",
+			"강한 훅",
+			"명확한",
+			"긴박한",
+			"근거 중심"
+		],
+		"bgm_mood": "urgent editorial",
+		"bgm_keywords": [
+			"ticker",
+			"percussion",
+			"fast cuts"
+		],
+		"bgm_tempo": "fast",
+		"bgm_reference_url": "",
+		"hook_pattern": "story",
+		"script_structure": [
+			{
+				"role": "hook",
+				"duration": 3,
+				"note": "story 훅으로 제목 약속 즉시 제시"
+			},
+			{
+				"role": "proof",
+				"duration": 62,
+				"note": "근거/장면을 빠르게 2-3개 제시"
+			},
+			{
+				"role": "turn",
+				"duration": 46,
+				"note": "반전 또는 핵심 정보 회수"
+			},
+			{
+				"role": "payoff",
+				"duration": 33,
+				"note": "결론과 다음 궁금증 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_shorts",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "news_issue",
+			"reference_category_label": "뉴스/이슈 해설",
+			"reference_format": "shorts",
+			"source_metrics": {
+				"videoId": "TYUtMw7XqPs",
+				"viewCount": 128232,
+				"likeCount": 0,
+				"commentCount": 0
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-news_issue-shorts",
+				"label": "뉴스/이슈 해설 쇼츠 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"shorts"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=TYUtMw7XqPs",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"shorts": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "news",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#101820",
+						"#e93f33",
+						"#f6f2e8"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "cut_driven",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 24.88,
+					"avgCutIntervalSeconds": 2.4,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "hardcut",
+					"density": "dense",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "bottom",
+					"sizePreset": "lg",
+					"backgroundStyle": "stroke",
+					"accentColor": "#e93f33",
+					"safeZone": "bottom_safe_area",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"압축",
+						"강한 훅",
+						"명확한",
+						"긴박한",
+						"근거 중심"
+					],
+					"ttsSpeed": 1.08,
+					"bgmMood": "urgent editorial",
+					"bgmKeywords": [
+						"ticker",
+						"percussion",
+						"fast cuts"
+					],
+					"bgmTempo": "fast",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777759883522-xb5clk"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:11:23.522Z",
+		"updated_at": "2026-05-02T22:11:23.522Z"
+	},
+	{
+		"id": "builtin-auto-news-issue-nw8fmda39dy",
+		"channel_id": "__builtin_reference__",
+		"name": "뉴스/이슈 해설 · MBCNEWS · 35살에 치른 '황제 대관식' 메시 '라스트 댄스' 몰아보기 [뉴스.",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=nw8fmda39dY",
+		"source_title": "35살에 치른 '황제 대관식' 메시 '라스트 댄스' 몰아보기 [뉴스.zip/MBC뉴스]",
+		"source_creator": "MBCNEWS",
+		"thumbnail_url": "https://i.ytimg.com/vi/nw8fmda39dY/hq720.jpg?sqp=-oaymwEcCNAFEJQDSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLA6yoApqJkXHd2rpqQ1zqcXGc-ZRg",
+		"duration_seconds": 586,
+		"dominant_colors": [
+			"#101820",
+			"#e93f33",
+			"#f6f2e8"
+		],
+		"visual_mood": "news",
+		"visual_prompt_template": "뉴스/이슈 해설 롱폼 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "dynamic",
+		"subtitle_size_preset": "md",
+		"subtitle_bg_style": "glow",
+		"subtitle_accent_color": "#e93f33",
+		"scene_count": 69,
+		"avg_scene_duration": 8.5,
+		"hook_duration": 8,
+		"transition_style": "mixed",
+		"pacing_preset": "medium",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 0.98,
+		"tts_tone_keywords": [
+			"명확한",
+			"긴박한",
+			"근거 중심"
+		],
+		"bgm_mood": "urgent editorial",
+		"bgm_keywords": [
+			"ticker",
+			"percussion",
+			"chaptered pacing"
+		],
+		"bgm_tempo": "mid",
+		"bgm_reference_url": "",
+		"hook_pattern": "story",
+		"script_structure": [
+			{
+				"role": "cold_open",
+				"duration": 12,
+				"note": "story 훅으로 핵심 갈등 선공개"
+			},
+			{
+				"role": "setup",
+				"duration": 94,
+				"note": "인물/사건/자료 배경 정리"
+			},
+			{
+				"role": "development",
+				"duration": 264,
+				"note": "챕터 단위 근거와 장면 전개"
+			},
+			{
+				"role": "turning_point",
+				"duration": 129,
+				"note": "반전, 쟁점, 해석 전환"
+			},
+			{
+				"role": "resolution",
+				"duration": 59,
+				"note": "결론, 시청자 질문 회수, 다음 편 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_longform",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "news_issue",
+			"reference_category_label": "뉴스/이슈 해설",
+			"reference_format": "longform",
+			"source_metrics": {
+				"videoId": "nw8fmda39dY",
+				"viewCount": 1550460,
+				"likeCount": 0,
+				"commentCount": 0
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-news_issue-longform",
+				"label": "뉴스/이슈 해설 롱폼 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"longform"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=nw8fmda39dY",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"longform": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "news",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#101820",
+						"#e93f33",
+						"#f6f2e8"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "slow_push",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 7.06,
+					"avgCutIntervalSeconds": 8.5,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "mixed",
+					"density": "medium",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "dynamic",
+					"sizePreset": "md",
+					"backgroundStyle": "glow",
+					"accentColor": "#e93f33",
+					"safeZone": "avoid_subject_zone_per_scene",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"명확한",
+						"긴박한",
+						"근거 중심"
+					],
+					"ttsSpeed": 0.98,
+					"bgmMood": "urgent editorial",
+					"bgmKeywords": [
+						"ticker",
+						"percussion",
+						"chaptered pacing"
+					],
+					"bgmTempo": "mid",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777759894900-fkgl30"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:11:34.900Z",
+		"updated_at": "2026-05-02T22:11:34.900Z"
+	},
+	{
+		"id": "builtin-auto-news-issue-xgj9rteoaju",
+		"channel_id": "__builtin_reference__",
+		"name": "뉴스/이슈 해설 · SBS 뉴스 · \"'Big Short' Protagonist Curses KOSPI.",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=xGJ9RTEoaJU",
+		"source_title": "\"'Big Short' Protagonist Curses KOSPI...\"Recent Sharp Fluctuations? Signs of the Apocalypse\" (Sub...",
+		"source_creator": "SBS 뉴스",
+		"thumbnail_url": "https://i.ytimg.com/vi/xGJ9RTEoaJU/hq720.jpg?sqp=-oaymwEcCNAFEJQDSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLCkd6iCg1NZMQshfDbpL8qLMxguWg",
+		"duration_seconds": 111,
+		"dominant_colors": [
+			"#101820",
+			"#e93f33",
+			"#f6f2e8"
+		],
+		"visual_mood": "news",
+		"visual_prompt_template": "뉴스/이슈 해설 쇼츠 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "bottom",
+		"subtitle_size_preset": "lg",
+		"subtitle_bg_style": "stroke",
+		"subtitle_accent_color": "#e93f33",
+		"scene_count": 46,
+		"avg_scene_duration": 2.4,
+		"hook_duration": 2.5,
+		"transition_style": "hardcut",
+		"pacing_preset": "fast",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 1.08,
+		"tts_tone_keywords": [
+			"압축",
+			"강한 훅",
+			"명확한",
+			"긴박한",
+			"근거 중심"
+		],
+		"bgm_mood": "urgent editorial",
+		"bgm_keywords": [
+			"ticker",
+			"percussion",
+			"fast cuts"
+		],
+		"bgm_tempo": "fast",
+		"bgm_reference_url": "",
+		"hook_pattern": "question",
+		"script_structure": [
+			{
+				"role": "hook",
+				"duration": 3,
+				"note": "question 훅으로 제목 약속 즉시 제시"
+			},
+			{
+				"role": "proof",
+				"duration": 42,
+				"note": "근거/장면을 빠르게 2-3개 제시"
+			},
+			{
+				"role": "turn",
+				"duration": 31,
+				"note": "반전 또는 핵심 정보 회수"
+			},
+			{
+				"role": "payoff",
+				"duration": 22,
+				"note": "결론과 다음 궁금증 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_shorts",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "news_issue",
+			"reference_category_label": "뉴스/이슈 해설",
+			"reference_format": "shorts",
+			"source_metrics": {
+				"videoId": "xGJ9RTEoaJU",
+				"viewCount": 52388,
+				"likeCount": 0,
+				"commentCount": 0
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-news_issue-shorts",
+				"label": "뉴스/이슈 해설 쇼츠 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"shorts"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=xGJ9RTEoaJU",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"shorts": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "news",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#101820",
+						"#e93f33",
+						"#f6f2e8"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "cut_driven",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 24.86,
+					"avgCutIntervalSeconds": 2.4,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "hardcut",
+					"density": "dense",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "bottom",
+					"sizePreset": "lg",
+					"backgroundStyle": "stroke",
+					"accentColor": "#e93f33",
+					"safeZone": "bottom_safe_area",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"압축",
+						"강한 훅",
+						"명확한",
+						"긴박한",
+						"근거 중심"
+					],
+					"ttsSpeed": 1.08,
+					"bgmMood": "urgent editorial",
+					"bgmKeywords": [
+						"ticker",
+						"percussion",
+						"fast cuts"
+					],
+					"bgmTempo": "fast",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777759883595-wzydrf"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:11:23.595Z",
+		"updated_at": "2026-05-02T22:11:23.595Z"
+	},
+	{
+		"id": "builtin-auto-news-issue-il20mglyngy",
+		"channel_id": "__builtin_reference__",
+		"name": "뉴스/이슈 해설 · SBS 뉴스 · Man collapses at restaurant; citizens ",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=Il20MgLYngY",
+		"source_title": "Man collapses at restaurant; citizens say \"I'll do it now\" and perform CPR in relay #shorts",
+		"source_creator": "SBS 뉴스",
+		"thumbnail_url": "https://i.ytimg.com/vi/Il20MgLYngY/hq720.jpg?sqp=-oaymwEcCNAFEJQDSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLBBXI5uJemRyuUA_A1yEn6KCoasWQ",
+		"duration_seconds": 90,
+		"dominant_colors": [
+			"#101820",
+			"#e93f33",
+			"#f6f2e8"
+		],
+		"visual_mood": "news",
+		"visual_prompt_template": "뉴스/이슈 해설 쇼츠 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "bottom",
+		"subtitle_size_preset": "lg",
+		"subtitle_bg_style": "stroke",
+		"subtitle_accent_color": "#e93f33",
+		"scene_count": 38,
+		"avg_scene_duration": 2.4,
+		"hook_duration": 2.5,
+		"transition_style": "hardcut",
+		"pacing_preset": "fast",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 1.08,
+		"tts_tone_keywords": [
+			"압축",
+			"강한 훅",
+			"명확한",
+			"긴박한",
+			"근거 중심"
+		],
+		"bgm_mood": "urgent editorial",
+		"bgm_keywords": [
+			"ticker",
+			"percussion",
+			"fast cuts"
+		],
+		"bgm_tempo": "fast",
+		"bgm_reference_url": "",
+		"hook_pattern": "story",
+		"script_structure": [
+			{
+				"role": "hook",
+				"duration": 3,
+				"note": "story 훅으로 제목 약속 즉시 제시"
+			},
+			{
+				"role": "proof",
+				"duration": 34,
+				"note": "근거/장면을 빠르게 2-3개 제시"
+			},
+			{
+				"role": "turn",
+				"duration": 25,
+				"note": "반전 또는 핵심 정보 회수"
+			},
+			{
+				"role": "payoff",
+				"duration": 18,
+				"note": "결론과 다음 궁금증 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_shorts",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "news_issue",
+			"reference_category_label": "뉴스/이슈 해설",
+			"reference_format": "shorts",
+			"source_metrics": {
+				"videoId": "Il20MgLYngY",
+				"viewCount": 7451,
+				"likeCount": 0,
+				"commentCount": 0
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-news_issue-shorts",
+				"label": "뉴스/이슈 해설 쇼츠 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"shorts"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=Il20MgLYngY",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"shorts": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "news",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#101820",
+						"#e93f33",
+						"#f6f2e8"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "cut_driven",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 25.33,
+					"avgCutIntervalSeconds": 2.4,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "hardcut",
+					"density": "dense",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "bottom",
+					"sizePreset": "lg",
+					"backgroundStyle": "stroke",
+					"accentColor": "#e93f33",
+					"safeZone": "bottom_safe_area",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"압축",
+						"강한 훅",
+						"명확한",
+						"긴박한",
+						"근거 중심"
+					],
+					"ttsSpeed": 1.08,
+					"bgmMood": "urgent editorial",
+					"bgmKeywords": [
+						"ticker",
+						"percussion",
+						"fast cuts"
+					],
+					"bgmTempo": "fast",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777760025177-qicoku"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:13:45.177Z",
+		"updated_at": "2026-05-02T22:13:45.177Z"
+	},
+	{
+		"id": "builtin-auto-news-issue-6oyrxfyq93m",
+		"channel_id": "__builtin_reference__",
+		"name": "뉴스/이슈 해설 · YTN · 올림픽서도 '페널티 실격'...쇼트트랙 황대헌, 1000m 준결승 좌",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=6OYRXfyQ93M",
+		"source_title": "올림픽서도 '페널티 실격'...쇼트트랙 황대헌, 1000m 준결승 좌절 [지금이뉴스] / YTN",
+		"source_creator": "YTN",
+		"thumbnail_url": "https://i.ytimg.com/vi/6OYRXfyQ93M/hq720.jpg?sqp=-oaymwEcCNAFEJQDSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLAWH43hrErgogdmW2so3f5LOJQcLg",
+		"duration_seconds": 102,
+		"dominant_colors": [
+			"#101820",
+			"#e93f33",
+			"#f6f2e8"
+		],
+		"visual_mood": "news",
+		"visual_prompt_template": "뉴스/이슈 해설 쇼츠 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "bottom",
+		"subtitle_size_preset": "lg",
+		"subtitle_bg_style": "stroke",
+		"subtitle_accent_color": "#e93f33",
+		"scene_count": 43,
+		"avg_scene_duration": 2.4,
+		"hook_duration": 2.5,
+		"transition_style": "hardcut",
+		"pacing_preset": "fast",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 1.08,
+		"tts_tone_keywords": [
+			"압축",
+			"강한 훅",
+			"명확한",
+			"긴박한",
+			"근거 중심"
+		],
+		"bgm_mood": "urgent editorial",
+		"bgm_keywords": [
+			"ticker",
+			"percussion",
+			"fast cuts"
+		],
+		"bgm_tempo": "fast",
+		"bgm_reference_url": "",
+		"hook_pattern": "story",
+		"script_structure": [
+			{
+				"role": "hook",
+				"duration": 3,
+				"note": "story 훅으로 제목 약속 즉시 제시"
+			},
+			{
+				"role": "proof",
+				"duration": 39,
+				"note": "근거/장면을 빠르게 2-3개 제시"
+			},
+			{
+				"role": "turn",
+				"duration": 29,
+				"note": "반전 또는 핵심 정보 회수"
+			},
+			{
+				"role": "payoff",
+				"duration": 20,
+				"note": "결론과 다음 궁금증 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_shorts",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "news_issue",
+			"reference_category_label": "뉴스/이슈 해설",
+			"reference_format": "shorts",
+			"source_metrics": {
+				"videoId": "6OYRXfyQ93M",
+				"viewCount": 254424,
+				"likeCount": 0,
+				"commentCount": 0
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-news_issue-shorts",
+				"label": "뉴스/이슈 해설 쇼츠 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"shorts"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=6OYRXfyQ93M",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"shorts": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "news",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#101820",
+						"#e93f33",
+						"#f6f2e8"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "cut_driven",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 25.29,
+					"avgCutIntervalSeconds": 2.4,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "hardcut",
+					"density": "dense",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "bottom",
+					"sizePreset": "lg",
+					"backgroundStyle": "stroke",
+					"accentColor": "#e93f33",
+					"safeZone": "bottom_safe_area",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"압축",
+						"강한 훅",
+						"명확한",
+						"긴박한",
+						"근거 중심"
+					],
+					"ttsSpeed": 1.08,
+					"bgmMood": "urgent editorial",
+					"bgmKeywords": [
+						"ticker",
+						"percussion",
+						"fast cuts"
+					],
+					"bgmTempo": "fast",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777759883449-iwfhbq"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:11:23.449Z",
+		"updated_at": "2026-05-02T22:11:23.449Z"
+	},
+	{
+		"id": "builtin-auto-automation-business-xknz7knjlhk",
+		"channel_id": "__builtin_reference__",
+		"name": "AI/비즈니스 자동화 · 공무원코딩 · 업무자동화 개발일지 1화",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=XKnZ7knjLhk",
+		"source_title": "업무자동화 개발일지 1화",
+		"source_creator": "공무원코딩",
+		"thumbnail_url": "https://i.ytimg.com/vi/XKnZ7knjLhk/hq720.jpg?sqp=-oaymwEcCNAFEJQDSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLD9TgZZBOm-ZtFvno03FHzzhuHZtw",
+		"duration_seconds": 61,
+		"dominant_colors": [
+			"#0c1b2a",
+			"#29d3a7",
+			"#edf7f3"
+		],
+		"visual_mood": "neutral",
+		"visual_prompt_template": "AI/비즈니스 자동화 쇼츠 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "bottom",
+		"subtitle_size_preset": "lg",
+		"subtitle_bg_style": "stroke",
+		"subtitle_accent_color": "#29d3a7",
+		"scene_count": 25,
+		"avg_scene_duration": 2.4,
+		"hook_duration": 2.5,
+		"transition_style": "hardcut",
+		"pacing_preset": "fast",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 1.08,
+		"tts_tone_keywords": [
+			"압축",
+			"강한 훅",
+			"실험적",
+			"실용적",
+			"빠른 결론"
+		],
+		"bgm_mood": "clean tech momentum",
+		"bgm_keywords": [
+			"synth",
+			"minimal beat",
+			"fast cuts"
+		],
+		"bgm_tempo": "fast",
+		"bgm_reference_url": "",
+		"hook_pattern": "story",
+		"script_structure": [
+			{
+				"role": "hook",
+				"duration": 3,
+				"note": "story 훅으로 제목 약속 즉시 제시"
+			},
+			{
+				"role": "proof",
+				"duration": 23,
+				"note": "근거/장면을 빠르게 2-3개 제시"
+			},
+			{
+				"role": "turn",
+				"duration": 17,
+				"note": "반전 또는 핵심 정보 회수"
+			},
+			{
+				"role": "payoff",
+				"duration": 12,
+				"note": "결론과 다음 궁금증 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_shorts",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "automation_business",
+			"reference_category_label": "AI/비즈니스 자동화",
+			"reference_format": "shorts",
+			"source_metrics": {
+				"videoId": "XKnZ7knjLhk",
+				"viewCount": 4127,
+				"likeCount": 0,
+				"commentCount": 0
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-automation_business-shorts",
+				"label": "AI/비즈니스 자동화 쇼츠 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"shorts"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=XKnZ7knjLhk",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"shorts": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "neutral",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#0c1b2a",
+						"#29d3a7",
+						"#edf7f3"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "cut_driven",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 24.59,
+					"avgCutIntervalSeconds": 2.4,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "hardcut",
+					"density": "dense",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "bottom",
+					"sizePreset": "lg",
+					"backgroundStyle": "stroke",
+					"accentColor": "#29d3a7",
+					"safeZone": "bottom_safe_area",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"압축",
+						"강한 훅",
+						"실험적",
+						"실용적",
+						"빠른 결론"
+					],
+					"ttsSpeed": 1.08,
+					"bgmMood": "clean tech momentum",
+					"bgmKeywords": [
+						"synth",
+						"minimal beat",
+						"fast cuts"
+					],
+					"bgmTempo": "fast",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777759912231-p3bl9f"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:11:52.231Z",
+		"updated_at": "2026-05-02T22:11:52.231Z"
+	},
+	{
+		"id": "builtin-auto-automation-business-q6fpjqazll8",
+		"channel_id": "__builtin_reference__",
+		"name": "AI/비즈니스 자동화 · 나도코딩 · C 언어 무료 강의 (입문부터 게임 개발까지)",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=q6fPjQAzll8",
+		"source_title": "C 언어 무료 강의 (입문부터 게임 개발까지)",
+		"source_creator": "나도코딩",
+		"thumbnail_url": "https://i.ytimg.com/vi/q6fPjQAzll8/hq720.jpg?sqp=-oaymwEcCNAFEJQDSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLA-Ks3uF_Os-SRW3nIFAJxD0qaqLA",
+		"duration_seconds": 24393,
+		"dominant_colors": [
+			"#0c1b2a",
+			"#29d3a7",
+			"#edf7f3"
+		],
+		"visual_mood": "neutral",
+		"visual_prompt_template": "AI/비즈니스 자동화 롱폼 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "dynamic",
+		"subtitle_size_preset": "md",
+		"subtitle_bg_style": "glow",
+		"subtitle_accent_color": "#29d3a7",
+		"scene_count": 2870,
+		"avg_scene_duration": 8.5,
+		"hook_duration": 8,
+		"transition_style": "mixed",
+		"pacing_preset": "medium",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 0.98,
+		"tts_tone_keywords": [
+			"실험적",
+			"실용적",
+			"빠른 결론"
+		],
+		"bgm_mood": "clean tech momentum",
+		"bgm_keywords": [
+			"synth",
+			"minimal beat",
+			"chaptered pacing"
+		],
+		"bgm_tempo": "mid",
+		"bgm_reference_url": "",
+		"hook_pattern": "story",
+		"script_structure": [
+			{
+				"role": "cold_open",
+				"duration": 12,
+				"note": "story 훅으로 핵심 갈등 선공개"
+			},
+			{
+				"role": "setup",
+				"duration": 3903,
+				"note": "인물/사건/자료 배경 정리"
+			},
+			{
+				"role": "development",
+				"duration": 10977,
+				"note": "챕터 단위 근거와 장면 전개"
+			},
+			{
+				"role": "turning_point",
+				"duration": 5366,
+				"note": "반전, 쟁점, 해석 전환"
+			},
+			{
+				"role": "resolution",
+				"duration": 2439,
+				"note": "결론, 시청자 질문 회수, 다음 편 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_longform",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "automation_business",
+			"reference_category_label": "AI/비즈니스 자동화",
+			"reference_format": "longform",
+			"source_metrics": {
+				"videoId": "q6fPjQAzll8",
+				"viewCount": 2012171,
+				"likeCount": 0,
+				"commentCount": 0
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-automation_business-longform",
+				"label": "AI/비즈니스 자동화 롱폼 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"longform"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=q6fPjQAzll8",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"longform": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "neutral",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#0c1b2a",
+						"#29d3a7",
+						"#edf7f3"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "slow_push",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 7.06,
+					"avgCutIntervalSeconds": 8.5,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "mixed",
+					"density": "medium",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "dynamic",
+					"sizePreset": "md",
+					"backgroundStyle": "glow",
+					"accentColor": "#29d3a7",
+					"safeZone": "avoid_subject_zone_per_scene",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"실험적",
+						"실용적",
+						"빠른 결론"
+					],
+					"ttsSpeed": 0.98,
+					"bgmMood": "clean tech momentum",
+					"bgmKeywords": [
+						"synth",
+						"minimal beat",
+						"chaptered pacing"
+					],
+					"bgmTempo": "mid",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777759923734-g75ci8"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:12:03.734Z",
+		"updated_at": "2026-05-02T22:12:03.734Z"
 	},
 	{
 		"id": "builtin-auto-automation-business-osvb2gdledw",
@@ -63028,8 +71891,8 @@ export const GENERATED_REFERENCE_TEMPLATES: BuiltInReferenceTemplateInput[] = [
 		},
 		"analysis_status": "complete",
 		"analysis_error": "",
-		"created_at": "2026-05-02T16:24:09.052Z",
-		"updated_at": "2026-05-02T21:11:49.536Z"
+		"created_at": "2026-05-02T21:11:48.641Z",
+		"updated_at": "2026-05-02T21:11:48.641Z"
 	},
 	{
 		"id": "builtin-auto-automation-business-xqg9jqxaqgk",
@@ -65326,8 +74189,224 @@ export const GENERATED_REFERENCE_TEMPLATES: BuiltInReferenceTemplateInput[] = [
 		},
 		"analysis_status": "complete",
 		"analysis_error": "",
-		"created_at": "2026-05-02T16:47:12.030Z",
-		"updated_at": "2026-05-02T21:26:57.972Z"
+		"created_at": "2026-05-02T21:26:54.636Z",
+		"updated_at": "2026-05-02T21:26:54.636Z"
+	},
+	{
+		"id": "builtin-auto-automation-business-v80-zu1e8hi",
+		"channel_id": "__builtin_reference__",
+		"name": "AI/비즈니스 자동화 · 삼성SDS · 단순반복 업무는 이제 그만! - AI 챗봇 기반 업무자동화 솔루션, ",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=v80_zu1E8HI",
+		"source_title": "단순반복 업무는 이제 그만!  - AI 챗봇 기반 업무자동화 솔루션, Brity RPA",
+		"source_creator": "삼성SDS",
+		"thumbnail_url": "https://i.ytimg.com/vi/v80_zu1E8HI/hqdefault.jpg?sqp=-oaymwE2COADEI4CSFXyq4qpAygIARUAAIhCGAFwAcABBvABAfgB1AaAAuADigIMCAAQARhyIFQoQDAP&rs=AOn4CLBOtT-68RVhuXe6FpyTfdVfX5o6wQ",
+		"duration_seconds": 47,
+		"dominant_colors": [
+			"#0c1b2a",
+			"#29d3a7",
+			"#edf7f3"
+		],
+		"visual_mood": "neutral",
+		"visual_prompt_template": "AI/비즈니스 자동화 쇼츠 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "bottom",
+		"subtitle_size_preset": "lg",
+		"subtitle_bg_style": "stroke",
+		"subtitle_accent_color": "#29d3a7",
+		"scene_count": 20,
+		"avg_scene_duration": 2.4,
+		"hook_duration": 2.5,
+		"transition_style": "hardcut",
+		"pacing_preset": "fast",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 1.08,
+		"tts_tone_keywords": [
+			"압축",
+			"강한 훅",
+			"실험적",
+			"실용적",
+			"빠른 결론"
+		],
+		"bgm_mood": "clean tech momentum",
+		"bgm_keywords": [
+			"synth",
+			"minimal beat",
+			"fast cuts"
+		],
+		"bgm_tempo": "fast",
+		"bgm_reference_url": "",
+		"hook_pattern": "story",
+		"script_structure": [
+			{
+				"role": "hook",
+				"duration": 3,
+				"note": "story 훅으로 제목 약속 즉시 제시"
+			},
+			{
+				"role": "proof",
+				"duration": 18,
+				"note": "근거/장면을 빠르게 2-3개 제시"
+			},
+			{
+				"role": "turn",
+				"duration": 13,
+				"note": "반전 또는 핵심 정보 회수"
+			},
+			{
+				"role": "payoff",
+				"duration": 9,
+				"note": "결론과 다음 궁금증 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_shorts",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "automation_business",
+			"reference_category_label": "AI/비즈니스 자동화",
+			"reference_format": "shorts",
+			"source_metrics": {
+				"videoId": "v80_zu1E8HI",
+				"viewCount": 1070,
+				"likeCount": 0,
+				"commentCount": 0
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-automation_business-shorts",
+				"label": "AI/비즈니스 자동화 쇼츠 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"shorts"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=v80_zu1E8HI",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"shorts": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "neutral",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#0c1b2a",
+						"#29d3a7",
+						"#edf7f3"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "cut_driven",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 25.53,
+					"avgCutIntervalSeconds": 2.4,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "hardcut",
+					"density": "dense",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "bottom",
+					"sizePreset": "lg",
+					"backgroundStyle": "stroke",
+					"accentColor": "#29d3a7",
+					"safeZone": "bottom_safe_area",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"압축",
+						"강한 훅",
+						"실험적",
+						"실용적",
+						"빠른 결론"
+					],
+					"ttsSpeed": 1.08,
+					"bgmMood": "clean tech momentum",
+					"bgmKeywords": [
+						"synth",
+						"minimal beat",
+						"fast cuts"
+					],
+					"bgmTempo": "fast",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777759912337-ikplr8"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:11:52.337Z",
+		"updated_at": "2026-05-02T22:11:52.337Z"
 	},
 	{
 		"id": "builtin-auto-automation-business-dbgfhrzi33m",
@@ -67625,8 +76704,440 @@ export const GENERATED_REFERENCE_TEMPLATES: BuiltInReferenceTemplateInput[] = [
 		},
 		"analysis_status": "complete",
 		"analysis_error": "",
-		"created_at": "2026-05-02T16:45:58.106Z",
-		"updated_at": "2026-05-02T20:28:03.036Z"
+		"created_at": "2026-05-02T20:27:59.787Z",
+		"updated_at": "2026-05-02T20:27:59.787Z"
+	},
+	{
+		"id": "builtin-auto-automation-business-zrxs26m4li4",
+		"channel_id": "__builtin_reference__",
+		"name": "AI/비즈니스 자동화 · 소상공인시장tv · [yestv뉴스] 제조 데이터 AI 문제해결 컨설팅 및 솔루션 실증사",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=ZRxs26m4Li4",
+		"source_title": "[yestv뉴스] 제조 데이터 AI 문제해결 컨설팅  및 솔루션 실증사업",
+		"source_creator": "소상공인시장tv",
+		"thumbnail_url": "https://i.ytimg.com/vi/ZRxs26m4Li4/hqdefault.jpg?sqp=-oaymwEcCOADEI4CSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLBgVBVz8oh4feuOJk3MjEtnvwZskQ",
+		"duration_seconds": 114,
+		"dominant_colors": [
+			"#0c1b2a",
+			"#29d3a7",
+			"#edf7f3"
+		],
+		"visual_mood": "neutral",
+		"visual_prompt_template": "AI/비즈니스 자동화 쇼츠 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "bottom",
+		"subtitle_size_preset": "lg",
+		"subtitle_bg_style": "stroke",
+		"subtitle_accent_color": "#29d3a7",
+		"scene_count": 48,
+		"avg_scene_duration": 2.4,
+		"hook_duration": 2.5,
+		"transition_style": "hardcut",
+		"pacing_preset": "fast",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 1.08,
+		"tts_tone_keywords": [
+			"압축",
+			"강한 훅",
+			"실험적",
+			"실용적",
+			"빠른 결론"
+		],
+		"bgm_mood": "clean tech momentum",
+		"bgm_keywords": [
+			"synth",
+			"minimal beat",
+			"fast cuts"
+		],
+		"bgm_tempo": "fast",
+		"bgm_reference_url": "",
+		"hook_pattern": "story",
+		"script_structure": [
+			{
+				"role": "hook",
+				"duration": 3,
+				"note": "story 훅으로 제목 약속 즉시 제시"
+			},
+			{
+				"role": "proof",
+				"duration": 43,
+				"note": "근거/장면을 빠르게 2-3개 제시"
+			},
+			{
+				"role": "turn",
+				"duration": 32,
+				"note": "반전 또는 핵심 정보 회수"
+			},
+			{
+				"role": "payoff",
+				"duration": 23,
+				"note": "결론과 다음 궁금증 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_shorts",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "automation_business",
+			"reference_category_label": "AI/비즈니스 자동화",
+			"reference_format": "shorts",
+			"source_metrics": {
+				"videoId": "ZRxs26m4Li4",
+				"viewCount": 483,
+				"likeCount": 0,
+				"commentCount": 0
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-automation_business-shorts",
+				"label": "AI/비즈니스 자동화 쇼츠 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"shorts"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=ZRxs26m4Li4",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"shorts": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "neutral",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#0c1b2a",
+						"#29d3a7",
+						"#edf7f3"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "cut_driven",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 25.26,
+					"avgCutIntervalSeconds": 2.4,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "hardcut",
+					"density": "dense",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "bottom",
+					"sizePreset": "lg",
+					"backgroundStyle": "stroke",
+					"accentColor": "#29d3a7",
+					"safeZone": "bottom_safe_area",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"압축",
+						"강한 훅",
+						"실험적",
+						"실용적",
+						"빠른 결론"
+					],
+					"ttsSpeed": 1.08,
+					"bgmMood": "clean tech momentum",
+					"bgmKeywords": [
+						"synth",
+						"minimal beat",
+						"fast cuts"
+					],
+					"bgmTempo": "fast",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777760052717-dxeiec"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:14:12.716Z",
+		"updated_at": "2026-05-02T22:14:12.716Z"
+	},
+	{
+		"id": "builtin-auto-automation-business-mcjy-4klre",
+		"channel_id": "__builtin_reference__",
+		"name": "AI/비즈니스 자동화 · 앱스피드-마이앱스 · [No-Code : AppSpeed-MyApps-] 행정업무 간소화,",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=-mcJy_4KLrE",
+		"source_title": "[No-Code : AppSpeed-MyApps-] 행정업무 간소화, 자동화, 정보화를 위한 노코드 개발 플랫폼",
+		"source_creator": "앱스피드-마이앱스",
+		"thumbnail_url": "https://i.ytimg.com/vi/-mcJy_4KLrE/hqdefault.jpg?sqp=-oaymwEcCOADEI4CSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLA8dmsLyN91x2GBILZ1rr9323TD0g",
+		"duration_seconds": 125,
+		"dominant_colors": [
+			"#0c1b2a",
+			"#29d3a7",
+			"#edf7f3"
+		],
+		"visual_mood": "neutral",
+		"visual_prompt_template": "AI/비즈니스 자동화 쇼츠 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "bottom",
+		"subtitle_size_preset": "lg",
+		"subtitle_bg_style": "stroke",
+		"subtitle_accent_color": "#29d3a7",
+		"scene_count": 52,
+		"avg_scene_duration": 2.4,
+		"hook_duration": 2.5,
+		"transition_style": "hardcut",
+		"pacing_preset": "fast",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 1.08,
+		"tts_tone_keywords": [
+			"압축",
+			"강한 훅",
+			"실험적",
+			"실용적",
+			"빠른 결론"
+		],
+		"bgm_mood": "clean tech momentum",
+		"bgm_keywords": [
+			"synth",
+			"minimal beat",
+			"fast cuts"
+		],
+		"bgm_tempo": "fast",
+		"bgm_reference_url": "",
+		"hook_pattern": "story",
+		"script_structure": [
+			{
+				"role": "hook",
+				"duration": 3,
+				"note": "story 훅으로 제목 약속 즉시 제시"
+			},
+			{
+				"role": "proof",
+				"duration": 48,
+				"note": "근거/장면을 빠르게 2-3개 제시"
+			},
+			{
+				"role": "turn",
+				"duration": 35,
+				"note": "반전 또는 핵심 정보 회수"
+			},
+			{
+				"role": "payoff",
+				"duration": 25,
+				"note": "결론과 다음 궁금증 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_shorts",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "automation_business",
+			"reference_category_label": "AI/비즈니스 자동화",
+			"reference_format": "shorts",
+			"source_metrics": {
+				"videoId": "-mcJy_4KLrE",
+				"viewCount": 17762,
+				"likeCount": 0,
+				"commentCount": 0
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-automation_business-shorts",
+				"label": "AI/비즈니스 자동화 쇼츠 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"shorts"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=-mcJy_4KLrE",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"shorts": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "neutral",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#0c1b2a",
+						"#29d3a7",
+						"#edf7f3"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "cut_driven",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 24.96,
+					"avgCutIntervalSeconds": 2.4,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "hardcut",
+					"density": "dense",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "bottom",
+					"sizePreset": "lg",
+					"backgroundStyle": "stroke",
+					"accentColor": "#29d3a7",
+					"safeZone": "bottom_safe_area",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"압축",
+						"강한 훅",
+						"실험적",
+						"실용적",
+						"빠른 결론"
+					],
+					"ttsSpeed": 1.08,
+					"bgmMood": "clean tech momentum",
+					"bgmKeywords": [
+						"synth",
+						"minimal beat",
+						"fast cuts"
+					],
+					"bgmTempo": "fast",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777759912203-lzynon"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:11:52.203Z",
+		"updated_at": "2026-05-02T22:11:52.203Z"
 	},
 	{
 		"id": "builtin-auto-automation-business-35etayfx0xm",
@@ -70069,8 +79580,224 @@ export const GENERATED_REFERENCE_TEMPLATES: BuiltInReferenceTemplateInput[] = [
 		},
 		"analysis_status": "complete",
 		"analysis_error": "",
-		"created_at": "2026-05-02T16:43:27.674Z",
-		"updated_at": "2026-05-02T19:51:57.957Z"
+		"created_at": "2026-05-02T19:51:54.450Z",
+		"updated_at": "2026-05-02T19:51:54.450Z"
+	},
+	{
+		"id": "builtin-auto-automation-business-bvocwrhyku0",
+		"channel_id": "__builtin_reference__",
+		"name": "AI/비즈니스 자동화 · 오늘부터 갓생 · 7월 15일 AI활용 유튜브 수익화 정지? 공식 답변으로 제대로 알아",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=BVOcWrhyku0",
+		"source_title": "7월 15일 AI활용 유튜브 수익화 정지? 공식 답변으로 제대로 알아보겠습니다.",
+		"source_creator": "오늘부터 갓생",
+		"thumbnail_url": "https://i.ytimg.com/vi/BVOcWrhyku0/hq720.jpg?sqp=-oaymwEcCNAFEJQDSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLBPZwfPUcoZBGxGMFf0Xr0ht_L_sg",
+		"duration_seconds": 175,
+		"dominant_colors": [
+			"#0c1b2a",
+			"#29d3a7",
+			"#edf7f3"
+		],
+		"visual_mood": "neutral",
+		"visual_prompt_template": "AI/비즈니스 자동화 쇼츠 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "bottom",
+		"subtitle_size_preset": "lg",
+		"subtitle_bg_style": "stroke",
+		"subtitle_accent_color": "#29d3a7",
+		"scene_count": 73,
+		"avg_scene_duration": 2.4,
+		"hook_duration": 2.5,
+		"transition_style": "hardcut",
+		"pacing_preset": "fast",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 1.08,
+		"tts_tone_keywords": [
+			"압축",
+			"강한 훅",
+			"실험적",
+			"실용적",
+			"빠른 결론"
+		],
+		"bgm_mood": "clean tech momentum",
+		"bgm_keywords": [
+			"synth",
+			"minimal beat",
+			"fast cuts"
+		],
+		"bgm_tempo": "fast",
+		"bgm_reference_url": "",
+		"hook_pattern": "question",
+		"script_structure": [
+			{
+				"role": "hook",
+				"duration": 3,
+				"note": "question 훅으로 제목 약속 즉시 제시"
+			},
+			{
+				"role": "proof",
+				"duration": 67,
+				"note": "근거/장면을 빠르게 2-3개 제시"
+			},
+			{
+				"role": "turn",
+				"duration": 49,
+				"note": "반전 또는 핵심 정보 회수"
+			},
+			{
+				"role": "payoff",
+				"duration": 35,
+				"note": "결론과 다음 궁금증 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_shorts",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "automation_business",
+			"reference_category_label": "AI/비즈니스 자동화",
+			"reference_format": "shorts",
+			"source_metrics": {
+				"videoId": "BVOcWrhyku0",
+				"viewCount": 3142,
+				"likeCount": 0,
+				"commentCount": 0
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-automation_business-shorts",
+				"label": "AI/비즈니스 자동화 쇼츠 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"shorts"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=BVOcWrhyku0",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"shorts": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "neutral",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#0c1b2a",
+						"#29d3a7",
+						"#edf7f3"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "cut_driven",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 25.03,
+					"avgCutIntervalSeconds": 2.4,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "hardcut",
+					"density": "dense",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "bottom",
+					"sizePreset": "lg",
+					"backgroundStyle": "stroke",
+					"accentColor": "#29d3a7",
+					"safeZone": "bottom_safe_area",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"압축",
+						"강한 훅",
+						"실험적",
+						"실용적",
+						"빠른 결론"
+					],
+					"ttsSpeed": 1.08,
+					"bgmMood": "clean tech momentum",
+					"bgmKeywords": [
+						"synth",
+						"minimal beat",
+						"fast cuts"
+					],
+					"bgmTempo": "fast",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777759912257-crcjqf"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:11:52.257Z",
+		"updated_at": "2026-05-02T22:11:52.257Z"
 	},
 	{
 		"id": "builtin-auto-automation-business-rpbcw9nan7q",
@@ -72404,8 +82131,441 @@ export const GENERATED_REFERENCE_TEMPLATES: BuiltInReferenceTemplateInput[] = [
 		},
 		"analysis_status": "complete",
 		"analysis_error": "",
-		"created_at": "2026-05-02T16:20:38.533Z",
-		"updated_at": "2026-05-02T20:36:25.088Z"
+		"created_at": "2026-05-02T20:36:24.869Z",
+		"updated_at": "2026-05-02T20:36:24.869Z"
+	},
+	{
+		"id": "builtin-auto-automation-business-8aa0w5t-4la",
+		"channel_id": "__builtin_reference__",
+		"name": "AI/비즈니스 자동화 · 일잘러 장피엠 · 노코드로 나만의 서비스 만들어보기 | 사수캠프 라이브 강의 프리뷰",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=8AA0W5T-4lA",
+		"source_title": "노코드로 나만의 서비스 만들어보기 | 사수캠프 라이브 강의 프리뷰",
+		"source_creator": "일잘러 장피엠",
+		"thumbnail_url": "https://i.ytimg.com/vi/8AA0W5T-4lA/hq720.jpg?sqp=-oaymwEcCNAFEJQDSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLAQBHI9Ab2jcDdJ2JgXXzxqIC_Kgg",
+		"duration_seconds": 106,
+		"dominant_colors": [
+			"#0c1b2a",
+			"#29d3a7",
+			"#edf7f3"
+		],
+		"visual_mood": "neutral",
+		"visual_prompt_template": "AI/비즈니스 자동화 쇼츠 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "bottom",
+		"subtitle_size_preset": "lg",
+		"subtitle_bg_style": "stroke",
+		"subtitle_accent_color": "#29d3a7",
+		"scene_count": 44,
+		"avg_scene_duration": 2.4,
+		"hook_duration": 2.5,
+		"transition_style": "hardcut",
+		"pacing_preset": "fast",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 1.08,
+		"tts_tone_keywords": [
+			"압축",
+			"강한 훅",
+			"실험적",
+			"실용적",
+			"빠른 결론"
+		],
+		"bgm_mood": "clean tech momentum",
+		"bgm_keywords": [
+			"synth",
+			"minimal beat",
+			"fast cuts"
+		],
+		"bgm_tempo": "fast",
+		"bgm_reference_url": "",
+		"hook_pattern": "story",
+		"script_structure": [
+			{
+				"role": "hook",
+				"duration": 3,
+				"note": "story 훅으로 제목 약속 즉시 제시"
+			},
+			{
+				"role": "proof",
+				"duration": 40,
+				"note": "근거/장면을 빠르게 2-3개 제시"
+			},
+			{
+				"role": "turn",
+				"duration": 30,
+				"note": "반전 또는 핵심 정보 회수"
+			},
+			{
+				"role": "payoff",
+				"duration": 21,
+				"note": "결론과 다음 궁금증 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_shorts",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "automation_business",
+			"reference_category_label": "AI/비즈니스 자동화",
+			"reference_format": "shorts",
+			"source_metrics": {
+				"videoId": "8AA0W5T-4lA",
+				"viewCount": 714,
+				"likeCount": 0,
+				"commentCount": 0
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-automation_business-shorts",
+				"label": "AI/비즈니스 자동화 쇼츠 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"shorts"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=8AA0W5T-4lA",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"shorts": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "neutral",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#0c1b2a",
+						"#29d3a7",
+						"#edf7f3"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "cut_driven",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 24.91,
+					"avgCutIntervalSeconds": 2.4,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "hardcut",
+					"density": "dense",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "bottom",
+					"sizePreset": "lg",
+					"backgroundStyle": "stroke",
+					"accentColor": "#29d3a7",
+					"safeZone": "bottom_safe_area",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"압축",
+						"강한 훅",
+						"실험적",
+						"실용적",
+						"빠른 결론"
+					],
+					"ttsSpeed": 1.08,
+					"bgmMood": "clean tech momentum",
+					"bgmKeywords": [
+						"synth",
+						"minimal beat",
+						"fast cuts"
+					],
+					"bgmTempo": "fast",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777759912367-kmea7j"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:11:52.367Z",
+		"updated_at": "2026-05-02T22:11:52.367Z"
+	},
+	{
+		"id": "builtin-auto-automation-business-d6xopw4lroi",
+		"channel_id": "__builtin_reference__",
+		"name": "AI/비즈니스 자동화 · 지식인사이드 and 김덕진의 AI디아 · '딸깍' 한번에 업무 시간 99% 줄어드는 AI 사용 꼼수ㅣ지식인초대",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=D6xoPw4LRoI",
+		"source_title": "'딸깍' 한번에 업무 시간 99% 줄어드는 AI 사용 꼼수ㅣ지식인초대석 EP.35 (김덕진 교수 2부)",
+		"source_creator": "지식인사이드 and 김덕진의 AI디아",
+		"thumbnail_url": "https://i.ytimg.com/vi/D6xoPw4LRoI/hq720.jpg?sqp=-oaymwEcCNAFEJQDSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLDDY75YDTn-UsnJvzmlj427qKRJqg",
+		"duration_seconds": 1219,
+		"dominant_colors": [
+			"#0c1b2a",
+			"#29d3a7",
+			"#edf7f3"
+		],
+		"visual_mood": "neutral",
+		"visual_prompt_template": "AI/비즈니스 자동화 롱폼 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "dynamic",
+		"subtitle_size_preset": "md",
+		"subtitle_bg_style": "glow",
+		"subtitle_accent_color": "#29d3a7",
+		"scene_count": 143,
+		"avg_scene_duration": 8.5,
+		"hook_duration": 8,
+		"transition_style": "mixed",
+		"pacing_preset": "medium",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 0.98,
+		"tts_tone_keywords": [
+			"실험적",
+			"실용적",
+			"빠른 결론"
+		],
+		"bgm_mood": "clean tech momentum",
+		"bgm_keywords": [
+			"synth",
+			"minimal beat",
+			"chaptered pacing"
+		],
+		"bgm_tempo": "mid",
+		"bgm_reference_url": "",
+		"hook_pattern": "story",
+		"script_structure": [
+			{
+				"role": "cold_open",
+				"duration": 12,
+				"note": "story 훅으로 핵심 갈등 선공개"
+			},
+			{
+				"role": "setup",
+				"duration": 195,
+				"note": "인물/사건/자료 배경 정리"
+			},
+			{
+				"role": "development",
+				"duration": 549,
+				"note": "챕터 단위 근거와 장면 전개"
+			},
+			{
+				"role": "turning_point",
+				"duration": 268,
+				"note": "반전, 쟁점, 해석 전환"
+			},
+			{
+				"role": "resolution",
+				"duration": 122,
+				"note": "결론, 시청자 질문 회수, 다음 편 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_longform",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "automation_business",
+			"reference_category_label": "AI/비즈니스 자동화",
+			"reference_format": "longform",
+			"source_metrics": {
+				"videoId": "D6xoPw4LRoI",
+				"viewCount": 1150450,
+				"likeCount": 0,
+				"commentCount": 0
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-automation_business-longform",
+				"label": "AI/비즈니스 자동화 롱폼 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"longform"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=D6xoPw4LRoI",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"longform": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "neutral",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#0c1b2a",
+						"#29d3a7",
+						"#edf7f3"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "slow_push",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 7.04,
+					"avgCutIntervalSeconds": 8.5,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "mixed",
+					"density": "medium",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "dynamic",
+					"sizePreset": "md",
+					"backgroundStyle": "glow",
+					"accentColor": "#29d3a7",
+					"safeZone": "avoid_subject_zone_per_scene",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"실험적",
+						"실용적",
+						"빠른 결론"
+					],
+					"ttsSpeed": 0.98,
+					"bgmMood": "clean tech momentum",
+					"bgmKeywords": [
+						"synth",
+						"minimal beat",
+						"chaptered pacing"
+					],
+					"bgmTempo": "mid",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777760065440-dv8nal"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:14:25.440Z",
+		"updated_at": "2026-05-02T22:14:25.440Z"
 	},
 	{
 		"id": "builtin-auto-automation-business-vswnmwrdvne",
@@ -74701,8 +84861,8 @@ export const GENERATED_REFERENCE_TEMPLATES: BuiltInReferenceTemplateInput[] = [
 		},
 		"analysis_status": "complete",
 		"analysis_error": "",
-		"created_at": "2026-05-02T16:47:07.890Z",
-		"updated_at": "2026-05-02T20:13:59.279Z"
+		"created_at": "2026-05-02T20:13:58.752Z",
+		"updated_at": "2026-05-02T20:13:58.752Z"
 	},
 	{
 		"id": "builtin-auto-automation-business-4rmmp7e-dpk",
@@ -77114,8 +87274,224 @@ export const GENERATED_REFERENCE_TEMPLATES: BuiltInReferenceTemplateInput[] = [
 		},
 		"analysis_status": "complete",
 		"analysis_error": "",
-		"created_at": "2026-05-02T16:20:42.511Z",
-		"updated_at": "2026-05-02T21:04:30.133Z"
+		"created_at": "2026-05-02T21:04:26.772Z",
+		"updated_at": "2026-05-02T21:04:26.772Z"
+	},
+	{
+		"id": "builtin-auto-automation-business-fqpcuezr54k",
+		"channel_id": "__builtin_reference__",
+		"name": "AI/비즈니스 자동화 · 홈페이지제작 에이전시왭 · 노코드로 홈페이지 제작, 요즘 만들기 쉽다는데 어렵다면",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=FqpCuEZr54k",
+		"source_title": "노코드로 홈페이지 제작, 요즘 만들기 쉽다는데 어렵다면",
+		"source_creator": "홈페이지제작 에이전시왭",
+		"thumbnail_url": "https://i.ytimg.com/vi/FqpCuEZr54k/hq720.jpg?sqp=-oaymwEcCNAFEJQDSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLBAt7i0SRbHehGkPW05k3Klcy2zsw",
+		"duration_seconds": 127,
+		"dominant_colors": [
+			"#0c1b2a",
+			"#29d3a7",
+			"#edf7f3"
+		],
+		"visual_mood": "neutral",
+		"visual_prompt_template": "AI/비즈니스 자동화 쇼츠 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "bottom",
+		"subtitle_size_preset": "lg",
+		"subtitle_bg_style": "stroke",
+		"subtitle_accent_color": "#29d3a7",
+		"scene_count": 53,
+		"avg_scene_duration": 2.4,
+		"hook_duration": 2.5,
+		"transition_style": "hardcut",
+		"pacing_preset": "fast",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 1.08,
+		"tts_tone_keywords": [
+			"압축",
+			"강한 훅",
+			"실험적",
+			"실용적",
+			"빠른 결론"
+		],
+		"bgm_mood": "clean tech momentum",
+		"bgm_keywords": [
+			"synth",
+			"minimal beat",
+			"fast cuts"
+		],
+		"bgm_tempo": "fast",
+		"bgm_reference_url": "",
+		"hook_pattern": "story",
+		"script_structure": [
+			{
+				"role": "hook",
+				"duration": 3,
+				"note": "story 훅으로 제목 약속 즉시 제시"
+			},
+			{
+				"role": "proof",
+				"duration": 48,
+				"note": "근거/장면을 빠르게 2-3개 제시"
+			},
+			{
+				"role": "turn",
+				"duration": 36,
+				"note": "반전 또는 핵심 정보 회수"
+			},
+			{
+				"role": "payoff",
+				"duration": 25,
+				"note": "결론과 다음 궁금증 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_shorts",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "automation_business",
+			"reference_category_label": "AI/비즈니스 자동화",
+			"reference_format": "shorts",
+			"source_metrics": {
+				"videoId": "FqpCuEZr54k",
+				"viewCount": 551,
+				"likeCount": 0,
+				"commentCount": 0
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-automation_business-shorts",
+				"label": "AI/비즈니스 자동화 쇼츠 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"shorts"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=FqpCuEZr54k",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"shorts": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "neutral",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#0c1b2a",
+						"#29d3a7",
+						"#edf7f3"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "cut_driven",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 25.04,
+					"avgCutIntervalSeconds": 2.4,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "hardcut",
+					"density": "dense",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "bottom",
+					"sizePreset": "lg",
+					"backgroundStyle": "stroke",
+					"accentColor": "#29d3a7",
+					"safeZone": "bottom_safe_area",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"압축",
+						"강한 훅",
+						"실험적",
+						"실용적",
+						"빠른 결론"
+					],
+					"ttsSpeed": 1.08,
+					"bgmMood": "clean tech momentum",
+					"bgmKeywords": [
+						"synth",
+						"minimal beat",
+						"fast cuts"
+					],
+					"bgmTempo": "fast",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777759912427-5q9nzi"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:11:52.427Z",
+		"updated_at": "2026-05-02T22:11:52.427Z"
 	},
 	{
 		"id": "builtin-auto-automation-business-qvv1chw-on8",
@@ -79572,8 +89948,440 @@ export const GENERATED_REFERENCE_TEMPLATES: BuiltInReferenceTemplateInput[] = [
 		},
 		"analysis_status": "complete",
 		"analysis_error": "",
-		"created_at": "2026-05-02T16:45:54.282Z",
-		"updated_at": "2026-05-02T20:21:38.994Z"
+		"created_at": "2026-05-02T20:21:38.464Z",
+		"updated_at": "2026-05-02T20:21:38.464Z"
+	},
+	{
+		"id": "builtin-auto-automation-business-kvuop1rwocs",
+		"channel_id": "__builtin_reference__",
+		"name": "AI/비즈니스 자동화 · b급TV · AI 쇼츠 자동화, 수익이 안되는 이유 (챗GPT, 미드저니, Mub",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=kvUop1RwOCs",
+		"source_title": "AI 쇼츠 자동화, 수익이 안되는 이유 (챗GPT, 미드저니, Mubert, Pictory, DALL-E, Canva 등등 다써봄)",
+		"source_creator": "b급TV",
+		"thumbnail_url": "https://i.ytimg.com/vi/kvUop1RwOCs/hqdefault.jpg?sqp=-oaymwEcCOADEI4CSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLBc8Zoq5DnnnP8YeNWPaG91G7IA0Q",
+		"duration_seconds": 180,
+		"dominant_colors": [
+			"#0c1b2a",
+			"#29d3a7",
+			"#edf7f3"
+		],
+		"visual_mood": "neutral",
+		"visual_prompt_template": "AI/비즈니스 자동화 쇼츠 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "bottom",
+		"subtitle_size_preset": "lg",
+		"subtitle_bg_style": "stroke",
+		"subtitle_accent_color": "#29d3a7",
+		"scene_count": 75,
+		"avg_scene_duration": 2.4,
+		"hook_duration": 2.5,
+		"transition_style": "hardcut",
+		"pacing_preset": "fast",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 1.08,
+		"tts_tone_keywords": [
+			"압축",
+			"강한 훅",
+			"실험적",
+			"실용적",
+			"빠른 결론"
+		],
+		"bgm_mood": "clean tech momentum",
+		"bgm_keywords": [
+			"synth",
+			"minimal beat",
+			"fast cuts"
+		],
+		"bgm_tempo": "fast",
+		"bgm_reference_url": "",
+		"hook_pattern": "claim",
+		"script_structure": [
+			{
+				"role": "hook",
+				"duration": 3,
+				"note": "claim 훅으로 제목 약속 즉시 제시"
+			},
+			{
+				"role": "proof",
+				"duration": 68,
+				"note": "근거/장면을 빠르게 2-3개 제시"
+			},
+			{
+				"role": "turn",
+				"duration": 50,
+				"note": "반전 또는 핵심 정보 회수"
+			},
+			{
+				"role": "payoff",
+				"duration": 36,
+				"note": "결론과 다음 궁금증 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_shorts",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "automation_business",
+			"reference_category_label": "AI/비즈니스 자동화",
+			"reference_format": "shorts",
+			"source_metrics": {
+				"videoId": "kvUop1RwOCs",
+				"viewCount": 650,
+				"likeCount": 0,
+				"commentCount": 0
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-automation_business-shorts",
+				"label": "AI/비즈니스 자동화 쇼츠 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"shorts"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=kvUop1RwOCs",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"shorts": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "neutral",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#0c1b2a",
+						"#29d3a7",
+						"#edf7f3"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "cut_driven",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 25,
+					"avgCutIntervalSeconds": 2.4,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "hardcut",
+					"density": "dense",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "bottom",
+					"sizePreset": "lg",
+					"backgroundStyle": "stroke",
+					"accentColor": "#29d3a7",
+					"safeZone": "bottom_safe_area",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"압축",
+						"강한 훅",
+						"실험적",
+						"실용적",
+						"빠른 결론"
+					],
+					"ttsSpeed": 1.08,
+					"bgmMood": "clean tech momentum",
+					"bgmKeywords": [
+						"synth",
+						"minimal beat",
+						"fast cuts"
+					],
+					"bgmTempo": "fast",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777759912398-ull66n"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:11:52.398Z",
+		"updated_at": "2026-05-02T22:11:52.398Z"
+	},
+	{
+		"id": "builtin-auto-automation-business-r8eyqbnqbxk",
+		"channel_id": "__builtin_reference__",
+		"name": "AI/비즈니스 자동화 · getgpt · [GetGPT] 노코드로 나만의 AI 서비스 만들기",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=R8eYQBnQBxk",
+		"source_title": "[GetGPT] 노코드로 나만의 AI 서비스 만들기",
+		"source_creator": "getgpt",
+		"thumbnail_url": "https://i.ytimg.com/vi/R8eYQBnQBxk/hq720.jpg?sqp=-oaymwEcCNAFEJQDSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLCboMQaqwjJBZc0oV_EceM1BnvA3A",
+		"duration_seconds": 142,
+		"dominant_colors": [
+			"#0c1b2a",
+			"#29d3a7",
+			"#edf7f3"
+		],
+		"visual_mood": "neutral",
+		"visual_prompt_template": "AI/비즈니스 자동화 쇼츠 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "bottom",
+		"subtitle_size_preset": "lg",
+		"subtitle_bg_style": "stroke",
+		"subtitle_accent_color": "#29d3a7",
+		"scene_count": 59,
+		"avg_scene_duration": 2.4,
+		"hook_duration": 2.5,
+		"transition_style": "hardcut",
+		"pacing_preset": "fast",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 1.08,
+		"tts_tone_keywords": [
+			"압축",
+			"강한 훅",
+			"실험적",
+			"실용적",
+			"빠른 결론"
+		],
+		"bgm_mood": "clean tech momentum",
+		"bgm_keywords": [
+			"synth",
+			"minimal beat",
+			"fast cuts"
+		],
+		"bgm_tempo": "fast",
+		"bgm_reference_url": "",
+		"hook_pattern": "story",
+		"script_structure": [
+			{
+				"role": "hook",
+				"duration": 3,
+				"note": "story 훅으로 제목 약속 즉시 제시"
+			},
+			{
+				"role": "proof",
+				"duration": 54,
+				"note": "근거/장면을 빠르게 2-3개 제시"
+			},
+			{
+				"role": "turn",
+				"duration": 40,
+				"note": "반전 또는 핵심 정보 회수"
+			},
+			{
+				"role": "payoff",
+				"duration": 28,
+				"note": "결론과 다음 궁금증 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_shorts",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "automation_business",
+			"reference_category_label": "AI/비즈니스 자동화",
+			"reference_format": "shorts",
+			"source_metrics": {
+				"videoId": "R8eYQBnQBxk",
+				"viewCount": 2205,
+				"likeCount": 0,
+				"commentCount": 0
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-automation_business-shorts",
+				"label": "AI/비즈니스 자동화 쇼츠 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"shorts"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=R8eYQBnQBxk",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"shorts": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "neutral",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#0c1b2a",
+						"#29d3a7",
+						"#edf7f3"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "cut_driven",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 24.93,
+					"avgCutIntervalSeconds": 2.4,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "hardcut",
+					"density": "dense",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "bottom",
+					"sizePreset": "lg",
+					"backgroundStyle": "stroke",
+					"accentColor": "#29d3a7",
+					"safeZone": "bottom_safe_area",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"압축",
+						"강한 훅",
+						"실험적",
+						"실용적",
+						"빠른 결론"
+					],
+					"ttsSpeed": 1.08,
+					"bgmMood": "clean tech momentum",
+					"bgmKeywords": [
+						"synth",
+						"minimal beat",
+						"fast cuts"
+					],
+					"bgmTempo": "fast",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777759912283-umgebu"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:11:52.283Z",
+		"updated_at": "2026-05-02T22:11:52.283Z"
 	},
 	{
 		"id": "builtin-auto-automation-business-ivty6t0lukq",
@@ -81933,8 +92741,1304 @@ export const GENERATED_REFERENCE_TEMPLATES: BuiltInReferenceTemplateInput[] = [
 		},
 		"analysis_status": "complete",
 		"analysis_error": "",
-		"created_at": "2026-05-02T16:43:23.856Z",
-		"updated_at": "2026-05-02T21:20:21.353Z"
+		"created_at": "2026-05-02T21:20:17.951Z",
+		"updated_at": "2026-05-02T21:20:17.951Z"
+	},
+	{
+		"id": "builtin-auto-automation-business-os84zs8ches",
+		"channel_id": "__builtin_reference__",
+		"name": "AI/비즈니스 자동화 · JTBC News · 유튜브 AI 영상 금지? \"아닙니다\"…정책변경 핵심은 #소셜픽 / J",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=os84zs8cHes",
+		"source_title": "유튜브 AI 영상 금지? \"아닙니다\"…정책변경 핵심은 #소셜픽 / JTBC 아침&",
+		"source_creator": "JTBC News",
+		"thumbnail_url": "https://i.ytimg.com/vi/os84zs8cHes/hq720.jpg?sqp=-oaymwEcCNAFEJQDSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLCIqFXzif3GfySQnoG8Lr2JSEoObA",
+		"duration_seconds": 105,
+		"dominant_colors": [
+			"#101820",
+			"#e93f33",
+			"#f6f2e8"
+		],
+		"visual_mood": "news",
+		"visual_prompt_template": "뉴스/이슈 해설 쇼츠 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "bottom",
+		"subtitle_size_preset": "lg",
+		"subtitle_bg_style": "stroke",
+		"subtitle_accent_color": "#e93f33",
+		"scene_count": 44,
+		"avg_scene_duration": 2.4,
+		"hook_duration": 2.5,
+		"transition_style": "hardcut",
+		"pacing_preset": "fast",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 1.08,
+		"tts_tone_keywords": [
+			"압축",
+			"강한 훅",
+			"명확한",
+			"긴박한",
+			"근거 중심"
+		],
+		"bgm_mood": "urgent editorial",
+		"bgm_keywords": [
+			"ticker",
+			"percussion",
+			"fast cuts"
+		],
+		"bgm_tempo": "fast",
+		"bgm_reference_url": "",
+		"hook_pattern": "question",
+		"script_structure": [
+			{
+				"role": "hook",
+				"duration": 3,
+				"note": "question 훅으로 제목 약속 즉시 제시"
+			},
+			{
+				"role": "proof",
+				"duration": 40,
+				"note": "근거/장면을 빠르게 2-3개 제시"
+			},
+			{
+				"role": "turn",
+				"duration": 29,
+				"note": "반전 또는 핵심 정보 회수"
+			},
+			{
+				"role": "payoff",
+				"duration": 21,
+				"note": "결론과 다음 궁금증 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_shorts",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "automation_business",
+			"reference_category_label": "AI/비즈니스 자동화",
+			"reference_format": "shorts",
+			"source_metrics": {
+				"videoId": "os84zs8cHes",
+				"viewCount": 192582,
+				"likeCount": 0,
+				"commentCount": 0
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-news_issue-shorts",
+				"label": "뉴스/이슈 해설 쇼츠 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"shorts"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=os84zs8cHes",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"shorts": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "news",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#101820",
+						"#e93f33",
+						"#f6f2e8"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "cut_driven",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 25.14,
+					"avgCutIntervalSeconds": 2.4,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "hardcut",
+					"density": "dense",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "bottom",
+					"sizePreset": "lg",
+					"backgroundStyle": "stroke",
+					"accentColor": "#e93f33",
+					"safeZone": "bottom_safe_area",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"압축",
+						"강한 훅",
+						"명확한",
+						"긴박한",
+						"근거 중심"
+					],
+					"ttsSpeed": 1.08,
+					"bgmMood": "urgent editorial",
+					"bgmKeywords": [
+						"ticker",
+						"percussion",
+						"fast cuts"
+					],
+					"bgmTempo": "fast",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777759883474-2c0a7z"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:11:23.474Z",
+		"updated_at": "2026-05-02T22:11:23.474Z"
+	},
+	{
+		"id": "builtin-auto-automation-business-znfzhmmaai",
+		"channel_id": "__builtin_reference__",
+		"name": "AI/비즈니스 자동화 · YTN 사이언스 · [과학뉴스] IBM, 향후 5년 안에 고객 비대면 업무 파트 AI, ",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=_ZNfZHmmAaI",
+		"source_title": "[과학뉴스] IBM, 향후 5년 안에 고객 비대면 업무 파트 AI, 자동화로 대체할 것 / 23.05.03",
+		"source_creator": "YTN 사이언스",
+		"thumbnail_url": "https://i.ytimg.com/vi/_ZNfZHmmAaI/hq720.jpg?sqp=-oaymwEcCNAFEJQDSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLCwgo4QWdoYpZbxowXNMw4_0_d1Kw",
+		"duration_seconds": 50,
+		"dominant_colors": [
+			"#0c1b2a",
+			"#29d3a7",
+			"#edf7f3"
+		],
+		"visual_mood": "neutral",
+		"visual_prompt_template": "AI/비즈니스 자동화 쇼츠 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "bottom",
+		"subtitle_size_preset": "lg",
+		"subtitle_bg_style": "stroke",
+		"subtitle_accent_color": "#29d3a7",
+		"scene_count": 21,
+		"avg_scene_duration": 2.4,
+		"hook_duration": 2.5,
+		"transition_style": "hardcut",
+		"pacing_preset": "fast",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 1.08,
+		"tts_tone_keywords": [
+			"압축",
+			"강한 훅",
+			"실험적",
+			"실용적",
+			"빠른 결론"
+		],
+		"bgm_mood": "clean tech momentum",
+		"bgm_keywords": [
+			"synth",
+			"minimal beat",
+			"fast cuts"
+		],
+		"bgm_tempo": "fast",
+		"bgm_reference_url": "",
+		"hook_pattern": "story",
+		"script_structure": [
+			{
+				"role": "hook",
+				"duration": 3,
+				"note": "story 훅으로 제목 약속 즉시 제시"
+			},
+			{
+				"role": "proof",
+				"duration": 19,
+				"note": "근거/장면을 빠르게 2-3개 제시"
+			},
+			{
+				"role": "turn",
+				"duration": 14,
+				"note": "반전 또는 핵심 정보 회수"
+			},
+			{
+				"role": "payoff",
+				"duration": 10,
+				"note": "결론과 다음 궁금증 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_shorts",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "automation_business",
+			"reference_category_label": "AI/비즈니스 자동화",
+			"reference_format": "shorts",
+			"source_metrics": {
+				"videoId": "_ZNfZHmmAaI",
+				"viewCount": 1212,
+				"likeCount": 0,
+				"commentCount": 0
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-automation_business-shorts",
+				"label": "AI/비즈니스 자동화 쇼츠 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"shorts"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=_ZNfZHmmAaI",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"shorts": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "neutral",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#0c1b2a",
+						"#29d3a7",
+						"#edf7f3"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "cut_driven",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 25.2,
+					"avgCutIntervalSeconds": 2.4,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "hardcut",
+					"density": "dense",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "bottom",
+					"sizePreset": "lg",
+					"backgroundStyle": "stroke",
+					"accentColor": "#29d3a7",
+					"safeZone": "bottom_safe_area",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"압축",
+						"강한 훅",
+						"실험적",
+						"실용적",
+						"빠른 결론"
+					],
+					"ttsSpeed": 1.08,
+					"bgmMood": "clean tech momentum",
+					"bgmKeywords": [
+						"synth",
+						"minimal beat",
+						"fast cuts"
+					],
+					"bgmTempo": "fast",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777759912310-7dn7fy"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:11:52.310Z",
+		"updated_at": "2026-05-02T22:11:52.310Z"
+	},
+	{
+		"id": "builtin-auto-money-psychology-76p-ddqge8s",
+		"channel_id": "__builtin_reference__",
+		"name": "돈/심리/자기계발 · (구) 한화투자증권 · 🙋‍♀️ 돈을 벌기 시작한 사회 초년생들을 위한 돈 공부 3편 - ",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=76P-ddqGE8s",
+		"source_title": "🙋‍♀️ 돈을 벌기 시작한 사회 초년생들을 위한 돈 공부 3편 - 연봉에 따라 다른 전략 짜기!",
+		"source_creator": "(구) 한화투자증권",
+		"thumbnail_url": "https://i.ytimg.com/vi/76P-ddqGE8s/hq720.jpg?sqp=-oaymwEcCNAFEJQDSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLBEN1tsoEs4RQnjVI4ukyqHn98Yfw",
+		"duration_seconds": 83,
+		"dominant_colors": [
+			"#151515",
+			"#f1c45b",
+			"#f8f1de"
+		],
+		"visual_mood": "warm",
+		"visual_prompt_template": "돈/심리/자기계발 쇼츠 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "bottom",
+		"subtitle_size_preset": "lg",
+		"subtitle_bg_style": "stroke",
+		"subtitle_accent_color": "#f1c45b",
+		"scene_count": 35,
+		"avg_scene_duration": 2.4,
+		"hook_duration": 2.5,
+		"transition_style": "hardcut",
+		"pacing_preset": "fast",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 1.08,
+		"tts_tone_keywords": [
+			"압축",
+			"강한 훅",
+			"설득형",
+			"따뜻한",
+			"성장 서사"
+		],
+		"bgm_mood": "warm motivational",
+		"bgm_keywords": [
+			"piano",
+			"soft beat",
+			"fast cuts"
+		],
+		"bgm_tempo": "fast",
+		"bgm_reference_url": "",
+		"hook_pattern": "story",
+		"script_structure": [
+			{
+				"role": "hook",
+				"duration": 3,
+				"note": "story 훅으로 제목 약속 즉시 제시"
+			},
+			{
+				"role": "proof",
+				"duration": 32,
+				"note": "근거/장면을 빠르게 2-3개 제시"
+			},
+			{
+				"role": "turn",
+				"duration": 23,
+				"note": "반전 또는 핵심 정보 회수"
+			},
+			{
+				"role": "payoff",
+				"duration": 17,
+				"note": "결론과 다음 궁금증 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_shorts",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "money_psychology",
+			"reference_category_label": "돈/심리/자기계발",
+			"reference_format": "shorts",
+			"source_metrics": {
+				"videoId": "76P-ddqGE8s",
+				"viewCount": 3048,
+				"likeCount": 0,
+				"commentCount": 0
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-money_psychology-shorts",
+				"label": "돈/심리/자기계발 쇼츠 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"shorts"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=76P-ddqGE8s",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"shorts": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "warm",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#151515",
+						"#f1c45b",
+						"#f8f1de"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "cut_driven",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 25.3,
+					"avgCutIntervalSeconds": 2.4,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "hardcut",
+					"density": "dense",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "bottom",
+					"sizePreset": "lg",
+					"backgroundStyle": "stroke",
+					"accentColor": "#f1c45b",
+					"safeZone": "bottom_safe_area",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"압축",
+						"강한 훅",
+						"설득형",
+						"따뜻한",
+						"성장 서사"
+					],
+					"ttsSpeed": 1.08,
+					"bgmMood": "warm motivational",
+					"bgmKeywords": [
+						"piano",
+						"soft beat",
+						"fast cuts"
+					],
+					"bgmTempo": "fast",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777759939039-p78qct"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:12:19.039Z",
+		"updated_at": "2026-05-02T22:12:19.039Z"
+	},
+	{
+		"id": "builtin-auto-money-psychology-ice7ph0ld48",
+		"channel_id": "__builtin_reference__",
+		"name": "돈/심리/자기계발 · 1분만 · How to make money",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=IcE7PH0Ld48",
+		"source_title": "How to make money",
+		"source_creator": "1분만",
+		"thumbnail_url": "https://i.ytimg.com/vi/IcE7PH0Ld48/hq720.jpg?sqp=-oaymwEcCNAFEJQDSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLAOFADpkI1yo4hmOnGEQTHs02sXmQ",
+		"duration_seconds": 60,
+		"dominant_colors": [
+			"#151515",
+			"#f1c45b",
+			"#f8f1de"
+		],
+		"visual_mood": "warm",
+		"visual_prompt_template": "돈/심리/자기계발 쇼츠 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "bottom",
+		"subtitle_size_preset": "lg",
+		"subtitle_bg_style": "stroke",
+		"subtitle_accent_color": "#f1c45b",
+		"scene_count": 25,
+		"avg_scene_duration": 2.4,
+		"hook_duration": 2.5,
+		"transition_style": "hardcut",
+		"pacing_preset": "fast",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 1.08,
+		"tts_tone_keywords": [
+			"압축",
+			"강한 훅",
+			"설득형",
+			"따뜻한",
+			"성장 서사"
+		],
+		"bgm_mood": "warm motivational",
+		"bgm_keywords": [
+			"piano",
+			"soft beat",
+			"fast cuts"
+		],
+		"bgm_tempo": "fast",
+		"bgm_reference_url": "",
+		"hook_pattern": "story",
+		"script_structure": [
+			{
+				"role": "hook",
+				"duration": 3,
+				"note": "story 훅으로 제목 약속 즉시 제시"
+			},
+			{
+				"role": "proof",
+				"duration": 23,
+				"note": "근거/장면을 빠르게 2-3개 제시"
+			},
+			{
+				"role": "turn",
+				"duration": 17,
+				"note": "반전 또는 핵심 정보 회수"
+			},
+			{
+				"role": "payoff",
+				"duration": 12,
+				"note": "결론과 다음 궁금증 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_shorts",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "money_psychology",
+			"reference_category_label": "돈/심리/자기계발",
+			"reference_format": "shorts",
+			"source_metrics": {
+				"videoId": "IcE7PH0Ld48",
+				"viewCount": 1578951,
+				"likeCount": 0,
+				"commentCount": 0
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-money_psychology-shorts",
+				"label": "돈/심리/자기계발 쇼츠 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"shorts"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=IcE7PH0Ld48",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"shorts": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "warm",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#151515",
+						"#f1c45b",
+						"#f8f1de"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "cut_driven",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 25,
+					"avgCutIntervalSeconds": 2.4,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "hardcut",
+					"density": "dense",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "bottom",
+					"sizePreset": "lg",
+					"backgroundStyle": "stroke",
+					"accentColor": "#f1c45b",
+					"safeZone": "bottom_safe_area",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"압축",
+						"강한 훅",
+						"설득형",
+						"따뜻한",
+						"성장 서사"
+					],
+					"ttsSpeed": 1.08,
+					"bgmMood": "warm motivational",
+					"bgmKeywords": [
+						"piano",
+						"soft beat",
+						"fast cuts"
+					],
+					"bgmTempo": "fast",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777759938937-vn856n"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:12:18.937Z",
+		"updated_at": "2026-05-02T22:12:18.937Z"
+	},
+	{
+		"id": "builtin-auto-money-psychology-ip8wzgniizq",
+		"channel_id": "__builtin_reference__",
+		"name": "돈/심리/자기계발 · 김새해 kimsaehae · 1000억 부자가 말하는 진짜 돈버는 마인드셋, 노하우",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=iP8WzGnIIzQ",
+		"source_title": "1000억 부자가 말하는 진짜 돈버는 마인드셋, 노하우",
+		"source_creator": "김새해 kimsaehae",
+		"thumbnail_url": "https://i.ytimg.com/vi/iP8WzGnIIzQ/hqdefault.jpg?sqp=-oaymwEcCOADEI4CSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLCW1IGT3_ksMSu_39N2J4cdRbYOHQ",
+		"duration_seconds": 178,
+		"dominant_colors": [
+			"#151515",
+			"#f1c45b",
+			"#f8f1de"
+		],
+		"visual_mood": "warm",
+		"visual_prompt_template": "돈/심리/자기계발 쇼츠 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "bottom",
+		"subtitle_size_preset": "lg",
+		"subtitle_bg_style": "stroke",
+		"subtitle_accent_color": "#f1c45b",
+		"scene_count": 74,
+		"avg_scene_duration": 2.4,
+		"hook_duration": 2.5,
+		"transition_style": "hardcut",
+		"pacing_preset": "fast",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 1.08,
+		"tts_tone_keywords": [
+			"압축",
+			"강한 훅",
+			"설득형",
+			"따뜻한",
+			"성장 서사"
+		],
+		"bgm_mood": "warm motivational",
+		"bgm_keywords": [
+			"piano",
+			"soft beat",
+			"fast cuts"
+		],
+		"bgm_tempo": "fast",
+		"bgm_reference_url": "",
+		"hook_pattern": "story",
+		"script_structure": [
+			{
+				"role": "hook",
+				"duration": 3,
+				"note": "story 훅으로 제목 약속 즉시 제시"
+			},
+			{
+				"role": "proof",
+				"duration": 68,
+				"note": "근거/장면을 빠르게 2-3개 제시"
+			},
+			{
+				"role": "turn",
+				"duration": 50,
+				"note": "반전 또는 핵심 정보 회수"
+			},
+			{
+				"role": "payoff",
+				"duration": 36,
+				"note": "결론과 다음 궁금증 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_shorts",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "money_psychology",
+			"reference_category_label": "돈/심리/자기계발",
+			"reference_format": "shorts",
+			"source_metrics": {
+				"videoId": "iP8WzGnIIzQ",
+				"viewCount": 4053,
+				"likeCount": 0,
+				"commentCount": 0
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-money_psychology-shorts",
+				"label": "돈/심리/자기계발 쇼츠 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"shorts"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=iP8WzGnIIzQ",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"shorts": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "warm",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#151515",
+						"#f1c45b",
+						"#f8f1de"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "cut_driven",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 24.94,
+					"avgCutIntervalSeconds": 2.4,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "hardcut",
+					"density": "dense",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "bottom",
+					"sizePreset": "lg",
+					"backgroundStyle": "stroke",
+					"accentColor": "#f1c45b",
+					"safeZone": "bottom_safe_area",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"압축",
+						"강한 훅",
+						"설득형",
+						"따뜻한",
+						"성장 서사"
+					],
+					"ttsSpeed": 1.08,
+					"bgmMood": "warm motivational",
+					"bgmKeywords": [
+						"piano",
+						"soft beat",
+						"fast cuts"
+					],
+					"bgmTempo": "fast",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777759938989-1njm05"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:12:18.989Z",
+		"updated_at": "2026-05-02T22:12:18.989Z"
+	},
+	{
+		"id": "builtin-auto-money-psychology-mtyzzc5koo",
+		"channel_id": "__builtin_reference__",
+		"name": "돈/심리/자기계발 · 단 한 줄 · 지혜로운 사람이 절대 놓치지 않는 5가지 대화법 #단한줄 #성공습관 ",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=-mTyZzc5kOo",
+		"source_title": "지혜로운 사람이 절대 놓치지 않는 5가지 대화법 #단한줄 #성공습관 #동기부여 #자기계발 #명언 #인생조언 #마인드셋 #shorts",
+		"source_creator": "단 한 줄",
+		"thumbnail_url": "https://i.ytimg.com/vi/-mTyZzc5kOo/hq720.jpg?sqp=-oaymwE2CNAFEJQDSFXyq4qpAygIARUAAIhCGAFwAcABBvABAfgBtgiAAoAPigIMCAAQARhkIGQoZDAP&rs=AOn4CLCOG2K7bdS3fJ9NRRh8awQWV69Xcg",
+		"duration_seconds": 9,
+		"dominant_colors": [
+			"#151515",
+			"#f1c45b",
+			"#f8f1de"
+		],
+		"visual_mood": "warm",
+		"visual_prompt_template": "돈/심리/자기계발 쇼츠 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "bottom",
+		"subtitle_size_preset": "lg",
+		"subtitle_bg_style": "stroke",
+		"subtitle_accent_color": "#f1c45b",
+		"scene_count": 8,
+		"avg_scene_duration": 1.1,
+		"hook_duration": 2.5,
+		"transition_style": "hardcut",
+		"pacing_preset": "fast",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 1.08,
+		"tts_tone_keywords": [
+			"압축",
+			"강한 훅",
+			"설득형",
+			"따뜻한",
+			"성장 서사"
+		],
+		"bgm_mood": "warm motivational",
+		"bgm_keywords": [
+			"piano",
+			"soft beat",
+			"fast cuts"
+		],
+		"bgm_tempo": "fast",
+		"bgm_reference_url": "",
+		"hook_pattern": "shock",
+		"script_structure": [
+			{
+				"role": "hook",
+				"duration": 3,
+				"note": "shock 훅으로 제목 약속 즉시 제시"
+			},
+			{
+				"role": "proof",
+				"duration": 8,
+				"note": "근거/장면을 빠르게 2-3개 제시"
+			},
+			{
+				"role": "turn",
+				"duration": 6,
+				"note": "반전 또는 핵심 정보 회수"
+			},
+			{
+				"role": "payoff",
+				"duration": 5,
+				"note": "결론과 다음 궁금증 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_shorts",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "money_psychology",
+			"reference_category_label": "돈/심리/자기계발",
+			"reference_format": "shorts",
+			"source_metrics": {
+				"videoId": "-mTyZzc5kOo",
+				"viewCount": 3871,
+				"likeCount": 0,
+				"commentCount": 0
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-money_psychology-shorts",
+				"label": "돈/심리/자기계발 쇼츠 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"shorts"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=-mTyZzc5kOo",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"shorts": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "warm",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#151515",
+						"#f1c45b",
+						"#f8f1de"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "cut_driven",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 53.33,
+					"avgCutIntervalSeconds": 1.1,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "hardcut",
+					"density": "dense",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "bottom",
+					"sizePreset": "lg",
+					"backgroundStyle": "stroke",
+					"accentColor": "#f1c45b",
+					"safeZone": "bottom_safe_area",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"압축",
+						"강한 훅",
+						"설득형",
+						"따뜻한",
+						"성장 서사"
+					],
+					"ttsSpeed": 1.08,
+					"bgmMood": "warm motivational",
+					"bgmKeywords": [
+						"piano",
+						"soft beat",
+						"fast cuts"
+					],
+					"bgmTempo": "fast",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777760080550-jbxak5"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:14:40.550Z",
+		"updated_at": "2026-05-02T22:14:40.550Z"
 	},
 	{
 		"id": "builtin-auto-money-psychology-mqsnf9wfdac",
@@ -84228,8 +96332,8 @@ export const GENERATED_REFERENCE_TEMPLATES: BuiltInReferenceTemplateInput[] = [
 		},
 		"analysis_status": "complete",
 		"analysis_error": "",
-		"created_at": "2026-05-02T16:47:20.156Z",
-		"updated_at": "2026-05-02T20:22:49.031Z"
+		"created_at": "2026-05-02T20:22:45.544Z",
+		"updated_at": "2026-05-02T20:22:45.544Z"
 	},
 	{
 		"id": "builtin-auto-money-psychology-ppgqret-8vs",
@@ -86566,8 +98670,225 @@ export const GENERATED_REFERENCE_TEMPLATES: BuiltInReferenceTemplateInput[] = [
 		},
 		"analysis_status": "complete",
 		"analysis_error": "",
-		"created_at": "2026-05-02T16:43:37.973Z",
-		"updated_at": "2026-05-02T19:52:22.973Z"
+		"created_at": "2026-05-02T19:52:18.399Z",
+		"updated_at": "2026-05-02T19:52:18.399Z"
+	},
+	{
+		"id": "builtin-auto-money-psychology-zpe9ypet5vk",
+		"channel_id": "__builtin_reference__",
+		"name": "돈/심리/자기계발 · 세바시 강연 Sebasi Talk · [세바시 몰아보기] 나이 들어도 잘 사는 법 | 강창희,구범준,유인경",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=ZPE9YpEt5vk",
+		"source_title": "[세바시 몰아보기] 나이 들어도 잘 사는 법 | 강창희,구범준,유인경,이호선,임형남,정재찬,조세현,조재천,최영훈 | 인생 노후 미래설계 | 세바시 정주행",
+		"source_creator": "세바시 강연 Sebasi Talk",
+		"thumbnail_url": "https://i.ytimg.com/vi/ZPE9YpEt5vk/hq720.jpg?sqp=-oaymwEcCNAFEJQDSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLDWw-LAcjGUZTJARBWhpL_vv4grtw",
+		"duration_seconds": 8333,
+		"dominant_colors": [
+			"#151515",
+			"#f1c45b",
+			"#f8f1de"
+		],
+		"visual_mood": "warm",
+		"visual_prompt_template": "돈/심리/자기계발 롱폼 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "dynamic",
+		"subtitle_size_preset": "md",
+		"subtitle_bg_style": "glow",
+		"subtitle_accent_color": "#f1c45b",
+		"scene_count": 980,
+		"avg_scene_duration": 8.5,
+		"hook_duration": 8,
+		"transition_style": "mixed",
+		"pacing_preset": "medium",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 0.98,
+		"tts_tone_keywords": [
+			"설득형",
+			"따뜻한",
+			"성장 서사"
+		],
+		"bgm_mood": "warm motivational",
+		"bgm_keywords": [
+			"piano",
+			"soft beat",
+			"chaptered pacing"
+		],
+		"bgm_tempo": "mid",
+		"bgm_reference_url": "",
+		"hook_pattern": "story",
+		"script_structure": [
+			{
+				"role": "cold_open",
+				"duration": 12,
+				"note": "story 훅으로 핵심 갈등 선공개"
+			},
+			{
+				"role": "setup",
+				"duration": 1333,
+				"note": "인물/사건/자료 배경 정리"
+			},
+			{
+				"role": "development",
+				"duration": 3750,
+				"note": "챕터 단위 근거와 장면 전개"
+			},
+			{
+				"role": "turning_point",
+				"duration": 1833,
+				"note": "반전, 쟁점, 해석 전환"
+			},
+			{
+				"role": "resolution",
+				"duration": 833,
+				"note": "결론, 시청자 질문 회수, 다음 편 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_longform",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "money_psychology",
+			"reference_category_label": "돈/심리/자기계발",
+			"reference_format": "longform",
+			"source_metrics": {
+				"videoId": "ZPE9YpEt5vk",
+				"viewCount": 4131571,
+				"likeCount": 0,
+				"commentCount": 0
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-money_psychology-longform",
+				"label": "돈/심리/자기계발 롱폼 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"longform"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=ZPE9YpEt5vk",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"longform": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "warm",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#151515",
+						"#f1c45b",
+						"#f8f1de"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "slow_push",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 7.06,
+					"avgCutIntervalSeconds": 8.5,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "mixed",
+					"density": "medium",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "dynamic",
+					"sizePreset": "md",
+					"backgroundStyle": "glow",
+					"accentColor": "#f1c45b",
+					"safeZone": "avoid_subject_zone_per_scene",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"설득형",
+						"따뜻한",
+						"성장 서사"
+					],
+					"ttsSpeed": 0.98,
+					"bgmMood": "warm motivational",
+					"bgmKeywords": [
+						"piano",
+						"soft beat",
+						"chaptered pacing"
+					],
+					"bgmTempo": "mid",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777760092441-d1fnj2"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:14:52.441Z",
+		"updated_at": "2026-05-02T22:14:52.441Z"
 	},
 	{
 		"id": "builtin-auto-money-psychology-jzztsuo8bme",
@@ -88869,8 +101190,440 @@ export const GENERATED_REFERENCE_TEMPLATES: BuiltInReferenceTemplateInput[] = [
 		},
 		"analysis_status": "complete",
 		"analysis_error": "",
-		"created_at": "2026-05-02T16:46:04.805Z",
-		"updated_at": "2026-05-02T21:13:24.609Z"
+		"created_at": "2026-05-02T21:13:23.246Z",
+		"updated_at": "2026-05-02T21:13:23.246Z"
+	},
+	{
+		"id": "builtin-auto-money-psychology-sadg5koiztu",
+		"channel_id": "__builtin_reference__",
+		"name": "돈/심리/자기계발 · 아로스TVㅣ부업 1위 · 몸 값 100배 뛰는 생각 '한 끝' 차이 동기부여 #shorts #",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=sAdg5koiztU",
+		"source_title": "몸 값 100배 뛰는 생각 '한 끝' 차이 동기부여 #shorts #동기부여 #자기계발",
+		"source_creator": "아로스TVㅣ부업 1위",
+		"thumbnail_url": "https://i.ytimg.com/vi/sAdg5koiztU/hq720.jpg?sqp=-oaymwE2CNAFEJQDSFXyq4qpAygIARUAAIhCGAFwAcABBvABAfgBtgiAAoAPigIMCAAQARhyIFEoPzAP&rs=AOn4CLCXGHOZviyHWTLV6KjPZ2nGtvNgOw",
+		"duration_seconds": 61,
+		"dominant_colors": [
+			"#151515",
+			"#f1c45b",
+			"#f8f1de"
+		],
+		"visual_mood": "warm",
+		"visual_prompt_template": "돈/심리/자기계발 쇼츠 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "bottom",
+		"subtitle_size_preset": "lg",
+		"subtitle_bg_style": "stroke",
+		"subtitle_accent_color": "#f1c45b",
+		"scene_count": 25,
+		"avg_scene_duration": 2.4,
+		"hook_duration": 2.5,
+		"transition_style": "hardcut",
+		"pacing_preset": "fast",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 1.08,
+		"tts_tone_keywords": [
+			"압축",
+			"강한 훅",
+			"설득형",
+			"따뜻한",
+			"성장 서사"
+		],
+		"bgm_mood": "warm motivational",
+		"bgm_keywords": [
+			"piano",
+			"soft beat",
+			"fast cuts"
+		],
+		"bgm_tempo": "fast",
+		"bgm_reference_url": "",
+		"hook_pattern": "story",
+		"script_structure": [
+			{
+				"role": "hook",
+				"duration": 3,
+				"note": "story 훅으로 제목 약속 즉시 제시"
+			},
+			{
+				"role": "proof",
+				"duration": 23,
+				"note": "근거/장면을 빠르게 2-3개 제시"
+			},
+			{
+				"role": "turn",
+				"duration": 17,
+				"note": "반전 또는 핵심 정보 회수"
+			},
+			{
+				"role": "payoff",
+				"duration": 12,
+				"note": "결론과 다음 궁금증 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_shorts",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "money_psychology",
+			"reference_category_label": "돈/심리/자기계발",
+			"reference_format": "shorts",
+			"source_metrics": {
+				"videoId": "sAdg5koiztU",
+				"viewCount": 2654,
+				"likeCount": 0,
+				"commentCount": 0
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-money_psychology-shorts",
+				"label": "돈/심리/자기계발 쇼츠 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"shorts"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=sAdg5koiztU",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"shorts": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "warm",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#151515",
+						"#f1c45b",
+						"#f8f1de"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "cut_driven",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 24.59,
+					"avgCutIntervalSeconds": 2.4,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "hardcut",
+					"density": "dense",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "bottom",
+					"sizePreset": "lg",
+					"backgroundStyle": "stroke",
+					"accentColor": "#f1c45b",
+					"safeZone": "bottom_safe_area",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"압축",
+						"강한 훅",
+						"설득형",
+						"따뜻한",
+						"성장 서사"
+					],
+					"ttsSpeed": 1.08,
+					"bgmMood": "warm motivational",
+					"bgmKeywords": [
+						"piano",
+						"soft beat",
+						"fast cuts"
+					],
+					"bgmTempo": "fast",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777759939090-z66lgc"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:12:19.090Z",
+		"updated_at": "2026-05-02T22:12:19.090Z"
+	},
+	{
+		"id": "builtin-auto-money-psychology-yqsmkktnlye",
+		"channel_id": "__builtin_reference__",
+		"name": "돈/심리/자기계발 · 억대연봉 도전 스토리 · 자기계발에 돈 아끼면 안되는 이유",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=YqsmKKtnLYE",
+		"source_title": "자기계발에 돈 아끼면 안되는 이유",
+		"source_creator": "억대연봉 도전 스토리",
+		"thumbnail_url": "https://i.ytimg.com/vi/YqsmKKtnLYE/hq720.jpg?sqp=-oaymwE2CNAFEJQDSFXyq4qpAygIARUAAIhCGAFwAcABBvABAfgB_gmAAtAFigIMCAAQARhjIGMoYzAP&rs=AOn4CLAnn88qVg832vV4jV-Q3A82HGNT1A",
+		"duration_seconds": 53,
+		"dominant_colors": [
+			"#151515",
+			"#f1c45b",
+			"#f8f1de"
+		],
+		"visual_mood": "warm",
+		"visual_prompt_template": "돈/심리/자기계발 쇼츠 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "bottom",
+		"subtitle_size_preset": "lg",
+		"subtitle_bg_style": "stroke",
+		"subtitle_accent_color": "#f1c45b",
+		"scene_count": 22,
+		"avg_scene_duration": 2.4,
+		"hook_duration": 2.5,
+		"transition_style": "hardcut",
+		"pacing_preset": "fast",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 1.08,
+		"tts_tone_keywords": [
+			"압축",
+			"강한 훅",
+			"설득형",
+			"따뜻한",
+			"성장 서사"
+		],
+		"bgm_mood": "warm motivational",
+		"bgm_keywords": [
+			"piano",
+			"soft beat",
+			"fast cuts"
+		],
+		"bgm_tempo": "fast",
+		"bgm_reference_url": "",
+		"hook_pattern": "claim",
+		"script_structure": [
+			{
+				"role": "hook",
+				"duration": 3,
+				"note": "claim 훅으로 제목 약속 즉시 제시"
+			},
+			{
+				"role": "proof",
+				"duration": 20,
+				"note": "근거/장면을 빠르게 2-3개 제시"
+			},
+			{
+				"role": "turn",
+				"duration": 15,
+				"note": "반전 또는 핵심 정보 회수"
+			},
+			{
+				"role": "payoff",
+				"duration": 11,
+				"note": "결론과 다음 궁금증 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_shorts",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "money_psychology",
+			"reference_category_label": "돈/심리/자기계발",
+			"reference_format": "shorts",
+			"source_metrics": {
+				"videoId": "YqsmKKtnLYE",
+				"viewCount": 1578,
+				"likeCount": 0,
+				"commentCount": 0
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-money_psychology-shorts",
+				"label": "돈/심리/자기계발 쇼츠 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"shorts"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=YqsmKKtnLYE",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"shorts": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "warm",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#151515",
+						"#f1c45b",
+						"#f8f1de"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "cut_driven",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 24.91,
+					"avgCutIntervalSeconds": 2.4,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "hardcut",
+					"density": "dense",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "bottom",
+					"sizePreset": "lg",
+					"backgroundStyle": "stroke",
+					"accentColor": "#f1c45b",
+					"safeZone": "bottom_safe_area",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"압축",
+						"강한 훅",
+						"설득형",
+						"따뜻한",
+						"성장 서사"
+					],
+					"ttsSpeed": 1.08,
+					"bgmMood": "warm motivational",
+					"bgmKeywords": [
+						"piano",
+						"soft beat",
+						"fast cuts"
+					],
+					"bgmTempo": "fast",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777759939164-bmiy0h"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:12:19.164Z",
+		"updated_at": "2026-05-02T22:12:19.164Z"
 	},
 	{
 		"id": "builtin-auto-money-psychology-wu9v6oo0yzq",
@@ -91190,8 +103943,440 @@ export const GENERATED_REFERENCE_TEMPLATES: BuiltInReferenceTemplateInput[] = [
 		},
 		"analysis_status": "complete",
 		"analysis_error": "",
-		"created_at": "2026-05-02T16:20:48.529Z",
-		"updated_at": "2026-05-02T21:28:18.010Z"
+		"created_at": "2026-05-02T21:28:17.702Z",
+		"updated_at": "2026-05-02T21:28:17.702Z"
+	},
+	{
+		"id": "builtin-auto-money-psychology-uof0wkyaefo",
+		"channel_id": "__builtin_reference__",
+		"name": "돈/심리/자기계발 · 인생을 바꾸다 · 알바생에서 연매출 1억 마트 사장으로! 그가 밝힌 성공의 비밀 #역전",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=UOf0wkyAefo",
+		"source_title": "알바생에서 연매출 1억 마트 사장으로! 그가 밝힌 성공의 비밀 #역전스토리 #편의점성공",
+		"source_creator": "인생을 바꾸다",
+		"thumbnail_url": "https://i.ytimg.com/vi/UOf0wkyAefo/hq720.jpg?sqp=-oaymwEcCNAFEJQDSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLBPH_LWOMboME8wxjmbeb3Dhk1obw",
+		"duration_seconds": 138,
+		"dominant_colors": [
+			"#151515",
+			"#f1c45b",
+			"#f8f1de"
+		],
+		"visual_mood": "warm",
+		"visual_prompt_template": "돈/심리/자기계발 쇼츠 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "bottom",
+		"subtitle_size_preset": "lg",
+		"subtitle_bg_style": "stroke",
+		"subtitle_accent_color": "#f1c45b",
+		"scene_count": 58,
+		"avg_scene_duration": 2.4,
+		"hook_duration": 2.5,
+		"transition_style": "hardcut",
+		"pacing_preset": "fast",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 1.08,
+		"tts_tone_keywords": [
+			"압축",
+			"강한 훅",
+			"설득형",
+			"따뜻한",
+			"성장 서사"
+		],
+		"bgm_mood": "warm motivational",
+		"bgm_keywords": [
+			"piano",
+			"soft beat",
+			"fast cuts"
+		],
+		"bgm_tempo": "fast",
+		"bgm_reference_url": "",
+		"hook_pattern": "claim",
+		"script_structure": [
+			{
+				"role": "hook",
+				"duration": 3,
+				"note": "claim 훅으로 제목 약속 즉시 제시"
+			},
+			{
+				"role": "proof",
+				"duration": 52,
+				"note": "근거/장면을 빠르게 2-3개 제시"
+			},
+			{
+				"role": "turn",
+				"duration": 39,
+				"note": "반전 또는 핵심 정보 회수"
+			},
+			{
+				"role": "payoff",
+				"duration": 28,
+				"note": "결론과 다음 궁금증 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_shorts",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "money_psychology",
+			"reference_category_label": "돈/심리/자기계발",
+			"reference_format": "shorts",
+			"source_metrics": {
+				"videoId": "UOf0wkyAefo",
+				"viewCount": 3572,
+				"likeCount": 0,
+				"commentCount": 0
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-money_psychology-shorts",
+				"label": "돈/심리/자기계발 쇼츠 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"shorts"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=UOf0wkyAefo",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"shorts": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "warm",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#151515",
+						"#f1c45b",
+						"#f8f1de"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "cut_driven",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 25.22,
+					"avgCutIntervalSeconds": 2.4,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "hardcut",
+					"density": "dense",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "bottom",
+					"sizePreset": "lg",
+					"backgroundStyle": "stroke",
+					"accentColor": "#f1c45b",
+					"safeZone": "bottom_safe_area",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"압축",
+						"강한 훅",
+						"설득형",
+						"따뜻한",
+						"성장 서사"
+					],
+					"ttsSpeed": 1.08,
+					"bgmMood": "warm motivational",
+					"bgmKeywords": [
+						"piano",
+						"soft beat",
+						"fast cuts"
+					],
+					"bgmTempo": "fast",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777759939014-o1g4ko"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:12:19.014Z",
+		"updated_at": "2026-05-02T22:12:19.014Z"
+	},
+	{
+		"id": "builtin-auto-money-psychology-zunsqahci",
+		"channel_id": "__builtin_reference__",
+		"name": "돈/심리/자기계발 · 인생지혜창고 · 3 People You Must Avoid in Old Age #sh",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=_-zUNsqAhcI",
+		"source_title": "3 People You Must Avoid in Old Age #shorts #YouTubeShorts #LifeWisdomWarehouse #LifeAdvice",
+		"source_creator": "인생지혜창고",
+		"thumbnail_url": "https://i.ytimg.com/vi/_-zUNsqAhcI/hq720.jpg?sqp=-oaymwE2CNAFEJQDSFXyq4qpAygIARUAAIhCGAFwAcABBvABAfgBtgiAAoAPigIMCAAQARhyIEsoOTAP&rs=AOn4CLBNh75FzdrenAwcYiQt45Qb9IqAWQ",
+		"duration_seconds": 69,
+		"dominant_colors": [
+			"#151515",
+			"#f1c45b",
+			"#f8f1de"
+		],
+		"visual_mood": "warm",
+		"visual_prompt_template": "돈/심리/자기계발 쇼츠 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "bottom",
+		"subtitle_size_preset": "lg",
+		"subtitle_bg_style": "stroke",
+		"subtitle_accent_color": "#f1c45b",
+		"scene_count": 29,
+		"avg_scene_duration": 2.4,
+		"hook_duration": 2.5,
+		"transition_style": "hardcut",
+		"pacing_preset": "fast",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 1.08,
+		"tts_tone_keywords": [
+			"압축",
+			"강한 훅",
+			"설득형",
+			"따뜻한",
+			"성장 서사"
+		],
+		"bgm_mood": "warm motivational",
+		"bgm_keywords": [
+			"piano",
+			"soft beat",
+			"fast cuts"
+		],
+		"bgm_tempo": "fast",
+		"bgm_reference_url": "",
+		"hook_pattern": "story",
+		"script_structure": [
+			{
+				"role": "hook",
+				"duration": 3,
+				"note": "story 훅으로 제목 약속 즉시 제시"
+			},
+			{
+				"role": "proof",
+				"duration": 26,
+				"note": "근거/장면을 빠르게 2-3개 제시"
+			},
+			{
+				"role": "turn",
+				"duration": 19,
+				"note": "반전 또는 핵심 정보 회수"
+			},
+			{
+				"role": "payoff",
+				"duration": 14,
+				"note": "결론과 다음 궁금증 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_shorts",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "money_psychology",
+			"reference_category_label": "돈/심리/자기계발",
+			"reference_format": "shorts",
+			"source_metrics": {
+				"videoId": "_-zUNsqAhcI",
+				"viewCount": 1789,
+				"likeCount": 0,
+				"commentCount": 0
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-money_psychology-shorts",
+				"label": "돈/심리/자기계발 쇼츠 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"shorts"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=_-zUNsqAhcI",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"shorts": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "warm",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#151515",
+						"#f1c45b",
+						"#f8f1de"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "cut_driven",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 25.22,
+					"avgCutIntervalSeconds": 2.4,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "hardcut",
+					"density": "dense",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "bottom",
+					"sizePreset": "lg",
+					"backgroundStyle": "stroke",
+					"accentColor": "#f1c45b",
+					"safeZone": "bottom_safe_area",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"압축",
+						"강한 훅",
+						"설득형",
+						"따뜻한",
+						"성장 서사"
+					],
+					"ttsSpeed": 1.08,
+					"bgmMood": "warm motivational",
+					"bgmKeywords": [
+						"piano",
+						"soft beat",
+						"fast cuts"
+					],
+					"bgmTempo": "fast",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777759939139-1bxhl0"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:12:19.139Z",
+		"updated_at": "2026-05-02T22:12:19.139Z"
 	},
 	{
 		"id": "builtin-auto-money-psychology-9uos2emwubg",
@@ -93497,8 +106682,8 @@ export const GENERATED_REFERENCE_TEMPLATES: BuiltInReferenceTemplateInput[] = [
 		},
 		"analysis_status": "complete",
 		"analysis_error": "",
-		"created_at": "2026-05-02T16:47:16.060Z",
-		"updated_at": "2026-05-02T20:15:19.320Z"
+		"created_at": "2026-05-02T20:15:15.084Z",
+		"updated_at": "2026-05-02T20:15:15.084Z"
 	},
 	{
 		"id": "builtin-auto-money-psychology-a-5wjsgagty",
@@ -95980,8 +109165,8 @@ export const GENERATED_REFERENCE_TEMPLATES: BuiltInReferenceTemplateInput[] = [
 		},
 		"analysis_status": "complete",
 		"analysis_error": "",
-		"created_at": "2026-05-02T16:22:23.052Z",
-		"updated_at": "2026-05-02T20:29:43.100Z"
+		"created_at": "2026-05-02T20:29:42.667Z",
+		"updated_at": "2026-05-02T20:29:42.667Z"
 	},
 	{
 		"id": "builtin-auto-money-psychology-nar0bkacgn8",
@@ -98322,8 +111507,224 @@ export const GENERATED_REFERENCE_TEMPLATES: BuiltInReferenceTemplateInput[] = [
 		},
 		"analysis_status": "complete",
 		"analysis_error": "",
-		"created_at": "2026-05-02T16:20:52.966Z",
-		"updated_at": "2026-05-02T21:06:20.197Z"
+		"created_at": "2026-05-02T21:06:17.147Z",
+		"updated_at": "2026-05-02T21:06:17.147Z"
+	},
+	{
+		"id": "builtin-auto-money-psychology-n7swrfrlgtm",
+		"channel_id": "__builtin_reference__",
+		"name": "돈/심리/자기계발 · 책 읽어주는 클라우디아 · [딸아, 돈 공부 절대 미루지 마라] 돈 때문에 기죽지 않고 당당하게",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=n7sWRFrLgTM",
+		"source_title": "[딸아, 돈 공부 절대 미루지 마라] 돈 때문에 기죽지 않고 당당하게 살고 싶은 딸에게 전하는 돈과 인생의 법칙. 돈과 인생에 대한 가장 현실적인 조언 50가지 돈의 심리학 투자법",
+		"source_creator": "책 읽어주는 클라우디아",
+		"thumbnail_url": "https://i.ytimg.com/vi/n7sWRFrLgTM/hq720.jpg?sqp=-oaymwE2CNAFEJQDSFXyq4qpAygIARUAAIhCGAFwAcABBvABAfgBtgiAAoAPigIMCAAQARhBIEkoZTAP&rs=AOn4CLD_eipYCuEENEgjD7Sgbg7jBkxqlw",
+		"duration_seconds": 61,
+		"dominant_colors": [
+			"#151515",
+			"#f1c45b",
+			"#f8f1de"
+		],
+		"visual_mood": "warm",
+		"visual_prompt_template": "돈/심리/자기계발 쇼츠 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "bottom",
+		"subtitle_size_preset": "lg",
+		"subtitle_bg_style": "stroke",
+		"subtitle_accent_color": "#f1c45b",
+		"scene_count": 25,
+		"avg_scene_duration": 2.4,
+		"hook_duration": 2.5,
+		"transition_style": "hardcut",
+		"pacing_preset": "fast",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 1.08,
+		"tts_tone_keywords": [
+			"압축",
+			"강한 훅",
+			"설득형",
+			"따뜻한",
+			"성장 서사"
+		],
+		"bgm_mood": "warm motivational",
+		"bgm_keywords": [
+			"piano",
+			"soft beat",
+			"fast cuts"
+		],
+		"bgm_tempo": "fast",
+		"bgm_reference_url": "",
+		"hook_pattern": "shock",
+		"script_structure": [
+			{
+				"role": "hook",
+				"duration": 3,
+				"note": "shock 훅으로 제목 약속 즉시 제시"
+			},
+			{
+				"role": "proof",
+				"duration": 23,
+				"note": "근거/장면을 빠르게 2-3개 제시"
+			},
+			{
+				"role": "turn",
+				"duration": 17,
+				"note": "반전 또는 핵심 정보 회수"
+			},
+			{
+				"role": "payoff",
+				"duration": 12,
+				"note": "결론과 다음 궁금증 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_shorts",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "money_psychology",
+			"reference_category_label": "돈/심리/자기계발",
+			"reference_format": "shorts",
+			"source_metrics": {
+				"videoId": "n7sWRFrLgTM",
+				"viewCount": 2973,
+				"likeCount": 0,
+				"commentCount": 0
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-money_psychology-shorts",
+				"label": "돈/심리/자기계발 쇼츠 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"shorts"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=n7sWRFrLgTM",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"shorts": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "warm",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#151515",
+						"#f1c45b",
+						"#f8f1de"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "cut_driven",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 24.59,
+					"avgCutIntervalSeconds": 2.4,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "hardcut",
+					"density": "dense",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "bottom",
+					"sizePreset": "lg",
+					"backgroundStyle": "stroke",
+					"accentColor": "#f1c45b",
+					"safeZone": "bottom_safe_area",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"압축",
+						"강한 훅",
+						"설득형",
+						"따뜻한",
+						"성장 서사"
+					],
+					"ttsSpeed": 1.08,
+					"bgmMood": "warm motivational",
+					"bgmKeywords": [
+						"piano",
+						"soft beat",
+						"fast cuts"
+					],
+					"bgmTempo": "fast",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777759939066-gwnjrh"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:12:19.066Z",
+		"updated_at": "2026-05-02T22:12:19.066Z"
 	},
 	{
 		"id": "builtin-auto-money-psychology-wayqcnmygio",
@@ -100659,8 +114060,657 @@ export const GENERATED_REFERENCE_TEMPLATES: BuiltInReferenceTemplateInput[] = [
 		},
 		"analysis_status": "complete",
 		"analysis_error": "",
-		"created_at": "2026-05-02T16:46:08.818Z",
-		"updated_at": "2026-05-02T20:38:00.139Z"
+		"created_at": "2026-05-02T20:37:58.798Z",
+		"updated_at": "2026-05-02T20:37:58.798Z"
+	},
+	{
+		"id": "builtin-auto-money-psychology-9ylzka5m270",
+		"channel_id": "__builtin_reference__",
+		"name": "돈/심리/자기계발 · KBS News · [이런뉴스] “부탁해요, 챗GPT” 공손함이 가져온 뜻밖의 결과는? ",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=9yLZKa5m270",
+		"source_title": "[이런뉴스] “부탁해요, 챗GPT” 공손함이 가져온 뜻밖의 결과는? / KBS 2025.04.22.",
+		"source_creator": "KBS News",
+		"thumbnail_url": "https://i.ytimg.com/vi/9yLZKa5m270/hq720.jpg?sqp=-oaymwEcCNAFEJQDSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLA0_poYLq_adn_m67dosBd0_gZdyA",
+		"duration_seconds": 111,
+		"dominant_colors": [
+			"#151515",
+			"#f1c45b",
+			"#f8f1de"
+		],
+		"visual_mood": "warm",
+		"visual_prompt_template": "돈/심리/자기계발 쇼츠 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "bottom",
+		"subtitle_size_preset": "lg",
+		"subtitle_bg_style": "stroke",
+		"subtitle_accent_color": "#f1c45b",
+		"scene_count": 46,
+		"avg_scene_duration": 2.4,
+		"hook_duration": 2.5,
+		"transition_style": "hardcut",
+		"pacing_preset": "fast",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 1.08,
+		"tts_tone_keywords": [
+			"압축",
+			"강한 훅",
+			"설득형",
+			"따뜻한",
+			"성장 서사"
+		],
+		"bgm_mood": "warm motivational",
+		"bgm_keywords": [
+			"piano",
+			"soft beat",
+			"fast cuts"
+		],
+		"bgm_tempo": "fast",
+		"bgm_reference_url": "",
+		"hook_pattern": "question",
+		"script_structure": [
+			{
+				"role": "hook",
+				"duration": 3,
+				"note": "question 훅으로 제목 약속 즉시 제시"
+			},
+			{
+				"role": "proof",
+				"duration": 42,
+				"note": "근거/장면을 빠르게 2-3개 제시"
+			},
+			{
+				"role": "turn",
+				"duration": 31,
+				"note": "반전 또는 핵심 정보 회수"
+			},
+			{
+				"role": "payoff",
+				"duration": 22,
+				"note": "결론과 다음 궁금증 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_shorts",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "money_psychology",
+			"reference_category_label": "돈/심리/자기계발",
+			"reference_format": "shorts",
+			"source_metrics": {
+				"videoId": "9yLZKa5m270",
+				"viewCount": 1558843,
+				"likeCount": 0,
+				"commentCount": 0
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-money_psychology-shorts",
+				"label": "돈/심리/자기계발 쇼츠 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"shorts"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=9yLZKa5m270",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"shorts": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "warm",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#151515",
+						"#f1c45b",
+						"#f8f1de"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "cut_driven",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 24.86,
+					"avgCutIntervalSeconds": 2.4,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "hardcut",
+					"density": "dense",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "bottom",
+					"sizePreset": "lg",
+					"backgroundStyle": "stroke",
+					"accentColor": "#f1c45b",
+					"safeZone": "bottom_safe_area",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"압축",
+						"강한 훅",
+						"설득형",
+						"따뜻한",
+						"성장 서사"
+					],
+					"ttsSpeed": 1.08,
+					"bgmMood": "warm motivational",
+					"bgmKeywords": [
+						"piano",
+						"soft beat",
+						"fast cuts"
+					],
+					"bgmTempo": "fast",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777759938965-8qjmwx"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:12:18.965Z",
+		"updated_at": "2026-05-02T22:12:18.965Z"
+	},
+	{
+		"id": "builtin-auto-money-psychology-yfvbhl0kmnq",
+		"channel_id": "__builtin_reference__",
+		"name": "돈/심리/자기계발 · MBN Entertainment · 인지심리학이 밝혀낸 ‘부자들의 공통점’ (가슴이 웅장해진다...) M",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=yFvBHL0kMNQ",
+		"source_title": "인지심리학이 밝혀낸 ‘부자들의 공통점’ (가슴이 웅장해진다...) MBN 210408 방송",
+		"source_creator": "MBN Entertainment",
+		"thumbnail_url": "https://i.ytimg.com/vi/yFvBHL0kMNQ/hq720.jpg?sqp=-oaymwEcCNAFEJQDSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLD_peVpqwlCKW1IByQRXAPMnXMVKA",
+		"duration_seconds": 86,
+		"dominant_colors": [
+			"#151515",
+			"#f1c45b",
+			"#f8f1de"
+		],
+		"visual_mood": "warm",
+		"visual_prompt_template": "돈/심리/자기계발 쇼츠 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "bottom",
+		"subtitle_size_preset": "lg",
+		"subtitle_bg_style": "stroke",
+		"subtitle_accent_color": "#f1c45b",
+		"scene_count": 36,
+		"avg_scene_duration": 2.4,
+		"hook_duration": 2.5,
+		"transition_style": "hardcut",
+		"pacing_preset": "fast",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 1.08,
+		"tts_tone_keywords": [
+			"압축",
+			"강한 훅",
+			"설득형",
+			"따뜻한",
+			"성장 서사"
+		],
+		"bgm_mood": "warm motivational",
+		"bgm_keywords": [
+			"piano",
+			"soft beat",
+			"fast cuts"
+		],
+		"bgm_tempo": "fast",
+		"bgm_reference_url": "",
+		"hook_pattern": "story",
+		"script_structure": [
+			{
+				"role": "hook",
+				"duration": 3,
+				"note": "story 훅으로 제목 약속 즉시 제시"
+			},
+			{
+				"role": "proof",
+				"duration": 33,
+				"note": "근거/장면을 빠르게 2-3개 제시"
+			},
+			{
+				"role": "turn",
+				"duration": 24,
+				"note": "반전 또는 핵심 정보 회수"
+			},
+			{
+				"role": "payoff",
+				"duration": 17,
+				"note": "결론과 다음 궁금증 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_shorts",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "money_psychology",
+			"reference_category_label": "돈/심리/자기계발",
+			"reference_format": "shorts",
+			"source_metrics": {
+				"videoId": "yFvBHL0kMNQ",
+				"viewCount": 2574,
+				"likeCount": 0,
+				"commentCount": 0
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-money_psychology-shorts",
+				"label": "돈/심리/자기계발 쇼츠 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"shorts"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=yFvBHL0kMNQ",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"shorts": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "warm",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#151515",
+						"#f1c45b",
+						"#f8f1de"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "cut_driven",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 25.12,
+					"avgCutIntervalSeconds": 2.4,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "hardcut",
+					"density": "dense",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "bottom",
+					"sizePreset": "lg",
+					"backgroundStyle": "stroke",
+					"accentColor": "#f1c45b",
+					"safeZone": "bottom_safe_area",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"압축",
+						"강한 훅",
+						"설득형",
+						"따뜻한",
+						"성장 서사"
+					],
+					"ttsSpeed": 1.08,
+					"bgmMood": "warm motivational",
+					"bgmKeywords": [
+						"piano",
+						"soft beat",
+						"fast cuts"
+					],
+					"bgmTempo": "fast",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777759939115-fi6zig"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:12:19.115Z",
+		"updated_at": "2026-05-02T22:12:19.115Z"
+	},
+	{
+		"id": "builtin-auto-money-psychology-iiillsl03me",
+		"channel_id": "__builtin_reference__",
+		"name": "돈/심리/자기계발 · tvN D ENT · [#티전드] 무의식이 사람을 만든다❓ (3시간) 동안 모아보는 김경일",
+		"source_type": "youtube",
+		"source_url": "https://www.youtube.com/watch?v=IIiLLsl03mE",
+		"source_title": "[#티전드] 무의식이 사람을 만든다❓ (3시간) 동안 모아보는 김경일 교수의 심리와 행복, 그리고 성공의 상관관계👀 | #어쩌다어른",
+		"source_creator": "tvN D ENT",
+		"thumbnail_url": "https://i.ytimg.com/vi/IIiLLsl03mE/hq720.jpg?sqp=-oaymwEcCNAFEJQDSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLBuqQ8WYpb0TTn_wnnBL-O7Xl7hgA",
+		"duration_seconds": 11564,
+		"dominant_colors": [
+			"#151515",
+			"#f1c45b",
+			"#f8f1de"
+		],
+		"visual_mood": "warm",
+		"visual_prompt_template": "돈/심리/자기계발 롱폼 reference: high-retention edit pacing, source-backed visuals, clear title payoff.",
+		"lighting_style": "mixed",
+		"subtitle_position": "dynamic",
+		"subtitle_size_preset": "md",
+		"subtitle_bg_style": "glow",
+		"subtitle_accent_color": "#f1c45b",
+		"scene_count": 1360,
+		"avg_scene_duration": 8.5,
+		"hook_duration": 8,
+		"transition_style": "mixed",
+		"pacing_preset": "medium",
+		"tts_voice_id": "alloy",
+		"tts_provider": "openai",
+		"tts_speed": 0.98,
+		"tts_tone_keywords": [
+			"설득형",
+			"따뜻한",
+			"성장 서사"
+		],
+		"bgm_mood": "warm motivational",
+		"bgm_keywords": [
+			"piano",
+			"soft beat",
+			"chaptered pacing"
+		],
+		"bgm_tempo": "mid",
+		"bgm_reference_url": "",
+		"hook_pattern": "claim",
+		"script_structure": [
+			{
+				"role": "cold_open",
+				"duration": 12,
+				"note": "claim 훅으로 핵심 갈등 선공개"
+			},
+			{
+				"role": "setup",
+				"duration": 1850,
+				"note": "인물/사건/자료 배경 정리"
+			},
+			{
+				"role": "development",
+				"duration": 5204,
+				"note": "챕터 단위 근거와 장면 전개"
+			},
+			{
+				"role": "turning_point",
+				"duration": 2544,
+				"note": "반전, 쟁점, 해석 전환"
+			},
+			{
+				"role": "resolution",
+				"duration": 1156,
+				"note": "결론, 시청자 질문 회수, 다음 편 연결"
+			}
+		],
+		"transcript": "",
+		"frame_urls": [],
+		"raw_analysis": {
+			"analysis_depth": "metadata_only",
+			"analysis_mode": "metadata_longform",
+			"built_in_reference": true,
+			"generated_reference": true,
+			"reference_category_id": "money_psychology",
+			"reference_category_label": "돈/심리/자기계발",
+			"reference_format": "longform",
+			"source_metrics": {
+				"videoId": "IIiLLsl03mE",
+				"viewCount": 4894546,
+				"likeCount": 0,
+				"commentCount": 0
+			},
+			"copy_boundary": {
+				"rawAssetsReusable": false,
+				"allowedUse": "Use only metadata-level structure, topic fit, pacing targets, and category rules. Do not reuse source footage, music, speech, or exact script."
+			},
+			"production_method": {
+				"id": "metadata-money_psychology-longform",
+				"label": "돈/심리/자기계발 롱폼 메타 레퍼런스",
+				"description": "YouTube 성과/길이/카테고리 메타데이터를 기반으로 제작 규칙과 템플릿을 만든다.",
+				"recommendedMode": "research",
+				"supportedFormats": [
+					"longform"
+				],
+				"manualVideoInsert": true,
+				"clipControls": [
+					"trim_start",
+					"duration_seconds",
+					"crop"
+				],
+				"referenceSources": [
+					{
+						"url": "https://www.youtube.com/watch?v=IIiLLsl03mE",
+						"purpose": "구조와 제작 규칙만 참조"
+					}
+				],
+				"rules": [
+					"원본 영상, 음악, 대사를 그대로 재사용하지 않는다.",
+					"자료와 화면 소스는 새 주제에 맞춰 별도로 확보한다.",
+					"제목의 핵심 약속을 첫 구간 안에서 반드시 회수한다.",
+					"문장 단위 TTS가 끊기지 않도록 컷을 정렬한다."
+				],
+				"sceneLayout": "full",
+				"sceneLayouts": {
+					"longform": "full"
+				}
+			},
+			"production_dna": {
+				"version": "production-dna-v1",
+				"analysisDepth": "metadata_only",
+				"pixelPrecisionAvailable": false,
+				"mood": {
+					"visualMood": "warm",
+					"atmosphere": [],
+					"lightingStyle": "mixed"
+				},
+				"color": {
+					"dominantColors": [
+						"#151515",
+						"#f1c45b",
+						"#f8f1de"
+					],
+					"brightness": 0,
+					"contrast": 0,
+					"saturation": 0,
+					"warmth": 0,
+					"temperature": "cool"
+				},
+				"layout": {
+					"frameSize": {
+						"width": 1920,
+						"height": 1080
+					},
+					"aspectRatio": 1.7778,
+					"compositionPattern": "metadata_inferred_full_frame",
+					"subjectZone": "inferred_center",
+					"textSafeZones": [
+						"bottom_center",
+						"top_center"
+					],
+					"subtitleCollisionRisk": "low"
+				},
+				"camera": {
+					"mode": "slow_push",
+					"motionIntensity": 0.36,
+					"first3Motion": 0.324,
+					"cutDensityPerMinute": 7.06,
+					"avgCutIntervalSeconds": 8.5,
+					"firstCutSeconds": null,
+					"sceneCutTimes": []
+				},
+				"transitions": {
+					"style": "mixed",
+					"density": "medium",
+					"firstCutSeconds": null,
+					"cutTimes": [],
+					"rules": [
+						"챕터 전환은 문장 끝에서 hard cut 또는 짧은 crossfade",
+						"인기 구간 전후에는 자료 컷 밀도를 높임",
+						"롱폼은 발화 중간 컷 금지, 문장/문단 단위로 컷 정렬"
+					]
+				},
+				"subtitles": {
+					"position": "dynamic",
+					"sizePreset": "md",
+					"backgroundStyle": "glow",
+					"accentColor": "#f1c45b",
+					"safeZone": "avoid_subject_zone_per_scene",
+					"collisionRisk": "low"
+				},
+				"audio": {
+					"voiceToneKeywords": [
+						"설득형",
+						"따뜻한",
+						"성장 서사"
+					],
+					"ttsSpeed": 0.98,
+					"bgmMood": "warm motivational",
+					"bgmKeywords": [
+						"piano",
+						"soft beat",
+						"chaptered pacing"
+					],
+					"bgmTempo": "mid",
+					"volumeMeanDb": null,
+					"volumeMaxDb": null,
+					"integratedLufs": null,
+					"loudnessRangeLu": null
+				},
+				"frames": [],
+				"copyBoundary": {
+					"rawAssetsReusable": false,
+					"allowedUse": "Use only production rules and numeric/style metrics. Do not reuse source frames, music, speech, or exact script."
+				}
+			},
+			"generated_from_job_id": "ref-meta-1777759949810-9ld1nf"
+		},
+		"analysis_status": "complete",
+		"analysis_error": "",
+		"created_at": "2026-05-02T22:12:29.810Z",
+		"updated_at": "2026-05-02T22:12:29.810Z"
 	},
 	{
 		"id": "builtin-auto-money-psychology-m5er72-oztu",
@@ -102949,7 +116999,7 @@ export const GENERATED_REFERENCE_TEMPLATES: BuiltInReferenceTemplateInput[] = [
 		},
 		"analysis_status": "complete",
 		"analysis_error": "",
-		"created_at": "2026-05-02T16:43:33.786Z",
-		"updated_at": "2026-05-02T21:22:06.459Z"
+		"created_at": "2026-05-02T21:22:06.167Z",
+		"updated_at": "2026-05-02T21:22:06.167Z"
 	}
 ];

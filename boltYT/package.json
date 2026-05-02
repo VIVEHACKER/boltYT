@@ -19,6 +19,8 @@
     "reference-analyzer": "npx tsx server/reference-analyzer.ts",
     "reference:batch": "npx tsx scripts/reference-batch-template.ts",
     "reference:continue": "npx tsx scripts/reference-batch-template.ts --increment-per-category 2 --max-channels 25 --results-per-query 25 --candidate-pool 25",
+    "reference:format100": "npx tsx scripts/reference-batch-template.ts --formats shorts,longform --target-per-category-format 10 --max-channels 40 --results-per-query 50 --candidate-pool 60 --fallback-ytsearch",
+    "reference:format100:metadata": "npx tsx scripts/reference-batch-template.ts --formats shorts,longform --target-per-category-format 10 --max-channels 40 --results-per-query 50 --candidate-pool 60 --metadata-only --fallback-ytsearch",
     "reference:deep": "npx tsx scripts/reference-deep-promote.ts --target-per-category 1 --limit 5",
     "reference:deep:retry": "npx tsx scripts/reference-deep-promote.ts --target-per-category 9 --limit 45 --retry-deep --timeout-ms 900000",
     "reference:write": "npx tsx scripts/reference-batch-template.ts --offline",
