@@ -51,6 +51,8 @@ async function main() {
 	await runGate("build");
 	await runGate("tests");
 	await runGate("lint");
+	await runGate("dead-exports");
+	await runGate("production-pipeline-guard");
 	if (options.e2e) await runGate("reference-e2e");
 	if (options.harness) await runGate("harness");
 

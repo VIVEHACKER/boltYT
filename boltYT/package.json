@@ -26,6 +26,7 @@
     "reference:write": "npx tsx scripts/reference-batch-template.ts --offline",
     "quality:loop": "npx tsx scripts/post-generation-improvement-loop.ts",
     "quality:loop:fix": "npx tsx scripts/post-generation-improvement-loop.ts --fix",
+    "quality:dead-exports": "node scripts/check-dead-exports.mjs",
     "servers": "npx tsx server/api-proxy.ts & npx tsx server/youtube-upload.ts & npx tsx server/render-queue.ts & npx tsx server/reference-analyzer.ts",
     "test": "vitest run",
     "test:watch": "vitest",

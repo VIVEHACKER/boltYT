@@ -2,7 +2,7 @@
 
 - Verdict: ship
 - Score: 100
-- Generated at: 2026-05-04T11:50:14.083Z
+- Generated at: 2026-05-04T16:42:57.912Z
 
 ## Checks
 
@@ -18,47 +18,73 @@
 ### PASS 프로덕션 빌드
 
 Command: `npm run build`
-Duration: 7s
+Duration: 8s
 
 ```text
-dist/assets/NicheResearchPage-CSmllO9G.js           20.12 kB │ gzip:   6.19 kB │ map:    54.84 kB
-dist/assets/reference-import-M60kRXK8.js            25.70 kB │ gzip:   9.56 kB │ map:    66.59 kB
-dist/assets/ReferenceImportPage-CxHmey52.js         36.24 kB │ gzip:  11.18 kB │ map:    89.08 kB
-dist/assets/chunk-QFMPRPBF-BWa2BJRR.js              42.38 kB │ gzip:  15.04 kB │ map:   420.84 kB
-dist/assets/types-DX-3xFsU.js                      114.43 kB │ gzip:  35.48 kB │ map:   396.22 kB
-dist/assets/TimelineEditor-ClUXZYy2.js             115.04 kB │ gzip:  34.03 kB │ map:   422.69 kB
-dist/assets/index-YtXwlzsU.js                      194.05 kB │ gzip:  61.98 kB │ map:   821.77 kB
-dist/assets/Composition-CXiFAMRf.js                196.96 kB │ gzip:  57.01 kB │ map:   691.46 kB
-dist/assets/ContentWizardPage-33vuYAhb.js          337.65 kB │ gzip: 107.55 kB │ map: 1,068.81 kB
-✓ built in 1.14s
+dist/assets/UploadsPage-DPDbxNFU.js                   37.50 kB │ gzip:  11.58 kB │ map:   101.33 kB
+dist/assets/chunk-QFMPRPBF-BWa2BJRR.js                42.38 kB │ gzip:  15.04 kB │ map:   420.84 kB
+dist/assets/GrowthCommandCenterPage-Bsq2YhFs.js       60.95 kB │ gzip:  18.80 kB │ map:   141.67 kB
+dist/assets/ReferenceDetailPage-Bq0lrxG-.js           61.08 kB │ gzip:  16.30 kB │ map:   143.62 kB
+dist/assets/types-CoQyoww3.js                        114.43 kB │ gzip:  35.47 kB │ map:   396.22 kB
+dist/assets/TimelineEditor-D6yh2f5h.js               114.77 kB │ gzip:  33.91 kB │ map:   420.46 kB
+dist/assets/index-BFEFYm-y.js                        194.98 kB │ gzip:  62.39 kB │ map:   822.14 kB
+dist/assets/Composition-CZDCthjq.js                  196.96 kB │ gzip:  57.01 kB │ map:   691.46 kB
+dist/assets/ContentWizardPage-DM3f079o.js            380.19 kB │ gzip: 121.32 kB │ map: 1,185.15 kB
+✓ built in 1.15s
 ```
 
 ### PASS 단위/통합 테스트
 
 Command: `npm test --if-present`
-Duration: 4s
+Duration: 6s
 
 ```text
-{"ts":"2026-05-04T11:50:03.640Z","level":"info","service":"test-svc","msg":"SIGTERM received, shutting down gracefully"}
-{"ts":"2026-05-04T11:50:03.640Z","level":"info","service":"test-svc","msg":"Server closed"}
-{"ts":"2026-05-04T11:50:03.640Z","level":"info","service":"test-svc","msg":"SIGTERM received, shutting down gracefully"}
-{"ts":"2026-05-04T11:50:03.640Z","level":"info","service":"test-svc","msg":"Server closed"}
-{"ts":"2026-05-04T11:50:13.640Z","level":"warn","service":"test-svc","msg":"Forced shutdown after timeout"}
-{"ts":"2026-05-04T11:50:03.642Z","level":"info","service":"test-svc","msg":"SIGTERM received, shutting down gracefully"}
-{"ts":"2026-05-04T11:50:03.642Z","level":"info","service":"test-svc","msg":"Server closed"}
-{"ts":"2026-05-04T11:50:13.642Z","level":"warn","service":"test-svc","msg":"Forced shutdown after timeout"}
-{"ts":"2026-05-04T11:50:03.701Z","level":"warn","service":"test-service","msg":"Missing env vars: TEST_KEY_B"}
-{"ts":"2026-05-04T11:50:03.705Z","level":"warn","service":"svc","msg":"Missing env vars: TEST_KEY_A, TEST_KEY_B"}
+{"ts":"2026-05-04T16:42:41.409Z","level":"info","service":"test-svc","msg":"SIGTERM received, shutting down gracefully"}
+{"ts":"2026-05-04T16:42:41.409Z","level":"info","service":"test-svc","msg":"Server closed"}
+{"ts":"2026-05-04T16:42:41.410Z","level":"info","service":"test-svc","msg":"SIGTERM received, shutting down gracefully"}
+{"ts":"2026-05-04T16:42:41.410Z","level":"info","service":"test-svc","msg":"Server closed"}
+{"ts":"2026-05-04T16:42:51.410Z","level":"warn","service":"test-svc","msg":"Forced shutdown after timeout"}
+{"ts":"2026-05-04T16:42:41.413Z","level":"info","service":"test-svc","msg":"SIGTERM received, shutting down gracefully"}
+{"ts":"2026-05-04T16:42:41.413Z","level":"info","service":"test-svc","msg":"Server closed"}
+{"ts":"2026-05-04T16:42:51.413Z","level":"warn","service":"test-svc","msg":"Forced shutdown after timeout"}
+{"ts":"2026-05-04T16:42:41.438Z","level":"warn","service":"test-service","msg":"Missing env vars: TEST_KEY_B"}
+{"ts":"2026-05-04T16:42:41.443Z","level":"warn","service":"svc","msg":"Missing env vars: TEST_KEY_A, TEST_KEY_B"}
 ```
 
 ### PASS 정적 린트
 
 Command: `npm run lint`
-Duration: 9s
+Duration: 12s
 
 ```text
 > template@0.0.0 lint
 > eslint .
+```
+
+### PASS exported dead-code 검사
+
+Command: `npm run quality:dead-exports`
+Duration: 1s
+
+```text
+> template@0.0.0 quality:dead-exports
+> node scripts/check-dead-exports.mjs
+dead-exports: PASS (424 files scanned, value exports)
+```
+
+### PASS 제작 파이프라인 10게이트
+
+Command: `npm test -- --run src/lib/production-pipeline-guard.test.ts`
+Duration: 1s
+
+```text
+> template@0.0.0 test
+> vitest run --run src/lib/production-pipeline-guard.test.ts
+RUN  v4.1.4 /Users/jjuni/bolt/boltYT
+Test Files  1 passed (1)
+Tests  4 passed (4)
+Start at  01:42:57
+Duration  175ms (transform 75ms, setup 16ms, import 82ms, tests 4ms, environment 0ms)
 ```
 
 ## Next Actions
@@ -128,3 +154,19 @@ in-app 브라우저 제어가 닫혀도 핵심 UI 상태는 Playwright E2E에서
 - src/lib/knowledge-system.ts
 - src/lib/reference-bridge.ts
 - src/pages/content/StepPreview.tsx
+
+### 제작 파이프라인은 10개 계약으로 충돌을 막는다
+
+주제/브리프, 포맷, 대본 밀도, 스토리 편집, 씬 타임라인, 자료 인덱스, 샷 커버리지, 레퍼런스 품질, 렌더 QC, 업로드 준비를 독립 게이트로 검증한다.
+
+- src/lib/production-pipeline-guard.ts
+- src/lib/production-pipeline-guard.test.ts
+- src/lib/post-generation-quality.ts
+
+### export는 실제 사용되거나 명시적으로 공개돼야 한다
+
+새 모듈을 추가할 때 named export가 외부에서 import되지 않으면 제거하고, 의도적 공개 API만 dead-export allowlist에 남긴다.
+
+- scripts/check-dead-exports.mjs
+- package.json
+- src/lib/post-generation-quality.ts

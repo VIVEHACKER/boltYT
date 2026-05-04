@@ -61,5 +61,25 @@ describe("post-generation-quality", () => {
 		expect(ids).toContain("policy-boundary");
 		expect(ids).toContain("reference-quality-routing");
 		expect(ids).toContain("tacit-explicit-knowledge-loop");
+		expect(ids).toContain("production-pipeline-10-gates");
+		expect(ids).toContain("dead-export-hygiene");
+	});
+
+	it("제작 파이프라인 10게이트를 공식 품질 게이트에 포함", () => {
+		const gate = POST_GENERATION_QUALITY_GATES.find(
+			(item) => item.id === "production-pipeline-guard",
+		);
+
+		expect(gate?.blocking).toBe(true);
+		expect(gate?.command).toContain("production-pipeline-guard.test.ts");
+	});
+
+	it("exported dead-code 검사를 공식 품질 게이트에 포함", () => {
+		const gate = POST_GENERATION_QUALITY_GATES.find(
+			(item) => item.id === "dead-exports",
+		);
+
+		expect(gate?.blocking).toBe(true);
+		expect(gate?.command).toBe("npm run quality:dead-exports");
 	});
 });

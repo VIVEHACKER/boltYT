@@ -1,0 +1,276 @@
+{
+  "description": "Known intentional public named value exports. The dead-export checker fails only on new unreviewed unused exports.",
+  "allow": [
+    {
+      "file": "server/lib/diag-agent.ts",
+      "exports": ["AGENT_TOOLS"],
+      "reason": "Diagnostics tool registry is a server public surface."
+    },
+    {
+      "file": "server/lib/job-manager.ts",
+      "exports": ["priorityWeight", "sortByPriority"],
+      "reason": "Render queue ordering helpers are kept as public testable utilities."
+    },
+    {
+      "file": "server/lib/proxy-file.ts",
+      "exports": ["DEFAULT_PROXY_OPTIONS"],
+      "reason": "Proxy defaults are intentionally inspectable for server integration."
+    },
+    {
+      "file": "server/lib/render-output-qc.ts",
+      "exports": ["compareRenderToReference"],
+      "reason": "Reference comparison remains available for QC tooling."
+    },
+    {
+      "file": "server/lib/sentry-server.ts",
+      "exports": ["Sentry"],
+      "reason": "Server-side Sentry namespace is re-exported for instrumentation boundaries."
+    },
+    {
+      "file": "src/components/timeline/Track.tsx",
+      "exports": ["Track"],
+      "reason": "Legacy V1 timeline component kept during V2 migration."
+    },
+    {
+      "file": "src/hooks/useAuth.ts",
+      "exports": ["useAuthStore"],
+      "reason": "Auth store remains a public hook surface."
+    },
+    {
+      "file": "src/hooks/useChannels.ts",
+      "exports": ["useChannelsStore", "useChannels"],
+      "reason": "Channel hooks remain reusable page-level surfaces."
+    },
+    {
+      "file": "src/lib/animation-production.ts",
+      "exports": [
+        "ANIMATION_PRODUCTION_FAMILY_PROFILES",
+        "ANIMATION_PRODUCTION_FAMILIES",
+        "getAnimationProductionFamilyProfile"
+      ],
+      "reason": "Animation production catalog is a reusable recommendation surface."
+    },
+    {
+      "file": "src/lib/audio-test-utils.ts",
+      "exports": ["computeFreqEnergy"],
+      "reason": "Audio assertions share this utility across current and future tests."
+    },
+    {
+      "file": "src/lib/beat-sync.ts",
+      "exports": ["snapTransitionFramesToBeat"],
+      "reason": "Beat-sync transition helper is part of the editing toolkit."
+    },
+    {
+      "file": "src/lib/bgm.ts",
+      "exports": ["normalizeMood", "getRecommendedBgm"],
+      "reason": "BGM selection helpers are kept as public generation APIs."
+    },
+    {
+      "file": "src/lib/bilingual-caption.ts",
+      "exports": ["buildBilingualLines", "activeBilingualLine"],
+      "reason": "Bilingual caption helpers are available for alternate caption renderers."
+    },
+    {
+      "file": "src/lib/caption-color-adapt.ts",
+      "exports": ["adaptiveCaptionColor"],
+      "reason": "Caption contrast helper is a renderer utility surface."
+    },
+    {
+      "file": "src/lib/channel-strategy-ranker.ts",
+      "exports": ["CHANNEL_STRATEGY_EVIDENCE_SOURCES"],
+      "reason": "Evidence source catalog is exposed for growth UI and reporting."
+    },
+    {
+      "file": "src/lib/color-grades.ts",
+      "exports": [
+        "COLOR_GRADE_CATEGORIES",
+        "CATEGORY_LABELS",
+        "PHOTO_INVERT",
+        "PHOTO_SEPIA",
+        "PHOTO_GRAYSCALE",
+        "luminancePreservingSaturation",
+        "combinePresets",
+        "multiplyMatrices",
+        "applyEase",
+        "interpolateColorMatrices"
+      ],
+      "reason": "Color grading module intentionally exposes a renderer toolkit API."
+    },
+    {
+      "file": "src/lib/cta-generator.ts",
+      "exports": ["generateCta"],
+      "reason": "CTA generation remains available for upload/copy automation."
+    },
+    {
+      "file": "src/lib/face-aware-kb.ts",
+      "exports": ["suggestKbFromFace", "pickPrimaryFace"],
+      "reason": "Face-aware Ken Burns helpers are reusable shot-planning utilities."
+    },
+    {
+      "file": "src/lib/generated-reference-loader.ts",
+      "exports": ["loadGeneratedReferenceTemplateCoverage"],
+      "reason": "Generated reference coverage is a reporting surface."
+    },
+    {
+      "file": "src/lib/growth-operating-system.ts",
+      "exports": [
+        "buildAnalyticsSyncPlan",
+        "buildExperimentBacklog",
+        "buildRetentionFindings",
+        "buildRightsLedger",
+        "buildAutomationRoutines"
+      ],
+      "reason": "Growth OS sub-builders are kept public for focused UI and tests."
+    },
+    {
+      "file": "src/lib/histogram.ts",
+      "exports": ["suggestExposureFromHistogram"],
+      "reason": "Histogram exposure helper is part of the media analysis toolkit."
+    },
+    {
+      "file": "src/lib/instagram.ts",
+      "exports": ["openIgAuth"],
+      "reason": "Instagram auth helper is reserved for platform setup flows."
+    },
+    {
+      "file": "src/lib/local-db.ts",
+      "exports": ["releaseAllBlobUrls", "getLocalBlobUrl"],
+      "reason": "Local asset URL lifecycle helpers are intentionally exposed."
+    },
+    {
+      "file": "src/lib/narration-normalize.ts",
+      "exports": ["normalizeScenesNarration"],
+      "reason": "Narration normalization is a reusable script repair utility."
+    },
+    {
+      "file": "src/lib/niche-research.ts",
+      "exports": ["loadNicheHandoffForTopic"],
+      "reason": "Niche handoff lookup is part of research-to-content handoff."
+    },
+    {
+      "file": "src/lib/reference-bridge.ts",
+      "exports": ["moodVisualIntensity"],
+      "reason": "Reference mood intensity is a reusable bridge helper."
+    },
+    {
+      "file": "src/lib/reference-duration-policy.ts",
+      "exports": ["clampLongformDurationSeconds"],
+      "reason": "Duration policy is intentionally available to generation callers."
+    },
+    {
+      "file": "src/lib/reference-similarity.ts",
+      "exports": ["visualSimilarityScore"],
+      "reason": "Reference similarity scoring is exposed for future ranking views."
+    },
+    {
+      "file": "src/lib/reference-template-presets.ts",
+      "exports": ["GENERATED_REFERENCE_CATEGORY_LABELS"],
+      "reason": "Reference category labels are a UI/reporting surface."
+    },
+    {
+      "file": "src/lib/render-queue.ts",
+      "exports": ["RenderJobError"],
+      "reason": "Render queue error type is part of the queue API boundary."
+    },
+    {
+      "file": "src/lib/scene-promote-hook.ts",
+      "exports": ["promoteHookScenes"],
+      "reason": "Hook-scene promotion remains a reusable editing pass."
+    },
+    {
+      "file": "src/lib/sentry.ts",
+      "exports": ["Sentry"],
+      "reason": "Client Sentry namespace is re-exported for instrumentation boundaries."
+    },
+    {
+      "file": "src/lib/sfx-cooldown.ts",
+      "exports": ["applyCooldownToSfx"],
+      "reason": "SFX cooldown helper is part of audio arrangement tooling."
+    },
+    {
+      "file": "src/lib/sfx.ts",
+      "exports": ["moodVolumeScale", "withMoodVolume"],
+      "reason": "SFX mood-volume helpers are reusable audio utilities."
+    },
+    {
+      "file": "src/lib/silence-remover.ts",
+      "exports": ["analyzeSilence"],
+      "reason": "Silence analysis is a reusable audio preprocessing utility."
+    },
+    {
+      "file": "src/lib/thumbnail-intelligence.ts",
+      "exports": ["buildReferenceThumbnailDna"],
+      "reason": "Thumbnail DNA extraction is exposed for reference learning."
+    },
+    {
+      "file": "src/lib/tiktok.ts",
+      "exports": ["openTikTokAuth"],
+      "reason": "TikTok auth helper is reserved for platform setup flows."
+    },
+    {
+      "file": "src/lib/timeline-model.ts",
+      "exports": ["DEFAULT_FPS", "clipsOverlap", "getSelected"],
+      "reason": "Timeline model constants/helpers form the editor model API."
+    },
+    {
+      "file": "src/lib/trend-reference-learning.ts",
+      "exports": ["buildTrendReferenceLearningMetadata"],
+      "reason": "Trend-to-reference metadata builder is a recommendation surface."
+    },
+    {
+      "file": "src/lib/upload-growth.ts",
+      "exports": ["recommendCadence"],
+      "reason": "Upload cadence recommendation is a growth strategy utility."
+    },
+    {
+      "file": "src/lib/upload-management.ts",
+      "exports": ["isScheduledInPast"],
+      "reason": "Upload schedule validation is a reusable queue helper."
+    },
+    {
+      "file": "src/lib/video-dynamics.ts",
+      "exports": ["__test"],
+      "reason": "Private probes are intentionally exposed for focused tests."
+    },
+    {
+      "file": "src/lib/video-gen.ts",
+      "exports": ["generateVideoToPath"],
+      "reason": "Video generation entrypoint is exposed for CLI/server callers."
+    },
+    {
+      "file": "src/lib/word-timing-gaps.ts",
+      "exports": ["insertGapPlaceholders"],
+      "reason": "Word timing repair helper is part of caption alignment tooling."
+    },
+    {
+      "file": "src/remotion/CompositionV2.tsx",
+      "exports": ["CompositionV2"],
+      "reason": "Remotion composition entrypoint for timeline projects."
+    },
+    {
+      "file": "src/remotion/cards/TitleCard.tsx",
+      "exports": ["HOOK_CARD_FRAMES"],
+      "reason": "Title card timing constant is exposed for composition tuning."
+    },
+    {
+      "file": "src/remotion/overlays/FilmGrain.tsx",
+      "exports": ["FilmGrain"],
+      "reason": "Overlay component is part of the Remotion visual toolkit."
+    },
+    {
+      "file": "src/remotion/overlays/Vignette.tsx",
+      "exports": ["Vignette"],
+      "reason": "Overlay component is part of the Remotion visual toolkit."
+    },
+    {
+      "file": "src/remotion/shot-timing.ts",
+      "exports": ["__test"],
+      "reason": "Private timing helpers are intentionally exposed for focused tests."
+    },
+    {
+      "file": "src/remotion/timing.ts",
+      "exports": ["J_CUT_PRE_FRAMES", "L_CUT_POST_FRAMES"],
+      "reason": "J/L cut timing constants are exposed for renderer tuning."
+    }
+  ]
+}

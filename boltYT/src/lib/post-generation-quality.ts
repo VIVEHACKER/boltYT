@@ -67,6 +67,15 @@ export const POST_GENERATION_QUALITY_GATES: QualityGate[] = [
 		rationale: "사용하지 않는 코드, React hook, import 품질 문제를 차단한다.",
 	},
 	{
+		id: "dead-exports",
+		label: "exported dead-code 검사",
+		phase: "verification",
+		blocking: true,
+		command: "npm run quality:dead-exports",
+		rationale:
+			"TypeScript가 잡지 못하는 외부 미사용 named export를 찾아 코드 표면적이 커지는 것을 막는다.",
+	},
+	{
 		id: "reference-e2e",
 		label: "레퍼런스 UI E2E",
 		phase: "visual",
@@ -74,6 +83,15 @@ export const POST_GENERATION_QUALITY_GATES: QualityGate[] = [
 		command: "npx playwright test e2e/references.spec.ts",
 		rationale:
 			"브라우저 수동 제어가 실패해도 자동 생성 레퍼런스가 화면에 노출되는지 검증한다.",
+	},
+	{
+		id: "production-pipeline-guard",
+		label: "제작 파이프라인 10게이트",
+		phase: "verification",
+		blocking: true,
+		command: "npm test -- --run src/lib/production-pipeline-guard.test.ts",
+		rationale:
+			"주제, 대본, 씬, 자료, 레퍼런스, 렌더, 업로드 계약 충돌을 10개 게이트로 사전 차단한다.",
 	},
 	{
 		id: "harness",
@@ -159,6 +177,26 @@ export const PROJECT_QUALITY_LEARNINGS: ProjectLearning[] = [
 			"src/lib/knowledge-system.ts",
 			"src/lib/reference-bridge.ts",
 			"src/pages/content/StepPreview.tsx",
+		],
+	},
+	{
+		id: "production-pipeline-10-gates",
+		title: "제작 파이프라인은 10개 계약으로 충돌을 막는다",
+		rule: "주제/브리프, 포맷, 대본 밀도, 스토리 편집, 씬 타임라인, 자료 인덱스, 샷 커버리지, 레퍼런스 품질, 렌더 QC, 업로드 준비를 독립 게이트로 검증한다.",
+		files: [
+			"src/lib/production-pipeline-guard.ts",
+			"src/lib/production-pipeline-guard.test.ts",
+			"src/lib/post-generation-quality.ts",
+		],
+	},
+	{
+		id: "dead-export-hygiene",
+		title: "export는 실제 사용되거나 명시적으로 공개돼야 한다",
+		rule: "새 모듈을 추가할 때 named export가 외부에서 import되지 않으면 제거하고, 의도적 공개 API만 dead-export allowlist에 남긴다.",
+		files: [
+			"scripts/check-dead-exports.mjs",
+			"package.json",
+			"src/lib/post-generation-quality.ts",
 		],
 	},
 ];
