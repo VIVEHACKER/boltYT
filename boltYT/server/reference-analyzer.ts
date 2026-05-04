@@ -23,6 +23,7 @@ import {
 	lstatSync,
 	mkdirSync,
 	readFileSync,
+	readdirSync,
 	realpathSync,
 	writeFileSync,
 } from "node:fs";
@@ -36,6 +37,12 @@ import { isAbsolute, join, relative, resolve } from "node:path";
 import { promisify } from "node:util";
 import { loadEnv, validateEnv } from "./lib/env.ts";
 import { createLogger } from "./lib/logger.ts";
+import {
+	getOpenAiSkipReason,
+	isOpenAiQuotaError,
+	markOpenAiOk,
+	markOpenAiQuotaBlocked,
+} from "./lib/openai-runtime-health.ts";
 import { enqueueProxyBuildBackground } from "./lib/proxy-enqueue.ts";
 import { createRateLimiter } from "./lib/rate-limit.ts";
 import {
@@ -45,6 +52,8 @@ import {
 import {
 	evaluateRenderOutput,
 	profileFromRenderOutputQc,
+	type RenderOutputQcReport,
+	type RenderReferenceProfile,
 } from "./lib/render-output-qc.ts";
 import { trackRequest } from "./lib/request-metrics.ts";
 import { setupGracefulShutdown } from "./lib/shutdown.ts";
@@ -69,8 +78,8 @@ const REFERENCE_ALLOWED_DIR = process.env.REFERENCE_ALLOWED_DIR
 /** 정밀 분석 가능 최대 영상 길이 (초). 프레임+Whisper+Vision 분석 전용 */
 const MAX_DURATION_SECONDS = 180;
 
-/** 다운로드 없이 메타데이터 기반으로 레퍼런스화할 수 있는 롱폼 최대 길이 */
-const MAX_LONGFORM_REFERENCE_SECONDS = 3 * 60 * 60;
+/** 운영 대상 롱폼 레퍼런스 최대 길이 */
+const MAX_LONGFORM_REFERENCE_SECONDS = 20 * 60;
 
 /** 긴 레퍼런스 deep 분석 시 실제로 뜯을 대표 구간 수와 구간 길이 */
 const DEEP_SAMPLE_SEGMENT_SECONDS = Math.max(
@@ -81,6 +90,8 @@ const DEEP_SAMPLE_SEGMENTS = Math.max(
 	2,
 	Math.min(8, Number(process.env.REFERENCE_DEEP_SAMPLE_SEGMENTS) || 5),
 );
+const OPENAI_VISION_MODEL = process.env.OPENAI_VISION_MODEL || "gpt-4o-mini";
+const OPENAI_TRANSCRIBE_MODEL = process.env.OPENAI_TRANSCRIBE_MODEL || "whisper-1";
 
 /** 분석 가능 최대 파일 크기 (바이트, 파일 업로드 시) */
 const MAX_FILE_SIZE_BYTES = 500 * 1024 * 1024; // 500MB
@@ -485,6 +496,107 @@ function findDownloadedSegment(outDir: string, prefix: string): string | null {
 	return null;
 }
 
+function parseVttTimestamp(value: string): number {
+	const parts = value.trim().split(":");
+	const seconds = Number(parts.pop()?.replace(",", ".") ?? 0) || 0;
+	const minutes = Number(parts.pop() ?? 0) || 0;
+	const hours = Number(parts.pop() ?? 0) || 0;
+	return hours * 3600 + minutes * 60 + seconds;
+}
+
+function cleanSubtitleText(value: string): string {
+	return value
+		.replace(/<[^>]+>/g, "")
+		.replace(/\{\\[^}]+}/g, "")
+		.replace(/&amp;/g, "&")
+		.replace(/&lt;/g, "<")
+		.replace(/&gt;/g, ">")
+		.replace(/\s+/g, " ")
+		.trim();
+}
+
+function parseVttTranscript(raw: string): {
+	text: string;
+	segments: Array<{ start: number; end: number; text: string }>;
+} {
+	const blocks = raw.replace(/\r/g, "").split(/\n{2,}/);
+	const segments: Array<{ start: number; end: number; text: string }> = [];
+	const seen = new Set<string>();
+	for (const block of blocks) {
+		const lines = block
+			.split("\n")
+			.map((line) => line.trim())
+			.filter(Boolean);
+		const timingIndex = lines.findIndex((line) => line.includes("-->"));
+		if (timingIndex < 0) continue;
+		const [startRaw, endRaw] = lines[timingIndex].split("-->");
+		const text = cleanSubtitleText(lines.slice(timingIndex + 1).join(" "));
+		if (!text || seen.has(`${startRaw}-${text}`)) continue;
+		seen.add(`${startRaw}-${text}`);
+		segments.push({
+			start: parseVttTimestamp(startRaw),
+			end: parseVttTimestamp(endRaw.split(/\s+/)[0] ?? ""),
+			text,
+		});
+	}
+	return {
+		text: segments.map((segment) => segment.text).join(" ").slice(0, 12_000),
+		segments: segments.slice(0, 120),
+	};
+}
+
+async function fetchYouTubeTranscript(
+	url: string,
+	jobId: string,
+): Promise<{
+	text: string;
+	segments: Array<{ start: number; end: number; text: string }>;
+	source: string;
+} | null> {
+	const outDir = join(WORK_DIR, jobId, "subtitles");
+	mkdirSync(outDir, { recursive: true });
+	const outputTemplate = join(outDir, "subtitle.%(ext)s");
+	try {
+		await execFileP(
+			"yt-dlp",
+			[
+				"--no-playlist",
+				"--skip-download",
+				"--write-subs",
+				"--write-auto-subs",
+				"--sub-langs",
+				"ko.*,ko,en.*,en",
+				"--sub-format",
+				"vtt",
+				"--output",
+				outputTemplate,
+				"--quiet",
+				"--no-warnings",
+				url,
+			],
+			{ timeout: 60_000 },
+		);
+	} catch (error) {
+		log.warn("YouTube subtitle extraction failed, continuing without", {
+			jobId,
+			error: error instanceof Error ? error.message : String(error),
+		});
+		return null;
+	}
+	const subtitleFiles = readdirSync(outDir)
+		.filter((file) => file.endsWith(".vtt"))
+		.sort((a, b) => {
+			const score = (file: string) =>
+				file.includes(".ko") ? 0 : file.includes(".en") ? 1 : 2;
+			return score(a) - score(b) || a.localeCompare(b);
+		});
+	for (const file of subtitleFiles) {
+		const parsed = parseVttTranscript(readFileSync(join(outDir, file), "utf8"));
+		if (parsed.text) return { ...parsed, source: `youtube_subtitle:${file}` };
+	}
+	return null;
+}
+
 async function downloadYouTubeSection(
 	url: string,
 	jobId: string,
@@ -685,6 +797,8 @@ async function transcribeAudio(audioPath: string): Promise<{
 }> {
 	const key = process.env.OPENAI_API_KEY;
 	if (!key) throw new Error("OPENAI_API_KEY not set");
+	const skipReason = getOpenAiSkipReason();
+	if (skipReason) throw new Error(skipReason);
 
 	const audioBuffer = await readFile(audioPath);
 	const form = new FormData();
@@ -693,7 +807,7 @@ async function transcribeAudio(audioPath: string): Promise<{
 		new Blob([audioBuffer], { type: "audio/mpeg" }),
 		"audio.mp3",
 	);
-	form.append("model", "whisper-1");
+	form.append("model", OPENAI_TRANSCRIBE_MODEL);
 	form.append("response_format", "verbose_json");
 	form.append("timestamp_granularities[]", "segment");
 
@@ -705,8 +819,14 @@ async function transcribeAudio(audioPath: string): Promise<{
 
 	if (!res.ok) {
 		const err = await res.text();
-		throw new Error(`Whisper error ${res.status}: ${err}`);
+		if (isOpenAiQuotaError(err)) {
+			markOpenAiQuotaBlocked(err, "reference-analyzer:whisper");
+		}
+			throw new Error(
+				`Transcription (${OPENAI_TRANSCRIBE_MODEL}) error ${res.status}: ${err}`,
+			);
 	}
+	markOpenAiOk();
 
 	const data = (await res.json()) as {
 		text: string;
@@ -782,6 +902,8 @@ async function analyzeWithVision(params: {
 }): Promise<Record<string, unknown>> {
 	const key = process.env.OPENAI_API_KEY;
 	if (!key) throw new Error("OPENAI_API_KEY not set");
+	const skipReason = getOpenAiSkipReason();
+	if (skipReason) throw new Error(skipReason);
 
 	// 프레임을 base64로 인코딩
 	const frameImages = await Promise.all(
@@ -873,7 +995,7 @@ ${params.segments
 			Authorization: `Bearer ${key}`,
 		},
 		body: JSON.stringify({
-			model: "gpt-4o",
+				model: OPENAI_VISION_MODEL,
 			messages: [
 				{ role: "system", content: systemPrompt },
 				{ role: "user", content: userParts },
@@ -885,8 +1007,14 @@ ${params.segments
 
 	if (!res.ok) {
 		const err = await res.text();
-		throw new Error(`GPT-4o Vision error ${res.status}: ${err}`);
+		if (isOpenAiQuotaError(err)) {
+			markOpenAiQuotaBlocked(err, "reference-analyzer:vision");
+		}
+		throw new Error(
+			`GPT Vision (${OPENAI_VISION_MODEL}) error ${res.status}: ${err}`,
+		);
 	}
+	markOpenAiOk();
 
 	const data = (await res.json()) as {
 		choices: Array<{ message: { content: string } }>;
@@ -922,6 +1050,11 @@ function parseAnalysisMode(value: unknown): ReferenceAnalysisMode | null {
 
 function clampNumber(value: number, min: number, max: number): number {
 	return Math.max(min, Math.min(max, value));
+}
+
+function roundNumber(value: number, decimals = 2): number {
+	const factor = 10 ** decimals;
+	return Math.round(value * factor) / factor;
 }
 
 function roundToMinute(seconds: number): number {
@@ -1337,6 +1470,360 @@ function stringArrayField(value: unknown): string[] {
 		: [];
 }
 
+type ShortformFamily = "mystery" | "news" | "social_clip" | "warm" | "generic";
+
+function inferShortformFamily(title: string, transcript: string): ShortformFamily {
+	const text = `${title} ${transcript}`.toLowerCase();
+	if (/(미스터리|괴담|공포|실종|범죄|사건|비밀|충격|mystery|horror|crime|secret)/i.test(text)) {
+		return "mystery";
+	}
+	if (/(뉴스|속보|논란|정치|경제|사회|현장|팩트|news|breaking|report|controversy)/i.test(text)) {
+		return "news";
+	}
+	if (/(인터뷰|대화|반응|댓글|연예|이슈|clip|podcast|reaction|celebrity|social)/i.test(text)) {
+		return "social_clip";
+	}
+	if (/(여행|음식|일상|감동|가족|연애|vlog|food|travel|life|story)/i.test(text)) {
+		return "warm";
+	}
+	return "generic";
+}
+
+function shortformFamilySettings(family: ShortformFamily): Pick<
+	ReferenceTemplateResult,
+	| "dominant_colors"
+	| "visual_mood"
+	| "visual_prompt_template"
+	| "lighting_style"
+	| "subtitle_position"
+	| "subtitle_size_preset"
+	| "subtitle_bg_style"
+	| "subtitle_accent_color"
+	| "transition_style"
+	| "pacing_preset"
+	| "tts_speed"
+	| "tts_tone_keywords"
+	| "bgm_mood"
+	| "bgm_keywords"
+	| "bgm_tempo"
+	| "hook_pattern"
+> {
+	switch (family) {
+		case "mystery":
+			return {
+				dominant_colors: ["#05060A", "#151A22", "#C8A45D", "#EFE8D8"],
+				visual_mood: "mystery",
+				visual_prompt_template:
+					"cinematic mystery short, archival b-roll feeling, tense contrast, warm highlight accents, documentary realism, no readable text",
+				lighting_style: "mixed",
+				subtitle_position: "bottom",
+				subtitle_size_preset: "xl",
+				subtitle_bg_style: "stroke",
+				subtitle_accent_color: "#E8B85A",
+				transition_style: "mixed",
+				pacing_preset: "fast",
+				tts_speed: 1.08,
+				tts_tone_keywords: ["긴장감 있는", "낮게 누르는", "의문을 남기는", "몰입형"],
+				bgm_mood: "mysterious",
+				bgm_keywords: ["dark pulse", "mystery tension", "cinematic riser", "low drone"],
+				bgm_tempo: "mid",
+				hook_pattern: "question",
+			};
+		case "news":
+			return {
+				dominant_colors: ["#08111F", "#F8FAFC", "#E11D48", "#2563EB"],
+				visual_mood: "news",
+				visual_prompt_template:
+					"fast editorial news short, source-backed b-roll montage, clean high contrast, urgent documentary framing, no readable text",
+				lighting_style: "natural",
+				subtitle_position: "bottom",
+				subtitle_size_preset: "lg",
+				subtitle_bg_style: "block",
+				subtitle_accent_color: "#E11D48",
+				transition_style: "hardcut",
+				pacing_preset: "fast",
+				tts_speed: 1.12,
+				tts_tone_keywords: ["명료한", "속도감 있는", "단정적인", "리포트형"],
+				bgm_mood: "tense",
+				bgm_keywords: ["news pulse", "urgent underscore", "investigative beat", "tight percussion"],
+				bgm_tempo: "fast",
+				hook_pattern: "claim",
+			};
+		case "social_clip":
+			return {
+				dominant_colors: ["#101010", "#F4F0E8", "#D9A84F", "#5B6470"],
+				visual_mood: "neutral",
+				visual_prompt_template:
+					"social commentary short, real clip editorial crop, human reaction focus, warm neutral contrast, documentary cutaway style, no readable text",
+				lighting_style: "natural",
+				subtitle_position: "bottom",
+				subtitle_size_preset: "xl",
+				subtitle_bg_style: "stroke",
+				subtitle_accent_color: "#E6B450",
+				transition_style: "hardcut",
+				pacing_preset: "fast",
+				tts_speed: 1.1,
+				tts_tone_keywords: ["대화형", "짧게 치는", "관찰적인", "반응 유도형"],
+				bgm_mood: "calm tension",
+				bgm_keywords: ["subtle social beat", "commentary bed", "light tension", "modern pulse"],
+				bgm_tempo: "mid",
+				hook_pattern: "claim",
+			};
+		case "warm":
+			return {
+				dominant_colors: ["#211A14", "#F7E5C6", "#F2B66D", "#77A889"],
+				visual_mood: "warm",
+				visual_prompt_template:
+					"warm human story short, soft realistic b-roll, close-up detail shots, gentle daylight, emotional editorial pacing, no readable text",
+				lighting_style: "natural",
+				subtitle_position: "bottom",
+				subtitle_size_preset: "lg",
+				subtitle_bg_style: "stroke",
+				subtitle_accent_color: "#F2B66D",
+				transition_style: "crossfade",
+				pacing_preset: "medium",
+				tts_speed: 1.03,
+				tts_tone_keywords: ["따뜻한", "공감형", "차분한", "스토리텔링"],
+				bgm_mood: "warm",
+				bgm_keywords: ["warm piano", "soft pulse", "emotional bed", "hopeful ambient"],
+				bgm_tempo: "mid",
+				hook_pattern: "story",
+			};
+		default:
+			return {
+				dominant_colors: ["#0B0D10", "#F2F2F2", "#C9A45C", "#6B7280"],
+				visual_mood: "neutral",
+				visual_prompt_template:
+					"high-retention editorial short, layered b-roll montage, clean cinematic contrast, bold subtitle-safe composition, no readable text",
+				lighting_style: "mixed",
+				subtitle_position: "bottom",
+				subtitle_size_preset: "lg",
+				subtitle_bg_style: "stroke",
+				subtitle_accent_color: "#C9A45C",
+				transition_style: "mixed",
+				pacing_preset: "fast",
+				tts_speed: 1.08,
+				tts_tone_keywords: ["빠른", "명료한", "궁금증 유도", "요약형"],
+				bgm_mood: "dramatic",
+				bgm_keywords: ["shorts tension", "cinematic pulse", "modern underscore", "quick riser"],
+				bgm_tempo: "mid",
+				hook_pattern: "claim",
+			};
+	}
+}
+
+function buildShortformScriptStructure(
+	family: ShortformFamily,
+	durationSeconds: number,
+	segments: Array<{ start: number; end: number; text: string }>,
+): ReferenceTemplateResult["script_structure"] {
+	const safeDuration = clampNumber(durationSeconds || 35, 8, MAX_DURATION_SECONDS);
+	const base =
+		family === "mystery"
+			? [
+					["hook", "정답을 바로 말하지 말고 첫 2초 안에 미해결 질문을 제시"],
+					["context", "장소, 인물, 사건 배경을 한 문장으로 압축"],
+					["clue", "시청자가 멈춰 볼 단서나 이상한 지점을 제시"],
+					["turn", "상식과 다른 반전 정보를 추가"],
+					["payoff", "남는 의문 또는 다음 조사 포인트로 마무리"],
+				]
+			: family === "news"
+				? [
+						["hook", "가장 강한 사실 또는 수치를 먼저 제시"],
+						["context", "왜 지금 중요한지 배경을 짧게 설명"],
+						["evidence", "자료 화면과 맞는 핵심 근거를 제시"],
+						["impact", "시청자에게 생기는 변화나 의미를 정리"],
+						["payoff", "마지막 문장으로 결론을 선명하게 닫기"],
+					]
+				: family === "social_clip"
+					? [
+							["hook", "사람의 말/표정 중 가장 센 한 문장을 먼저 배치"],
+							["setup", "누가 어떤 맥락에서 말했는지 짧게 설명"],
+							["clip_reaction", "실제 클립 또는 대체 b-roll을 문장 끝마다 컷"],
+							["commentary", "짧은 해석을 넣되 화면 위 설명 텍스트는 최소화"],
+							["payoff", "논점 하나만 남기고 끝내기"],
+						]
+					: [
+							["hook", "첫 장면에서 결과 또는 궁금증을 먼저 제시"],
+							["setup", "상황을 이해시키는 최소 맥락"],
+							["build", "핵심 정보 1-2개를 빠른 컷으로 누적"],
+							["turn", "예상과 다른 지점 또는 감정 변화"],
+							["payoff", "기억할 한 문장으로 정리"],
+						];
+	const weights = [0.16, 0.22, 0.24, 0.22, 0.16];
+	let allocated = 0;
+	return base.map(([role, note], index) => {
+		const isLast = index === base.length - 1;
+		const duration = isLast
+			? roundNumber(Math.max(1.2, safeDuration - allocated), 1)
+			: roundNumber(Math.max(1.4, safeDuration * (weights[index] ?? 0.2)), 1);
+		allocated += duration;
+		const segmentHint = segments[index]?.text?.trim();
+		return {
+			role,
+			duration,
+			note: segmentHint ? `${note}. 참고 발화: ${segmentHint.slice(0, 90)}` : note,
+		};
+	});
+}
+
+function buildLocalDeepAnalysisFallback(params: {
+	title: string;
+	duration: number;
+	transcript: string;
+	segments: Array<{ start: number; end: number; text: string }>;
+	frameProfile: RenderReferenceProfile | null;
+	frameQcReport: RenderOutputQcReport | null;
+}): Record<string, unknown> {
+	const family = inferShortformFamily(params.title, params.transcript);
+	const settings = shortformFamilySettings(family);
+	const safeDuration = clampNumber(params.duration || MAX_DURATION_SECONDS, 8, MAX_DURATION_SECONDS);
+	const estimatedCuts =
+		params.frameProfile?.sceneCuts.estimatedCuts ??
+		params.frameQcReport?.metrics.sceneCuts.estimatedCuts ??
+		0;
+	const cutDensity =
+		params.frameProfile?.cutDensityPerMinute ??
+		(estimatedCuts > 0 ? (estimatedCuts / safeDuration) * 60 : 0);
+	const avgDiff = params.frameProfile?.fullFrame.avgDiff ?? 0;
+	const first3AvgDiff = params.frameProfile?.fullFrame.first3AvgDiff ?? 0;
+	const fastCutting = cutDensity >= 14 || first3AvgDiff >= 0.035;
+	const sceneCount = clampNumber(
+		estimatedCuts > 0
+			? Math.round(estimatedCuts + 1)
+			: Math.round(safeDuration / (fastCutting ? 1.8 : 2.8)),
+		4,
+		safeDuration <= 30 ? 18 : 42,
+	);
+	const avgSceneDuration = roundNumber(safeDuration / sceneCount, 2);
+	const hookDuration = roundNumber(clampNumber(safeDuration * 0.14, 1.4, 3.4), 1);
+	const transitionStyle =
+		cutDensity >= 18
+			? "hardcut"
+			: cutDensity >= 8
+				? settings.transition_style
+				: "crossfade";
+	const cameraMode =
+		cutDensity >= 18
+			? "cut_driven"
+			: avgDiff >= 0.05
+				? "handheld"
+				: avgDiff >= 0.018
+					? "slow_push"
+					: "mixed";
+	const cameraMotion =
+		cameraMode === "cut_driven"
+			? ["rapid source cuts", "punch-in crops", "sentence-end hard cuts"]
+			: cameraMode === "handheld"
+				? ["handheld movement", "reactive crop", "micro zoom"]
+				: cameraMode === "slow_push"
+					? ["slow push-in", "parallax crop", "gentle reframing"]
+					: ["mixed b-roll motion", "subtitle-safe crop", "timed punch-in"];
+
+	return {
+		...settings,
+		scene_count: sceneCount,
+		avg_scene_duration: avgSceneDuration,
+		hook_duration: hookDuration,
+		transition_style: transitionStyle,
+		pacing_preset:
+			fastCutting || avgSceneDuration <= 2.2 ? "fast" : settings.pacing_preset,
+		camera_mode: cameraMode,
+		camera_motion: cameraMotion,
+		layout_pattern:
+			family === "social_clip"
+				? "full_frame_editorial_clip"
+				: family === "news"
+					? "source_broll_news_stack"
+					: "full_frame_editorial_broll",
+		subject_placement: "center",
+		text_zones: [
+			"bottom_center_with_stroke",
+			"top_center_title_safe",
+			"middle_center_reserved_for_subject",
+		],
+		transition_rules: [
+			"발화 중간 컷 금지: TTS 세그먼트 end 또는 문장부호에서만 컷",
+			`컷 밀도는 분당 ${roundNumber(cutDensity, 1)}회 수준을 목표로 조정`,
+			"첫 3초에는 title-safe 상단을 비우고 피사체 또는 자료 컷을 크게 배치",
+			"원본 프레임, 원본 음성, 원본 음악은 재사용하지 않고 동일 리듬의 대체 소재로 재구성",
+		],
+		voice_delivery: settings.tts_tone_keywords,
+		bgm_energy_curve: fastCutting
+			? "0-3초 riser, 중반 short pulse 반복, 마지막 1초 hit-out"
+			: "0-3초 low bed, 중반 점진 상승, 결말에서 짧은 resolve",
+		script_structure: buildShortformScriptStructure(
+			family,
+			safeDuration,
+			params.segments,
+		),
+		vision_fallback: true,
+		vision_fallback_reason: "openai_vision_unavailable_or_quota",
+		inferred_family: family,
+		local_frame_metrics: {
+			cutDensityPerMinute: roundNumber(cutDensity, 2),
+			avgDiff: roundNumber(avgDiff, 5),
+			first3AvgDiff: roundNumber(first3AvgDiff, 5),
+			estimatedCuts,
+			sceneCount,
+		},
+	};
+}
+
+function buildShortformProductionMethod(params: {
+	sourceUrl: string;
+	duration: number;
+	analysis: Record<string, unknown>;
+	visionAnalyzed: boolean;
+}) {
+	const sceneCount = Number(params.analysis.scene_count) || 8;
+	const avgSceneDuration = Number(params.analysis.avg_scene_duration) || 3;
+	const hookDuration = Number(params.analysis.hook_duration) || 3;
+	const durationSeconds = Math.round(params.duration || sceneCount * avgSceneDuration);
+	return {
+		id: params.visionAnalyzed
+			? "deep-shortform-vision-reference"
+			: "deep-shortform-local-frame-reference",
+		label: params.visionAnalyzed ? "딥 쇼츠 레퍼런스" : "로컬 딥 쇼츠 레퍼런스",
+		description: params.visionAnalyzed
+			? "프레임, 전사, 컷 밀도, 오디오 지표를 분석해 대본/TTS/BGM/편집 규칙으로 변환합니다."
+			: "OpenAI Vision 또는 Whisper가 막혀도 프레임 QC, 컷 밀도, 오디오 지표를 분석해 대본/TTS/BGM/편집 규칙으로 변환합니다.",
+		recommendedMode: "research",
+		supportedFormats: ["shorts", "longform"],
+		formatProfiles: {
+			shorts: {
+				durationSeconds,
+				sceneCount,
+				avgSceneDuration,
+				hookDuration,
+			},
+			longform: {
+				durationSeconds: Math.max(180, durationSeconds * 4),
+				sceneCount: Math.max(18, sceneCount * 3),
+				avgSceneDuration: Math.max(6, avgSceneDuration * 2),
+				hookDuration: Math.max(8, hookDuration * 2),
+			},
+		},
+		sceneLayout: "full",
+		sceneLayouts: { shorts: "full", longform: "full" },
+		manualVideoInsert: true,
+		clipControls: ["trim_start", "duration_seconds", "crop"],
+		referenceSources: [
+			{
+				url: params.sourceUrl,
+				purpose:
+					"화면 구성, 컷 밀도, 자막 배치, TTS/BGM 톤만 참조. 원본 영상/음악/대사 재사용 금지.",
+			},
+		],
+		rules: [
+			"원본 프레임, 원본 음성, 원본 음악을 그대로 재사용하지 않는다.",
+			"발화 중간에서 컷하지 않고 문장 끝, 세그먼트 끝, 비트 전환점에 컷을 정렬한다.",
+			"첫 3초는 hook 텍스트와 피사체가 겹치지 않도록 title-safe 영역을 유지한다.",
+			"BGM은 원곡 복제가 아니라 mood/tempo/keyword 기반으로 새 트랙을 선택한다.",
+		],
+	};
+}
+
 function deepAnalysisLimits(
 	sample: {
 		windows: DeepSampleWindow[];
@@ -1408,15 +1895,25 @@ async function runDeepSampledLongformAnalysis(
 	let transcript = "";
 	let segments: Array<{ start: number; end: number; text: string }> = [];
 	let audioTranscribed = false;
-	try {
-		const t = await transcribeAudio(audioPath);
-		transcript = t.text;
-		segments = t.segments;
-		audioTranscribed = true;
-	} catch (e) {
-		log.warn("Deep sample transcription failed, continuing without", {
-			error: (e as Error).message,
-		});
+	let transcriptSource = "none";
+	const subtitleTranscript = await fetchYouTubeTranscript(sourceUrl, job.id);
+	if (subtitleTranscript) {
+		transcript = subtitleTranscript.text;
+		segments = subtitleTranscript.segments;
+		transcriptSource = subtitleTranscript.source;
+	}
+	if (!transcript) {
+		try {
+			const t = await transcribeAudio(audioPath);
+			transcript = t.text;
+			segments = t.segments;
+			audioTranscribed = true;
+			transcriptSource = "openai_whisper";
+		} catch (e) {
+			log.warn("Deep sample transcription failed, continuing without", {
+				error: (e as Error).message,
+			});
+		}
 	}
 
 	job.status = "analyzing";
@@ -1532,11 +2029,12 @@ async function runDeepSampledLongformAnalysis(
 			analysis_mode: "deep_sampled_longform",
 			longform_reference: true,
 			sampled_deep_reference: true,
-			analysis_limits: deepAnalysisLimits(sample, {
-				audioTranscribed,
-				visionAnalyzed,
-			}),
-			production_dna: productionDna,
+				analysis_limits: deepAnalysisLimits(sample, {
+					audioTranscribed,
+					visionAnalyzed,
+				}),
+				transcript_source: transcriptSource,
+				production_dna: productionDna,
 			production_method: metadataRaw.production_method,
 			frame_profile: frameProfile,
 			frame_qc: frameQcReport
@@ -1689,42 +2187,77 @@ async function runAnalysis(job: AnalysisJob): Promise<void> {
 			? profileFromRenderOutputQc(frameQcReport)
 			: null;
 
-		// 3. Whisper 전사
-		job.status = "transcribing";
-		job.progress = 55;
-		saveJobs();
+			// 3. YouTube 자막 우선, 없으면 Whisper 전사
+			job.status = "transcribing";
+			job.progress = 55;
+			saveJobs();
 
-		let transcript = "";
-		let segments: Array<{ start: number; end: number; text: string }> = [];
-		try {
-			const t = await transcribeAudio(audioPath);
-			transcript = t.text;
-			segments = t.segments;
-		} catch (e) {
-			log.warn("Transcription failed, continuing without", {
-				error: (e as Error).message,
+			let transcript = "";
+			let segments: Array<{ start: number; end: number; text: string }> = [];
+			let audioTranscribed = false;
+			let transcriptSource = "none";
+			if (job.input.type === "youtube" && job.input.url) {
+				const subtitleTranscript = await fetchYouTubeTranscript(
+					job.input.url,
+					job.id,
+				);
+				if (subtitleTranscript) {
+					transcript = subtitleTranscript.text;
+					segments = subtitleTranscript.segments;
+					transcriptSource = subtitleTranscript.source;
+				}
+			}
+			if (!transcript) {
+				try {
+					const t = await transcribeAudio(audioPath);
+					transcript = t.text;
+					segments = t.segments;
+					audioTranscribed = true;
+					transcriptSource = "openai_whisper";
+				} catch (e) {
+					log.warn("Transcription failed, continuing without", {
+						error: (e as Error).message,
+					});
+				}
+			}
+
+			// 4. Vision 분석. 쿼터/일시 장애가 있어도 로컬 프레임 DNA로 승격은 계속한다.
+			job.status = "analyzing";
+			job.progress = 80;
+			saveJobs();
+
+			let visionAnalyzed = false;
+			let analysis: Record<string, unknown>;
+			try {
+				analysis = await analyzeWithVision({
+					framePaths,
+					transcript,
+					segments,
+					duration,
+					title,
+				});
+				visionAnalyzed = true;
+			} catch (e) {
+				log.warn("Vision analysis failed, using local frame/audio/edit fallback", {
+					error: (e as Error).message,
+					jobId: job.id,
+				});
+				analysis = buildLocalDeepAnalysisFallback({
+					title,
+					duration,
+					transcript,
+					segments,
+					frameProfile,
+					frameQcReport,
+				});
+			}
+			const productionDna = await analyzeReferenceProductionDna({
+				framePaths,
+				durationSeconds: duration,
+				analysis,
+				frameProfile,
+				frameQcReport,
 			});
-		}
-
-		// 4. GPT-4o Vision 분석
-		job.status = "analyzing";
-		job.progress = 80;
-		saveJobs();
-
-		const analysis = await analyzeWithVision({
-			framePaths,
-			transcript,
-			segments,
-			duration,
-			title,
-		});
-		const productionDna = await analyzeReferenceProductionDna({
-			framePaths,
-			durationSeconds: duration,
-			analysis,
-			frameProfile,
-			frameQcReport,
-		});
 
 		// 5. 결과 조립
 		const result: ReferenceTemplateResult = {
@@ -1787,15 +2320,36 @@ async function runAnalysis(job: AnalysisJob): Promise<void> {
 			frame_urls: framePaths.map(
 				(p) => `/api/reference/frame?path=${encodeURIComponent(p)}`,
 			),
-			raw_analysis: {
-				...analysis,
-				analysis_depth: "pixel_frame_audio_edit",
-				production_dna: productionDna,
-				frame_profile: frameProfile,
-				frame_qc: frameQcReport
-					? {
-							score: frameQcReport.score,
-							verdict: frameQcReport.verdict,
+				raw_analysis: {
+					...analysis,
+					analysis_depth: "pixel_frame_audio_edit",
+					analysis_mode: visionAnalyzed
+						? "deep_vision_shortform"
+						: "deep_local_frame_audio_edit",
+					vision_analyzed: visionAnalyzed,
+					transcript_source: transcriptSource,
+					analysis_limits: {
+						full_video_downloaded: true,
+						audio_transcribed: audioTranscribed,
+						vision_analyzed: visionAnalyzed,
+						frames_extracted: true,
+						raw_assets_reusable: false,
+						reason: visionAnalyzed
+							? "Shortform deep reference used downloaded source only to extract transferable style DNA."
+							: "GPT Vision was unavailable or quota-limited, so transferable style DNA was inferred from frame, audio, cut-density and transcript timing metrics.",
+					},
+					production_method: buildShortformProductionMethod({
+						sourceUrl: job.input.url ?? "",
+						duration,
+						analysis,
+						visionAnalyzed,
+					}),
+					production_dna: productionDna,
+					frame_profile: frameProfile,
+					frame_qc: frameQcReport
+						? {
+								score: frameQcReport.score,
+								verdict: frameQcReport.verdict,
 							issues: frameQcReport.issues,
 							requiredActions: frameQcReport.requiredActions,
 						}
@@ -1889,7 +2443,9 @@ const server = createServer(async (req, res) => {
 		return;
 	}
 
-	if (url.pathname !== "/health") {
+	const isJobStatusPoll =
+		req.method === "GET" && /^\/api\/reference\/job\/[^/]+$/.test(url.pathname);
+	if (url.pathname !== "/health" && !isJobStatusPoll) {
 		const rl = rateLimit(req);
 		if (!rl.allowed) return json(req, res, 429, { error: "rate limit" });
 	}

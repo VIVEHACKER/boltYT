@@ -8,8 +8,18 @@ import {
 	PText,
 	PTextarea,
 } from "@porsche-design-system/components-react";
-import { ImagePlus, Newspaper, X } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+	ArrowDown,
+	ArrowUp,
+	Copy,
+	FilePlus2,
+	ImagePlus,
+	Newspaper,
+	PencilLine,
+	Trash2,
+	X,
+} from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import TabButton from "../../components/TabButton";
 import {
 	analyzeAnimationProductionReadiness,
@@ -25,9 +35,21 @@ import { generateResearchScript, generateScript } from "../../lib/ai";
 import { planSceneSourceAssignments, researchTopic } from "../../lib/ai-agents";
 import { snapDurationToBeat } from "../../lib/beat-sync";
 import { suggestColorGrade } from "../../lib/color-grades";
+import {
+	buildContentRecommendationPlan,
+	type ContentPerformanceSample,
+	type RankedScriptRecommendation,
+} from "../../lib/content-recommendation-ranker";
+import {
+	buildReferenceKnowledgeProfile,
+	compactKnowledgeProfile,
+} from "../../lib/knowledge-system";
 import { assignMotionGraphicsForScene } from "../../lib/motion-graphics";
 import { referenceToPreset } from "../../lib/reference-bridge";
-import { getReferenceTemplateSupportedFormats } from "../../lib/reference-template-presets";
+import {
+	getReferenceTemplateReadiness,
+	getReferenceTemplateSupportedFormats,
+} from "../../lib/reference-template-presets";
 import {
 	formatNicheHandoffForPrompt,
 	type NicheResearchHandoff,
@@ -50,6 +72,16 @@ import {
 } from "../../lib/scene-shots";
 import { supabase } from "../../lib/supabase";
 import {
+	buildStoryEditDraft,
+	createEmptyStoryEditDraft,
+	deleteStoryScene,
+	duplicateStoryScene,
+	insertStorySceneAfter,
+	moveStoryScene,
+	summarizeStoryEditDraft,
+	type StoryEditDraft,
+} from "../../lib/story-editing";
+import {
 	analyzeTopicProductionReadiness,
 	type TopicProductionReadinessReport,
 } from "../../lib/topic-production-readiness";
@@ -63,6 +95,8 @@ interface StepScriptProps {
 	sources?: CollectedSource[];
 	referenceTemplate?: ReferenceTemplate | null;
 	nicheHandoff?: NicheResearchHandoff | null;
+	topicTitle?: string;
+	performanceHistory?: ContentPerformanceSample[];
 	onNext: (scriptId: string) => void;
 	onBack: () => void;
 }
@@ -90,6 +124,8 @@ export default function StepScript({
 	sources = [],
 	referenceTemplate,
 	nicheHandoff,
+	topicTitle: initialTopicTitle = "",
+	performanceHistory = [],
 	onNext,
 	onBack,
 }: StepScriptProps) {
@@ -99,6 +135,9 @@ export default function StepScript({
 		if (supported.length === 1) return supported[0];
 		return "both";
 	});
+	const [storyDraft, setStoryDraft] = useState<StoryEditDraft>(() =>
+		createEmptyStoryEditDraft(),
+	);
 	const [shortsScript, setShortsScript] = useState("");
 	const [longformScenes, setLongformScenes] = useState<SceneData[]>([]);
 	const [generating, setGenerating] = useState(true);
@@ -106,6 +145,7 @@ export default function StepScript({
 	const [genError, setGenError] = useState("");
 	const [submitError, setSubmitError] = useState("");
 	const [searchKeywords, setSearchKeywords] = useState<string[]>([]);
+	const [resolvedTopicTitle, setResolvedTopicTitle] = useState(initialTopicTitle);
 	const [aligningSources, setAligningSources] = useState(false);
 	const [topicReadiness, setTopicReadiness] =
 		useState<TopicProductionReadinessReport | null>(null);
@@ -114,6 +154,28 @@ export default function StepScript({
 	const [animationBible, setAnimationBible] = useState<
 		AnimationBible | undefined
 	>(undefined);
+	const recommendationPlan = useMemo(
+		() =>
+			buildContentRecommendationPlan({
+				topicTitle: resolvedTopicTitle || initialTopicTitle,
+				mode,
+				selectedFormat: format,
+				sources,
+				referenceTemplate,
+				nicheHandoff,
+				performanceHistory,
+			}),
+		[
+			resolvedTopicTitle,
+			initialTopicTitle,
+			mode,
+			format,
+			sources,
+			referenceTemplate,
+			nicheHandoff,
+			performanceHistory,
+		],
+	);
 
 	useEffect(() => {
 		if (!referenceTemplate) return;
@@ -121,6 +183,11 @@ export default function StepScript({
 		if (supported.length !== 1) return;
 		setFormat((current) => (current === supported[0] ? current : supported[0]));
 	}, [referenceTemplate]);
+
+	useEffect(() => {
+		if (!initialTopicTitle.trim()) return;
+		setResolvedTopicTitle(initialTopicTitle.trim());
+	}, [initialTopicTitle]);
 
 	const toShotSources = useCallback(
 		(items: CollectedSource[]): ShotSource[] =>
@@ -312,7 +379,7 @@ export default function StepScript({
 		try {
 			// Research Director: 주제 리서치 → 팩트 수집
 			let brief: Awaited<ReturnType<typeof researchTopic>> | undefined;
-			let topicTitle = "";
+			let currentTopicTitle = initialTopicTitle.trim();
 			setTopicReadiness(null);
 			setAnimationReadiness(null);
 			if (mode === "research") {
@@ -322,9 +389,9 @@ export default function StepScript({
 						.select("title")
 						.eq("id", briefId)
 						.maybeSingle();
-					topicTitle = topic?.title ?? "";
-					if (topic?.title) {
-						brief = await researchTopic(topic.title);
+					currentTopicTitle = currentTopicTitle || topic?.title || "";
+					if (currentTopicTitle) {
+						brief = await researchTopic(currentTopicTitle);
 						if (brief?.search_keywords?.length) {
 							setSearchKeywords(brief.search_keywords);
 						}
@@ -332,7 +399,7 @@ export default function StepScript({
 				} catch {
 					// 리서치 실패해도 스크립트 생성은 진행
 				}
-			} else if (mode === "animation") {
+			} else {
 				try {
 					const { data: briefRow } = await supabase
 						.from("briefs")
@@ -342,21 +409,23 @@ export default function StepScript({
 					const topic = (briefRow as Record<string, unknown> | null)?.topics as
 						| Record<string, unknown>
 						| undefined;
-					topicTitle =
+					const fetchedTopicTitle =
 						(topic?.title as string | undefined) ??
 						((briefRow as Record<string, unknown> | null)?.core_message as
 							| string
 							| undefined) ??
 						"";
+					currentTopicTitle = currentTopicTitle || fetchedTopicTitle;
 				} catch {
 					// 브리프 제목 조회 실패 시 아래 게이트가 보수적으로 판단
 				}
 			}
+			setResolvedTopicTitle(currentTopicTitle);
 
 			const readiness =
 				mode === "research"
 					? analyzeTopicProductionReadiness({
-							topicTitle,
+							topicTitle: currentTopicTitle,
 							format,
 							sources,
 							researchBrief: brief,
@@ -374,7 +443,7 @@ export default function StepScript({
 			const animationGate =
 				mode === "animation"
 					? analyzeAnimationProductionReadiness({
-							topicTitle,
+							topicTitle: currentTopicTitle,
 							format,
 						})
 					: null;
@@ -387,6 +456,17 @@ export default function StepScript({
 						animationGate.requiredActions[0] ??
 						"주인공과 갈등이 드러나도록 주제를 보강하세요."
 					}`,
+				);
+				return;
+			}
+			const referenceReadiness = referenceTemplate
+				? getReferenceTemplateReadiness(referenceTemplate)
+				: null;
+			if (referenceReadiness?.status === "blocked") {
+				setShortsScript("");
+				setLongformScenes([]);
+				setGenError(
+					`레퍼런스 품질 보류: ${referenceReadiness.summary}. ${referenceReadiness.action}`,
 				);
 				return;
 			}
@@ -463,6 +543,14 @@ export default function StepScript({
 				animationGate?.productionFamily,
 			);
 			setLongformScenes(alignedScenes);
+			setStoryDraft(
+				buildStoryEditDraft({
+					shortsScript: script.shorts_script || "",
+					scenes: alignedScenes,
+					referenceName: referenceTemplate?.name,
+					format,
+				}),
+			);
 		} catch (err) {
 			setGenError(
 				err instanceof Error ? err.message : "스크립트 생성에 실패했습니다.",
@@ -473,6 +561,7 @@ export default function StepScript({
 	}, [
 		alignScenesToTimeline,
 		briefId,
+		initialTopicTitle,
 		format,
 		mode,
 		sources,
@@ -523,6 +612,84 @@ export default function StepScript({
 				return next;
 			}),
 		);
+	}
+
+	function updateStoryDraft(field: keyof StoryEditDraft, value: string) {
+		setStoryDraft((current) => ({
+			...current,
+			[field]: value,
+			updatedAt: new Date().toISOString(),
+		}));
+	}
+
+	function applyScriptRecommendation(candidate: RankedScriptRecommendation) {
+		if (candidate.format === "shorts" || candidate.format === "longform") {
+			setFormat(candidate.format);
+		}
+		setStoryDraft((current) => ({
+			...current,
+			hook: candidate.hook,
+			storyAngle: candidate.structure,
+			viewerQuestion: candidate.viewerQuestion,
+			endingBeat: candidate.endingBeat,
+			mustKeep: [
+				candidate.durationLabel,
+				...candidate.scriptBeats.slice(0, 2),
+			].join(" · "),
+			avoid: candidate.risks.slice(0, 3).join(" · "),
+			editorNotes: [
+				`추천 #${candidate.rank} ${candidate.title} (${candidate.score}점)`,
+				`근거: ${candidate.reasons.slice(0, 2).join(" / ")}`,
+				`썸네일: ${candidate.thumbnailAngle}`,
+			].join("\n"),
+			updatedAt: new Date().toISOString(),
+		}));
+		if (!shortsScript.trim()) {
+			setShortsScript(
+				[
+					`[훅] ${candidate.hook}`,
+					"",
+					...candidate.scriptBeats.map((beat) => `- ${beat}`),
+					"",
+					`[마무리] ${candidate.endingBeat}`,
+				].join("\n"),
+			);
+		}
+	}
+
+	function applyHookRecommendation(hook: string) {
+		updateStoryDraft("hook", hook);
+	}
+
+	function moveScene(index: number, direction: -1 | 1) {
+		setLongformScenes((prev) => moveStoryScene(prev, index, direction));
+	}
+
+	function duplicateScene(index: number) {
+		setLongformScenes((prev) =>
+			duplicateStoryScene(prev, index).map((scene, sceneIndex) =>
+				sceneIndex === index + 1 ? applySceneShots(scene) : scene,
+			),
+		);
+	}
+
+	function insertSceneAfter(index: number) {
+		setLongformScenes((prev) =>
+			insertStorySceneAfter(prev, index, {
+				narration:
+					"새 장면입니다. 여기서 스토리 전환, 반전, 추가 증거를 작성하세요.",
+				type: "image",
+				visualPrompt:
+					"cinematic documentary insert shot, relevant evidence, clean composition",
+				duration: 8,
+			}).map((scene, sceneIndex) =>
+				sceneIndex === index + 1 ? applySceneShots(scene) : scene,
+			),
+		);
+	}
+
+	function deleteSceneAt(index: number) {
+		setLongformScenes((prev) => deleteStoryScene(prev, index));
 	}
 
 	function updateShot(
@@ -611,6 +778,14 @@ export default function StepScript({
 					production_family: animationReadiness?.productionFamily,
 					production_family_label: animationReadiness?.productionFamilyLabel,
 					topic_readiness: topicReadiness,
+					story_edit: storyDraft,
+					story_edit_summary: summarizeStoryEditDraft(storyDraft),
+					content_recommendation_plan: recommendationPlan,
+					reference_knowledge: referenceTemplate
+						? compactKnowledgeProfile(
+								buildReferenceKnowledgeProfile(referenceTemplate),
+							)
+						: null,
 					niche_research: nicheHandoff
 						? {
 								id: nicheHandoff.id,
@@ -884,6 +1059,190 @@ export default function StepScript({
 		);
 	}
 
+	function renderRecommendationPanel() {
+		const topScript = recommendationPlan.scripts[0];
+		if (!topScript) return null;
+		return (
+			<div className="mb-static-lg rounded-[18px] border border-[#d7c3a4] bg-[#fbf3e4] p-static-md shadow-[0_18px_45px_rgba(81,54,22,0.10)]">
+				<div className="flex flex-col gap-static-sm md:flex-row md:items-start md:justify-between mb-static-md">
+					<div>
+						<div className="flex items-center gap-static-xs flex-wrap mb-1">
+							<PTag color="notification-info-soft">추천 순위</PTag>
+							<PTag color="background-surface">
+								{recommendationPlan.categoryLabel}
+							</PTag>
+							<PTag color="background-surface">
+								신뢰도 {recommendationPlan.confidence}
+							</PTag>
+							{recommendationPlan.performanceFeedback.sampleCount > 0 && (
+								<PTag color="background-surface">
+									성과 {recommendationPlan.performanceFeedback.sampleCount}개 반영
+								</PTag>
+							)}
+						</div>
+						<PHeading size="small" tag="h3">
+							주제 기반 대본/훅/썸네일 추천
+						</PHeading>
+						<PText size="small" color="contrast-medium" className="mt-1">
+							{recommendationPlan.topSummary}
+						</PText>
+						{recommendationPlan.performanceFeedback.sampleCount > 0 && (
+							<div className="mt-2 flex flex-wrap gap-1">
+								{recommendationPlan.performanceFeedback.topSignals
+									.slice(0, 4)
+									.map((signal) => (
+										<PTag key={signal} color="background-frosted">
+											{signal}
+										</PTag>
+									))}
+							</div>
+						)}
+					</div>
+					<PButton
+						compact
+						variant="secondary"
+						onClick={() => applyScriptRecommendation(topScript)}
+					>
+						1순위 적용
+					</PButton>
+				</div>
+
+				<div className="grid grid-cols-1 lg:grid-cols-3 gap-static-sm mb-static-md">
+					{recommendationPlan.scripts.slice(0, 3).map((script) => (
+						<div
+							key={script.id}
+							className={`rounded-[14px] border p-static-sm ${
+								script.rank === 1
+									? "bg-[#fff8ea] border-[#b8842d]"
+									: "bg-[#fffdf8] border-[#e4d2b2]"
+							}`}
+						>
+							<div className="flex items-center justify-between gap-static-xs mb-1">
+								<PText size="small" weight="semi-bold">
+									#{script.rank} {script.title}
+								</PText>
+								<PTag color="background-frosted">{script.score}점</PTag>
+							</div>
+							<PText size="x-small" color="contrast-medium" className="mb-2">
+								{script.hook}
+							</PText>
+							<PText size="x-small" className="mb-2">
+								{script.structure}
+							</PText>
+							<div className="flex flex-wrap gap-1 mb-2">
+								<PTag color="background-surface">
+									{script.format === "both"
+										? "쇼츠+롱폼"
+										: script.format === "shorts"
+											? "쇼츠"
+											: "롱폼"}
+								</PTag>
+								<PTag color="background-surface">{script.durationLabel}</PTag>
+							</div>
+							<ul className="list-disc pl-4 text-[11px] text-contrast-medium mb-2">
+								{script.scriptBeats.slice(0, 3).map((beat) => (
+									<li key={beat}>{beat}</li>
+								))}
+							</ul>
+							<PButton
+								compact
+								variant="secondary"
+								onClick={() => applyScriptRecommendation(script)}
+							>
+								이 방향 적용
+							</PButton>
+						</div>
+					))}
+				</div>
+
+				<div className="grid grid-cols-1 md:grid-cols-3 gap-static-sm">
+					<div className="rounded-[12px] bg-[#fffdf8] border border-[#e4d2b2] p-static-sm">
+						<PText size="small" weight="semi-bold" className="mb-1">
+							훅 추천
+						</PText>
+						<div className="flex flex-col gap-1">
+							{recommendationPlan.hooks.slice(0, 3).map((hook) => (
+								<button
+									key={hook.text}
+									type="button"
+									className="text-left rounded-[8px] border border-[#ead9bd] bg-[#fff8ea] p-2 hover:border-[#b8842d] transition-colors cursor-pointer"
+									onClick={() => applyHookRecommendation(hook.text)}
+								>
+									<span className="block text-[11px] font-semibold">
+										#{hook.rank} {hook.score}점 · {hook.pattern}
+									</span>
+									<span className="block text-[12px] text-contrast-medium">
+										{hook.text}
+									</span>
+								</button>
+							))}
+						</div>
+					</div>
+
+					<div className="rounded-[12px] bg-[#fffdf8] border border-[#e4d2b2] p-static-sm">
+						<PText size="small" weight="semi-bold" className="mb-1">
+							썸네일 추천
+						</PText>
+						<div className="flex flex-col gap-1">
+							{recommendationPlan.thumbnails.slice(0, 3).map((thumb) => (
+								<div
+									key={thumb.text}
+									className="rounded-[8px] border border-[#ead9bd] bg-[#fff8ea] p-2"
+								>
+									<PText size="x-small" weight="semi-bold">
+										#{thumb.rank} {thumb.text} · {thumb.score}점
+									</PText>
+									<PText size="x-small" color="contrast-medium">
+										{thumb.layout}
+									</PText>
+								</div>
+							))}
+						</div>
+					</div>
+
+					<div className="rounded-[12px] bg-[#fffdf8] border border-[#e4d2b2] p-static-sm">
+						<PText size="small" weight="semi-bold" className="mb-1">
+							포맷 추천
+						</PText>
+						<div className="flex flex-col gap-1">
+							{recommendationPlan.formats.slice(0, 3).map((choice) => (
+								<button
+									key={choice.format}
+									type="button"
+									className="text-left rounded-[8px] border border-[#ead9bd] bg-[#fff8ea] p-2 hover:border-[#b8842d] transition-colors cursor-pointer"
+									onClick={() => setFormat(choice.format)}
+								>
+									<span className="block text-[11px] font-semibold">
+										#{choice.rank} {choice.label} · {choice.score}점
+									</span>
+									<span className="block text-[12px] text-contrast-medium">
+										{choice.durationRange}
+									</span>
+								</button>
+							))}
+						</div>
+					</div>
+				</div>
+
+				<details className="mt-static-sm text-[12px] text-contrast-medium">
+					<summary className="cursor-pointer">추천 근거와 품질 게이트</summary>
+					<div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-static-sm">
+						<ul className="list-disc pl-4">
+							{recommendationPlan.evidence.map((item) => (
+								<li key={item}>{item}</li>
+							))}
+						</ul>
+						<ul className="list-disc pl-4">
+							{recommendationPlan.qualityGates.map((item) => (
+								<li key={item}>{item}</li>
+							))}
+						</ul>
+					</div>
+				</details>
+			</div>
+		);
+	}
+
 	if (generating) {
 		return (
 			<div className="bg-surface rounded-[8px] p-static-lg text-center py-fluid-lg">
@@ -903,6 +1262,7 @@ export default function StepScript({
 			<div className="bg-surface rounded-[8px] p-static-lg">
 				{renderTopicReadinessPanel()}
 				{renderAnimationReadinessPanel()}
+				{renderRecommendationPanel()}
 				<PInlineNotification
 					heading="스크립트 생성 실패"
 					description={genError}
@@ -943,6 +1303,14 @@ export default function StepScript({
 			{renderTopicReadinessPanel()}
 			{renderAnimationReadinessPanel()}
 			{nicheHandoff && renderNicheHandoffPanel(nicheHandoff)}
+			{renderRecommendationPanel()}
+			<StoryEditPanel
+				draft={storyDraft}
+				referenceTemplate={referenceTemplate}
+				sceneCount={longformScenes.length}
+				totalDuration={longformScenes.reduce((sum, s) => sum + s.duration, 0)}
+				onChange={updateStoryDraft}
+			/>
 
 			<div className="flex gap-static-sm mb-static-lg">
 				{formatChoices.map((f) => (
@@ -1030,9 +1398,47 @@ export default function StepScript({
 								<div key={i} className="bg-canvas rounded-[4px] p-static-md">
 									{/* 헤더: 씬 번호 + 타입 선택 + 길이 */}
 									<div className="flex items-center justify-between mb-static-sm">
-										<PText weight="semi-bold" size="small">
-											씬 {i + 1}
-										</PText>
+										<div className="flex items-center gap-2">
+											<PText weight="semi-bold" size="small">
+												씬 {i + 1}
+											</PText>
+											<div className="flex items-center gap-1">
+												<SceneActionButton
+													label="위로"
+													disabled={i === 0}
+													onClick={() => moveScene(i, -1)}
+												>
+													<ArrowUp size={12} />
+												</SceneActionButton>
+												<SceneActionButton
+													label="아래로"
+													disabled={i === longformScenes.length - 1}
+													onClick={() => moveScene(i, 1)}
+												>
+													<ArrowDown size={12} />
+												</SceneActionButton>
+												<SceneActionButton
+													label="복제"
+													onClick={() => duplicateScene(i)}
+												>
+													<Copy size={12} />
+												</SceneActionButton>
+												<SceneActionButton
+													label="추가"
+													onClick={() => insertSceneAfter(i)}
+												>
+													<FilePlus2 size={12} />
+												</SceneActionButton>
+												<SceneActionButton
+													label="삭제"
+													disabled={longformScenes.length <= 1}
+													danger
+													onClick={() => deleteSceneAt(i)}
+												>
+													<Trash2 size={12} />
+												</SceneActionButton>
+											</div>
+										</div>
 										<div className="flex items-center gap-static-xs">
 											{(
 												[
@@ -1308,14 +1714,21 @@ export default function StepScript({
 										</div>
 									)}
 
-									{/* 비주얼 프롬프트 (news_overlay가 아닌 경우) */}
-									{scene.type !== "news_overlay" && (
-										<div className="mt-static-sm">
-											<PText size="x-small" color="contrast-medium">
-												비주얼: {scene.visualPrompt}
-											</PText>
-										</div>
-									)}
+									<div className="mt-static-sm">
+										<PTextarea
+											name={`scene-visual-${i}`}
+											label="비주얼 프롬프트"
+											value={scene.visualPrompt}
+											rows={2}
+											onInput={(e) =>
+												updateScene(
+													i,
+													"visualPrompt",
+													(e.target as HTMLTextAreaElement).value,
+												)
+											}
+										/>
+									</div>
 								</div>
 							);
 						})}
@@ -1360,5 +1773,157 @@ export default function StepScript({
 				</div>
 			</div>
 		</div>
+	);
+}
+
+function StoryEditPanel({
+	draft,
+	referenceTemplate,
+	sceneCount,
+	totalDuration,
+	onChange,
+}: {
+	draft: StoryEditDraft;
+	referenceTemplate?: ReferenceTemplate | null;
+	sceneCount: number;
+	totalDuration: number;
+	onChange: (field: keyof StoryEditDraft, value: string) => void;
+}) {
+	return (
+		<section className="mb-static-lg overflow-hidden rounded-[18px] border border-[#d8c9b5] bg-[#fffaf2]">
+			<div className="flex flex-wrap items-start justify-between gap-3 border-b border-[#eadcc8] bg-[#211a12] px-4 py-3 text-[#fff9ed]">
+				<div>
+					<div className="mb-1 inline-flex items-center gap-2 text-[11px] font-black uppercase tracking-[.18em] text-[#f0b957]">
+						<PencilLine size={14} />
+						Story edit layer
+					</div>
+					<PHeading size="small" tag="h3">
+						레퍼런스 생성 전 스토리 직접 편집
+					</PHeading>
+					<PText size="x-small" className="mt-1 text-[#d8cbb9]">
+						레퍼런스는 화면 문법만 가져오고, 내용·전개·결말은 여기서 바꾼 뒤
+						저장됩니다.
+					</PText>
+				</div>
+				<div className="flex flex-wrap gap-2">
+					{referenceTemplate && (
+						<PTag color="notification-info-soft">{referenceTemplate.name}</PTag>
+					)}
+					<PTag color="background-frosted">{sceneCount}개 씬</PTag>
+					<PTag color="background-frosted">{Math.round(totalDuration)}초</PTag>
+				</div>
+			</div>
+
+			<div className="grid gap-3 p-4 lg:grid-cols-2">
+				<StoryTextField
+					label="첫 훅"
+					value={draft.hook}
+					onChange={(value) => onChange("hook", value)}
+					placeholder="첫 3-8초에 시청자가 멈추는 질문/충격 문장"
+				/>
+				<StoryTextField
+					label="스토리 각도"
+					value={draft.storyAngle}
+					onChange={(value) => onChange("storyAngle", value)}
+					placeholder="이 주제를 어떤 관점으로 전개할지"
+				/>
+				<StoryTextField
+					label="시청자 질문"
+					value={draft.viewerQuestion}
+					onChange={(value) => onChange("viewerQuestion", value)}
+					placeholder="끝까지 봐야 풀리는 핵심 질문"
+				/>
+				<StoryTextField
+					label="결말/회수"
+					value={draft.endingBeat}
+					onChange={(value) => onChange("endingBeat", value)}
+					placeholder="마지막에 밝혀질 반전, 결론, 다음 영상 연결"
+				/>
+				<StoryTextField
+					label="반드시 유지"
+					value={draft.mustKeep}
+					onChange={(value) => onChange("mustKeep", value)}
+					placeholder="유지할 장면, 인물, 증거, 톤"
+				/>
+				<StoryTextField
+					label="금지/제외"
+					value={draft.avoid}
+					onChange={(value) => onChange("avoid", value)}
+					placeholder="원본 복제, 과장, 특정 소재 등 제외할 것"
+				/>
+				<div className="lg:col-span-2">
+					<PTextarea
+						name="storyEditorNotes"
+						label="편집 메모"
+						value={draft.editorNotes}
+						rows={3}
+						onInput={(event) =>
+							onChange(
+								"editorNotes",
+								(event.target as HTMLTextAreaElement).value,
+							)
+						}
+					/>
+				</div>
+			</div>
+		</section>
+	);
+}
+
+function StoryTextField({
+	label,
+	value,
+	placeholder,
+	onChange,
+}: {
+	label: string;
+	value: string;
+	placeholder: string;
+	onChange: (value: string) => void;
+}) {
+	return (
+		<label className="block">
+			<span className="mb-1 block text-[11px] font-black uppercase tracking-[.14em] text-[#6d5d48]">
+				{label}
+			</span>
+			<input
+				type="text"
+				value={value}
+				placeholder={placeholder}
+				onChange={(event) => onChange(event.target.value)}
+				className="h-10 w-full rounded-xl border border-[#d8c9b5] bg-white px-3 text-[13px] font-semibold text-[#211a12] outline-none transition focus:border-[#9b6b2f] focus:ring-4 focus:ring-[#d69a3a]/15"
+			/>
+		</label>
+	);
+}
+
+function SceneActionButton({
+	label,
+	children,
+	onClick,
+	disabled = false,
+	danger = false,
+}: {
+	label: string;
+	children: React.ReactNode;
+	onClick: () => void;
+	disabled?: boolean;
+	danger?: boolean;
+}) {
+	return (
+		<button
+			type="button"
+			title={label}
+			aria-label={label}
+			disabled={disabled}
+			onClick={onClick}
+			className={`grid h-6 w-6 place-items-center rounded-full border text-[11px] transition disabled:cursor-not-allowed disabled:opacity-35 ${
+				danger
+					? "border-[#f3b4aa] bg-[#fff1ef] text-[#a33725] hover:bg-[#ffe2dd]"
+					: "border-[#d8c9b5] bg-[#fffaf2] text-[#4d3f2f] hover:border-[#9b6b2f]"
+			}`}
+		>
+			{children}
+		</button>
 	);
 }

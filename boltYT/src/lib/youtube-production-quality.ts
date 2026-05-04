@@ -1,5 +1,6 @@
 import { analyzeYouTubePolicyRisk } from "./youtube-policy-risk";
 import { analyzeOpeningRetention } from "./youtube-retention";
+import { LONGFORM_MAX_DURATION_SECONDS } from "./reference-duration-policy";
 
 export type ProductionQualitySeverity = "critical" | "warning" | "info";
 
@@ -859,6 +860,16 @@ export function analyzeProductionQuality(
 	}
 
 	if (isLongform) {
+		if (totalDurationSeconds > LONGFORM_MAX_DURATION_SECONDS) {
+			issues.push(
+				buildIssue(
+					"critical",
+					"longform_runtime_over_cap",
+					"롱폼 총 길이가 운영 상한인 20분을 초과합니다.",
+				),
+			);
+			pushAction(actions, "챕터를 압축하거나 씬 duration을 줄여 총 길이를 20분 이하로 맞추세요.");
+		}
 		if (totalDurationSeconds > 0 && totalDurationSeconds < 120) {
 			issues.push(
 				buildIssue(

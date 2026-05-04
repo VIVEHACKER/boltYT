@@ -82,7 +82,7 @@ describe("reference-channel-scout", () => {
 				channelTitle: "Mystery Lab",
 				title: "풀리지 않는 사건의 모든 것",
 				viewCount: 700_000,
-				durationSeconds: 1500,
+				durationSeconds: 900,
 			}),
 		]);
 
@@ -112,6 +112,35 @@ describe("reference-channel-scout", () => {
 
 		expect(candidates.map((candidate) => candidate.channelTitle)).toEqual([
 			"Longform",
+		]);
+	});
+
+	it("20분 초과 영상은 롱폼 레퍼런스 후보에서 제외한다", () => {
+		const category = REFERENCE_CHANNEL_CATEGORIES[0];
+		const candidates = buildReferenceChannelCandidates(
+			category,
+			[
+				video({
+					videoId: "too-long",
+					channelId: "too-long",
+					channelTitle: "Too Long",
+					viewCount: 5_000_000,
+					durationSeconds: 1201,
+				}),
+				video({
+					videoId: "within-cap",
+					channelId: "within-cap",
+					channelTitle: "Within Cap",
+					viewCount: 300_000,
+					durationSeconds: 900,
+				}),
+			],
+			5,
+			"longform",
+		);
+
+		expect(candidates.map((candidate) => candidate.channelTitle)).toEqual([
+			"Within Cap",
 		]);
 	});
 });

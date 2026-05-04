@@ -44,6 +44,52 @@ interface AnalyticsResult {
 	favorites: number;
 }
 
+export interface DeepAnalyticsResult extends AnalyticsResult {
+	estimatedMinutesWatched?: number;
+	averageViewDuration?: number;
+	averageViewPercentage?: number;
+	subscribersGained?: number;
+	subscribersLost?: number;
+	shares?: number;
+	impressions?: number | null;
+	impressionCtr?: number | null;
+	trafficSources?: Array<{
+		source: string;
+		views: number;
+		estimatedMinutesWatched?: number;
+		averageViewDuration?: number;
+	}>;
+	retentionCurve?: Array<{
+		elapsedVideoTimeRatio: number;
+		audienceWatchRatio: number;
+		relativeRetentionPerformance?: number | null;
+	}>;
+	dailyRows?: Array<{
+		day: string;
+		views: number;
+		estimatedMinutesWatched?: number;
+		averageViewDuration?: number;
+		averageViewPercentage?: number;
+		subscribersGained?: number;
+		subscribersLost?: number;
+		likes?: number;
+		comments?: number;
+		shares?: number;
+	}>;
+	warnings?: string[];
+}
+
+export interface VideoCommentThread {
+	id: string;
+	videoId: string;
+	author: string;
+	text: string;
+	likeCount: number;
+	publishedAt: string;
+	updatedAt?: string;
+	replyCount?: number;
+}
+
 interface ChannelVideo {
 	videoId: string;
 	title: string;
@@ -167,6 +213,24 @@ export async function getVideoAnalytics(
 	videoId: string,
 ): Promise<AnalyticsResult> {
 	return fetchYT<AnalyticsResult>(`/analytics/${videoId}`);
+}
+
+/** 심화 분석 데이터 조회 — Analytics API 권한이 없으면 서버가 기본 통계와 warnings를 반환 */
+export async function getDeepVideoAnalytics(
+	videoId: string,
+	days = 28,
+): Promise<DeepAnalyticsResult> {
+	return fetchYT<DeepAnalyticsResult>(`/analytics/deep/${videoId}?days=${days}`);
+}
+
+/** 영상 댓글/반응 조회 */
+export async function getVideoComments(
+	videoId: string,
+	maxResults = 100,
+): Promise<{ videoId: string; comments: VideoCommentThread[]; warnings?: string[] }> {
+	return fetchYT<{ videoId: string; comments: VideoCommentThread[]; warnings?: string[] }>(
+		`/comments/${videoId}?maxResults=${maxResults}`,
+	);
 }
 
 /** 채널 영상 목록 */

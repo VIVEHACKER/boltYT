@@ -1,5 +1,9 @@
 import type { SceneShot } from "./scene-shot-types";
-import type { ThumbnailPreset } from "./thumbnail";
+import type { ReferenceTemplate } from "../types/database";
+import {
+	buildThumbnailPlanFromReference,
+	type ThumbnailPlan,
+} from "./thumbnail-intelligence";
 
 export interface YouTubeMetadataScene {
 	narration_text?: string;
@@ -16,6 +20,7 @@ export interface YouTubeMetadataInput {
 	channelName?: string;
 	format?: "shorts" | "longform" | "both" | string;
 	scenes: YouTubeMetadataScene[];
+	referenceTemplate?: ReferenceTemplate | null;
 }
 
 export interface YouTubeMetadata {
@@ -25,12 +30,7 @@ export interface YouTubeMetadata {
 	hashtags: string[];
 	primaryKeywords: string[];
 	chapters: string[];
-	thumbnail: {
-		title: string;
-		subtitle: string;
-		preset: ThumbnailPreset;
-		accentColor: string;
-	};
+	thumbnail: ThumbnailPlan;
 }
 
 const STOPWORDS = new Set([
@@ -122,14 +122,6 @@ function inferTopicTags(topicTitle: string, scenes: YouTubeMetadataScene[]): str
 		tags.push("뉴스분석");
 	}
 	return tags;
-}
-
-function inferThumbnailPreset(topicTags: string[]): ThumbnailPreset {
-	if (topicTags.includes("뉴스분석")) return "news";
-	if (topicTags.includes("미스터리") || topicTags.includes("미제사건")) {
-		return "dramatic";
-	}
-	return "mystery";
 }
 
 function buildThumbnailTitle(
@@ -253,7 +245,6 @@ export function buildYouTubeMetadata(
 		...contentKeywords.slice(0, 3),
 		...topicTags.slice(0, 2),
 	]).slice(0, 6);
-	const thumbnailPreset = inferThumbnailPreset(topicTags);
 	const title = clampText(
 		isShorts
 			? `${topicTitle} 핵심만 60초 요약`
@@ -293,6 +284,14 @@ export function buildYouTubeMetadata(
 	])
 		.filter((tag) => !tag.startsWith("#"))
 		.slice(0, 14);
+	const fallbackThumbnailTitle = buildThumbnailTitle(topicTitle, primaryKeywords);
+	const thumbnail = buildThumbnailPlanFromReference({
+		topicTitle,
+		fallbackTitle: fallbackThumbnailTitle,
+		fallbackSubtitle: buildThumbnailSubtitle(isShorts, topicTags),
+		isShorts,
+		referenceTemplate: input.referenceTemplate,
+	});
 
 	return {
 		title,
@@ -301,11 +300,6 @@ export function buildYouTubeMetadata(
 		hashtags,
 		primaryKeywords,
 		chapters,
-		thumbnail: {
-			title: buildThumbnailTitle(topicTitle, primaryKeywords),
-			subtitle: buildThumbnailSubtitle(isShorts, topicTags),
-			preset: thumbnailPreset,
-			accentColor: thumbnailPreset === "news" ? "#ef4444" : "#f59e0b",
-		},
+		thumbnail,
 	};
 }

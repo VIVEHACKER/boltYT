@@ -123,4 +123,20 @@ describe("analyzeYouTubePolicyRisk", () => {
 			),
 		).toBe(true);
 	});
+
+	it("외부 유도/수익 보장 문구는 계정 삭제형 critical 리스크로 본다", () => {
+		const report = analyzeYouTubePolicyRisk({
+			title: "텔레그램 입장하면 수익 보장",
+			description: "원본 풀영상 download now",
+			scenes: [],
+		});
+
+		expect(report.passed).toBe(false);
+		expect(
+			report.issues.some(
+				(issue) => issue.code === "deceptive_spam_language",
+			),
+		).toBe(true);
+		expect(report.requiredActions.join(" ")).toContain("외부 링크");
+	});
 });

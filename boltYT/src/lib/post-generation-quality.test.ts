@@ -59,5 +59,7 @@ describe("post-generation-quality", () => {
 		expect(ids).toContain("audio-bgm-gate");
 		expect(ids).toContain("browser-risk-e2e");
 		expect(ids).toContain("policy-boundary");
+		expect(ids).toContain("reference-quality-routing");
+		expect(ids).toContain("tacit-explicit-knowledge-loop");
 	});
 });

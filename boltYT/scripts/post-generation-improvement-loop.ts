@@ -8,7 +8,11 @@ import {
 	type QualityCheckResult,
 	type QualityLoopReport,
 } from "../src/lib/post-generation-quality.ts";
-import { getGeneratedReferenceTemplateCoverage } from "../src/lib/reference-template-presets.ts";
+import { GENERATED_REFERENCE_TEMPLATES } from "../src/lib/generated-reference-template-presets.ts";
+import {
+	calculateGeneratedReferenceTemplateCoverage,
+	cloneReferenceTemplateInput,
+} from "../src/lib/reference-template-presets.ts";
 
 const execFileP = promisify(execFile);
 const REPORT_DIR = ".quality";
@@ -109,16 +113,49 @@ async function runCommand(
 }
 
 function checkReferenceCoverage(): QualityCheckResult {
-	const coverage = getGeneratedReferenceTemplateCoverage();
-	const weak = coverage.categories.filter((category) => category.count < 3);
+	const coverage = calculateGeneratedReferenceTemplateCoverage(
+		GENERATED_REFERENCE_TEMPLATES.map((template) =>
+			cloneReferenceTemplateInput(template),
+		),
+	);
+	const weak = coverage.categories.filter(
+		(category) =>
+			category.count < 20 ||
+			category.deep !== category.count ||
+			category.over20 > 0 ||
+			category.qualityAvg < 88 ||
+			category.knowledgeAvg < 88,
+	);
+	const pass =
+		coverage.total >= 100 &&
+		coverage.deep === coverage.total &&
+		coverage.over20 === 0 &&
+		coverage.qualityAvg >= 90 &&
+		coverage.knowledgeAvg >= 90 &&
+		coverage.qualityMin >= 70 &&
+		coverage.blocked === 0 &&
+		weak.length === 0;
 	return {
 		id: "reference-coverage",
 		label: "레퍼런스 커버리지",
-		status: weak.length === 0 && coverage.total >= 15 ? "pass" : "fail",
+		status: pass ? "pass" : "fail",
 		details:
-			weak.length === 0
-				? `자동 생성 ${coverage.total}개, ${coverage.categories.length}/${coverage.categories.length} 카테고리 3개 이상`
-				: `부족: ${weak.map((category) => `${category.label} ${category.count}개`).join(", ")}`,
+			pass
+				? `자동 생성 ${coverage.total}개, deep ${coverage.deep}/${coverage.total}, 평균 Q${coverage.qualityAvg}, 평균 K${coverage.knowledgeAvg}, 최저 Q${coverage.qualityMin}, 즉시 사용 ${coverage.ready}개, 성과 반영 ${coverage.outcomeCalibrated}개`
+				: [
+						`자동 생성 ${coverage.total}개`,
+						`deep ${coverage.deep}/${coverage.total}`,
+						`평균 Q${coverage.qualityAvg}`,
+						`평균 K${coverage.knowledgeAvg}`,
+						`최저 Q${coverage.qualityMin}`,
+						`차단 ${coverage.blocked}개`,
+						`성과 반영 ${coverage.outcomeCalibrated}개`,
+						weak.length > 0
+							? `부족: ${weak.map((category) => `${category.label} ${category.count}개/Q${category.qualityAvg}/K${category.knowledgeAvg}`).join(", ")}`
+							: "",
+					]
+						.filter(Boolean)
+						.join(" · "),
 	};
 }
 

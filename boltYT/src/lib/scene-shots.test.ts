@@ -1107,7 +1107,7 @@ describe("scene-shots 추가 분기", () => {
 		expect((result[0] as { type: string }).type).toBe("video");
 	});
 
-	it("applyLongformVideoRules: 장편 레퍼런스 목표 길이면 6분 고정으로 줄이지 않는다", () => {
+	it("applyLongformVideoRules: 장편 레퍼런스 목표 길이도 20분을 넘기지 않는다", () => {
 		const scenes = Array.from({ length: 64 }, (_, index) => ({
 			narration: `장편 몰아보기 씬 ${index + 1}`,
 			type: index % 5 === 0 ? ("video" as const) : ("image" as const),
@@ -1120,8 +1120,8 @@ describe("scene-shots 추가 분기", () => {
 		});
 		const total = result.reduce((sum, scene) => sum + scene.duration, 0);
 
-		expect(total).toBeGreaterThanOrEqual(5000);
-		expect(result.every((scene) => scene.duration <= 180)).toBe(true);
+		expect(total).toBeLessThanOrEqual(1200);
+		expect(result.every((scene) => scene.duration <= 45)).toBe(true);
 		expect((result[0] as { transition?: string }).transition).toBe("none");
 	});
 });

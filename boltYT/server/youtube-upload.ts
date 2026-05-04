@@ -15,6 +15,8 @@
  *   POST /upload             — 영상 업로드
  *   POST /upload/schedule    — 예약 업로드
  *   GET  /analytics/:videoId — 영상 분석 데이터
+ *   GET  /analytics/deep/:videoId — 심화 분석 데이터
+ *   GET  /comments/:videoId  — 영상 댓글 데이터
  *   GET  /health             — 상태 확인
  */
 
@@ -54,6 +56,7 @@ const SCOPES = [
 	"https://www.googleapis.com/auth/youtube.upload",
 	"https://www.googleapis.com/auth/youtube",
 	"https://www.googleapis.com/auth/youtube.readonly",
+	"https://www.googleapis.com/auth/yt-analytics.readonly",
 ];
 
 function createOAuthClient() {
@@ -76,12 +79,19 @@ function saveToken(token: Record<string, unknown>) {
 }
 
 /** 인증된 YouTube 클라이언트 생성 */
-function getAuthenticatedClient() {
+function getAuthenticatedAuth() {
 	const token = loadToken();
 	if (!token) return null;
 
 	const auth = createOAuthClient();
 	auth.setCredentials(token);
+	return auth;
+}
+
+/** 인증된 YouTube 클라이언트 생성 */
+function getAuthenticatedClient() {
+	const auth = getAuthenticatedAuth();
+	if (!auth) return null;
 	return google.youtube({ version: "v3", auth });
 }
 
@@ -187,6 +197,201 @@ function decodeThumbnailDataUrl(dataUrl: string): {
 		buffer,
 		mimeType,
 		ext: mimeType === "image/png" ? "png" : "jpg",
+	};
+}
+
+type AnalyticsCell = string | number | null | undefined;
+
+interface AnalyticsReport {
+	columnHeaders?: Array<{ name?: string | null }>;
+	rows?: AnalyticsCell[][];
+}
+
+function analyticsDateRange(days: number) {
+	const safeDays = Math.max(1, Math.min(90, Math.round(days || 28)));
+	const end = new Date();
+	end.setUTCDate(end.getUTCDate() - 1);
+	const start = new Date(end);
+	start.setUTCDate(start.getUTCDate() - safeDays + 1);
+	return {
+		startDate: start.toISOString().slice(0, 10),
+		endDate: end.toISOString().slice(0, 10),
+	};
+}
+
+function reportRows(report: AnalyticsReport | null | undefined): Record<string, AnalyticsCell>[] {
+	const headers = report?.columnHeaders?.map((header) => header.name ?? "") ?? [];
+	return (report?.rows ?? []).map((row) => {
+		const record: Record<string, AnalyticsCell> = {};
+		headers.forEach((header, index) => {
+			record[header] = row[index];
+		});
+		return record;
+	});
+}
+
+function num(value: AnalyticsCell): number {
+	const parsed = Number(value ?? 0);
+	return Number.isFinite(parsed) ? parsed : 0;
+}
+
+async function queryAnalyticsReport(
+	auth: ReturnType<typeof createOAuthClient>,
+	params: {
+		startDate: string;
+		endDate: string;
+		metrics: string;
+		dimensions?: string;
+		filters?: string;
+		sort?: string;
+		maxResults?: number;
+	},
+): Promise<AnalyticsReport> {
+	const youtubeAnalytics = google.youtubeAnalytics({ version: "v2", auth });
+	const response = await youtubeAnalytics.reports.query({
+		ids: "channel==MINE",
+		startDate: params.startDate,
+		endDate: params.endDate,
+		metrics: params.metrics,
+		dimensions: params.dimensions,
+		filters: params.filters,
+		sort: params.sort,
+		maxResults: params.maxResults,
+	});
+	return response.data as AnalyticsReport;
+}
+
+async function fetchDeepAnalytics(input: {
+	auth: ReturnType<typeof createOAuthClient>;
+	videoId: string;
+	days: number;
+	baseStats: {
+		videoId: string;
+		title: string;
+		views: number;
+		likes: number;
+		comments: number;
+		favorites: number;
+	};
+}) {
+	const { auth, videoId, days, baseStats } = input;
+	const { startDate, endDate } = analyticsDateRange(days);
+	const warnings: string[] = [];
+	const filters = `video==${videoId}`;
+	let summary: Record<string, AnalyticsCell> = {};
+	let dailyRows: Record<string, AnalyticsCell>[] = [];
+	let trafficRows: Record<string, AnalyticsCell>[] = [];
+	let retentionRows: Record<string, AnalyticsCell>[] = [];
+
+	try {
+		const report = await queryAnalyticsReport(auth, {
+			startDate,
+			endDate,
+			filters,
+			metrics:
+				"views,estimatedMinutesWatched,averageViewDuration,averageViewPercentage,likes,comments,shares,subscribersGained,subscribersLost",
+		});
+		summary = reportRows(report)[0] ?? {};
+	} catch (error) {
+		warnings.push(
+			`summary analytics unavailable: ${error instanceof Error ? error.message : "unknown error"}`,
+		);
+	}
+
+	try {
+		const report = await queryAnalyticsReport(auth, {
+			startDate,
+			endDate,
+			filters,
+			dimensions: "day",
+			metrics:
+				"views,estimatedMinutesWatched,averageViewDuration,averageViewPercentage,likes,comments,shares,subscribersGained,subscribersLost",
+			sort: "day",
+		});
+		dailyRows = reportRows(report);
+	} catch (error) {
+		warnings.push(
+			`daily analytics unavailable: ${error instanceof Error ? error.message : "unknown error"}`,
+		);
+	}
+
+	try {
+		const report = await queryAnalyticsReport(auth, {
+			startDate,
+			endDate,
+			filters,
+			dimensions: "insightTrafficSourceType",
+			metrics: "views,estimatedMinutesWatched,averageViewDuration",
+			sort: "-views",
+			maxResults: 12,
+		});
+		trafficRows = reportRows(report);
+	} catch (error) {
+		warnings.push(
+			`traffic source analytics unavailable: ${error instanceof Error ? error.message : "unknown error"}`,
+		);
+	}
+
+	try {
+		const report = await queryAnalyticsReport(auth, {
+			startDate,
+			endDate,
+			filters,
+			dimensions: "elapsedVideoTimeRatio",
+			metrics: "audienceWatchRatio,relativeRetentionPerformance",
+			sort: "elapsedVideoTimeRatio",
+		});
+		retentionRows = reportRows(report);
+	} catch (error) {
+		warnings.push(
+			`retention analytics unavailable: ${error instanceof Error ? error.message : "unknown error"}`,
+		);
+	}
+
+	return {
+		...baseStats,
+		dateRange: { startDate, endDate },
+		views: num(summary.views) || baseStats.views,
+		likes: num(summary.likes) || baseStats.likes,
+		comments: num(summary.comments) || baseStats.comments,
+		estimatedMinutesWatched: num(summary.estimatedMinutesWatched),
+		averageViewDuration: num(summary.averageViewDuration),
+		averageViewPercentage: num(summary.averageViewPercentage),
+		subscribersGained: num(summary.subscribersGained),
+		subscribersLost: num(summary.subscribersLost),
+		shares: num(summary.shares),
+		impressions: null,
+		impressionCtr: null,
+		trafficSources: trafficRows.map((row) => ({
+			source: String(row.insightTrafficSourceType ?? "UNKNOWN"),
+			views: num(row.views),
+			estimatedMinutesWatched: num(row.estimatedMinutesWatched),
+			averageViewDuration: num(row.averageViewDuration),
+		})),
+		retentionCurve: retentionRows.map((row) => ({
+			elapsedVideoTimeRatio: num(row.elapsedVideoTimeRatio),
+			audienceWatchRatio: num(row.audienceWatchRatio),
+			relativeRetentionPerformance:
+				row.relativeRetentionPerformance === undefined
+					? null
+					: num(row.relativeRetentionPerformance),
+		})),
+		dailyRows: dailyRows.map((row) => ({
+			day: String(row.day ?? ""),
+			views: num(row.views),
+			estimatedMinutesWatched: num(row.estimatedMinutesWatched),
+			averageViewDuration: num(row.averageViewDuration),
+			averageViewPercentage: num(row.averageViewPercentage),
+			likes: num(row.likes),
+			comments: num(row.comments),
+			shares: num(row.shares),
+			subscribersGained: num(row.subscribersGained),
+			subscribersLost: num(row.subscribersLost),
+		})),
+		warnings: [
+			...warnings,
+			"impressions/CTR are shown in YouTube Studio; this endpoint stores them as null unless a supported API report is available.",
+		],
 	};
 }
 
@@ -505,6 +710,103 @@ const server = createServer(async (req, res) => {
 			json(req, res, 200, { ok: true, videoId, scheduledAt });
 		} catch (e) {
 			const msg = e instanceof Error ? e.message : "Schedule failed";
+			json(req, res, 500, { error: msg });
+		}
+		return;
+	}
+
+	// ─── 심화 분석 데이터 조회 ───
+	if (url.pathname.startsWith("/analytics/deep/") && req.method === "GET") {
+		const auth = getAuthenticatedAuth();
+		const youtube = auth ? google.youtube({ version: "v3", auth }) : null;
+		if (!auth || !youtube) {
+			json(req, res, 401, { error: "YouTube 인증이 필요합니다." });
+			return;
+		}
+
+		const videoId = url.pathname.split("/analytics/deep/")[1];
+		const days = Number(url.searchParams.get("days") ?? 28);
+		if (!videoId) {
+			json(req, res, 400, { error: "videoId가 필요합니다." });
+			return;
+		}
+
+		try {
+			const videoRes = await youtube.videos.list({
+				part: ["statistics", "snippet"],
+				id: [videoId],
+			});
+			const video = videoRes.data.items?.[0];
+			if (!video) {
+				json(req, res, 404, { error: "영상을 찾을 수 없습니다." });
+				return;
+			}
+
+			const stats = video.statistics;
+			const baseStats = {
+				videoId,
+				title: video.snippet?.title ?? "",
+				views: Number(stats?.viewCount ?? 0),
+				likes: Number(stats?.likeCount ?? 0),
+				comments: Number(stats?.commentCount ?? 0),
+				favorites: Number(stats?.favoriteCount ?? 0),
+			};
+			const deep = await fetchDeepAnalytics({
+				auth,
+				videoId,
+				days,
+				baseStats,
+			});
+			json(req, res, 200, deep);
+		} catch (e) {
+			const msg = e instanceof Error ? e.message : "Deep analytics fetch failed";
+			json(req, res, 500, { error: msg });
+		}
+		return;
+	}
+
+	// ─── 댓글 데이터 조회 ───
+	if (url.pathname.startsWith("/comments/") && req.method === "GET") {
+		const youtube = getAuthenticatedClient();
+		if (!youtube) {
+			json(req, res, 401, { error: "YouTube 인증이 필요합니다." });
+			return;
+		}
+
+		const videoId = url.pathname.split("/comments/")[1];
+		const maxResults = Math.max(
+			1,
+			Math.min(100, Number(url.searchParams.get("maxResults") ?? 100)),
+		);
+		if (!videoId) {
+			json(req, res, 400, { error: "videoId가 필요합니다." });
+			return;
+		}
+
+		try {
+			const commentsRes = await youtube.commentThreads.list({
+				part: ["snippet", "replies"],
+				videoId,
+				maxResults,
+				order: "relevance",
+				textFormat: "plainText",
+			});
+			const comments = (commentsRes.data.items ?? []).map((item) => {
+				const snippet = item.snippet?.topLevelComment?.snippet;
+				return {
+					id: item.id ?? "",
+					videoId,
+					author: snippet?.authorDisplayName ?? "",
+					text: snippet?.textDisplay ?? snippet?.textOriginal ?? "",
+					likeCount: Number(snippet?.likeCount ?? 0),
+					publishedAt: snippet?.publishedAt ?? "",
+					updatedAt: snippet?.updatedAt ?? "",
+					replyCount: Number(item.snippet?.totalReplyCount ?? 0),
+				};
+			});
+			json(req, res, 200, { videoId, comments });
+		} catch (e) {
+			const msg = e instanceof Error ? e.message : "Comments fetch failed";
 			json(req, res, 500, { error: msg });
 		}
 		return;

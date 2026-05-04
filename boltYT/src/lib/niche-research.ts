@@ -1,4 +1,9 @@
 import { getApiProxyUrl } from "./proxy";
+import {
+	isAllowedLongformDuration,
+	LONGFORM_MAX_DURATION_SECONDS,
+	LONGFORM_MIN_DURATION_SECONDS,
+} from "./reference-duration-policy";
 
 export interface NicheResearchOptions {
 	maxResults: number;
@@ -604,7 +609,7 @@ export function analyzeNicheResearch(
 	const views = scored.map((video) => video.viewCount);
 	const velocities = scored.map((video) => video.viewsPerDay);
 	const longformCount = scored.filter(
-		(video) => video.durationSeconds >= 8 * 60,
+		(video) => isAllowedLongformDuration(video.durationSeconds),
 	).length;
 	const hiddenSubscriberCount = scored.filter(
 		(video) => video.hiddenSubscriberCount,
@@ -675,14 +680,17 @@ export function scoreNicheVideo(
 	const leverage =
 		viewSubscriberRatio === null ? 0.48 : logScore(viewSubscriberRatio, 4);
 	const engagement = clamp01(engagementRate / 0.045);
-	const longform =
-		video.durationSeconds >= 12 * 60
+	const longform = !isAllowedLongformDuration(video.durationSeconds)
+		? video.durationSeconds > LONGFORM_MAX_DURATION_SECONDS
+			? 0.22
+			: video.durationSeconds >= 4 * 60
+				? 0.52
+				: 0.18
+		: video.durationSeconds >= 12 * 60
 			? 1
-			: video.durationSeconds >= 8 * 60
+			: video.durationSeconds >= LONGFORM_MIN_DURATION_SECONDS
 				? 0.84
-				: video.durationSeconds >= 4 * 60
-					? 0.52
-					: 0.18;
+				: 0.52;
 	const freshness = clamp01(1 - ageDays / 730);
 
 	const score = Math.round(

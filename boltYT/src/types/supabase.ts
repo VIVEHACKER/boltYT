@@ -3,6 +3,8 @@ import type {
 	Approval,
 	Brief,
 	Channel,
+	GrowthComment,
+	GrowthExperiment,
 	MediaAsset,
 	Profile,
 	ReferenceTemplate,
@@ -26,6 +28,8 @@ export interface DatabaseSchema {
 	approvals: Approval;
 	uploads: Upload;
 	analytics: Analytics;
+	growth_experiments: GrowthExperiment;
+	growth_comments: GrowthComment;
 	profiles: Profile;
 	style_bibles: StyleBible;
 	reference_templates: ReferenceTemplate;

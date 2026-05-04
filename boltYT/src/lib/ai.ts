@@ -2,6 +2,7 @@ import type { ResearchBrief } from "./ai-agents";
 import { getApiProxyUrl } from "./proxy";
 import type { ReferencePreset } from "./reference-bridge";
 import { buildScriptConstraint } from "./reference-bridge";
+import { LONGFORM_MAX_DURATION_SECONDS } from "./reference-duration-policy";
 import { supabase } from "./supabase";
 import {
 	buildChronologicalTimeline,
@@ -158,12 +159,12 @@ function formatMinutes(seconds: number): string {
 }
 
 function isFeatureLengthReference(referencePreset?: ReferencePreset): boolean {
-	return (referencePreset?.script?.targetDuration ?? 0) >= 1800;
+	return (referencePreset?.script?.targetDuration ?? 0) >= LONGFORM_MAX_DURATION_SECONDS;
 }
 
 function buildLongformPacing(referencePreset?: ReferencePreset): string {
 	if (!referencePreset?.script) {
-		return "롱폼: 10~18개 씬, 6~12분 목표. 씬당 10~28초. 챕터형 전개, 나레이션 3~6문장, 자료/문서/지도/영상 근거를 번갈아 사용.";
+		return "롱폼: 10~18개 씬, 6~12분 목표, 최대 20분 초과 금지. 씬당 10~28초. 챕터형 전개, 나레이션 3~6문장, 자료/문서/지도/영상 근거를 번갈아 사용.";
 	}
 
 	const target = referencePreset.script.targetDuration;
@@ -172,10 +173,10 @@ function buildLongformPacing(referencePreset?: ReferencePreset): string {
 	const hook = referencePreset.script.hookDuration;
 
 	if (isFeatureLengthReference(referencePreset)) {
-		return `레퍼런스 장편 롱폼: ${sceneCount}개 내외 씬, ${formatMinutes(target)} 목표. 첫 ${hook}초 안에 작품의 핵심 아이러니/비밀을 던지고, 6~10개 챕터로 쪼개세요. 씬 평균은 ${avg}초이며, 각 씬은 실제 TTS 길이가 맞도록 충분한 나레이션(6~10문장)을 작성합니다. 줄거리 요약만 나열하지 말고 인물 관계, 선택의 이유, 장르적 재미, 결말 회수를 섞어 중반 반복을 막으세요.`;
+		return `레퍼런스 롱폼 상한: ${sceneCount}개 내외 씬, ${formatMinutes(target)} 목표, 최대 20분 초과 금지. 첫 ${hook}초 안에 작품의 핵심 아이러니/비밀을 던지고, 5~7개 챕터로 쪼개세요. 씬 평균은 ${avg}초이며, 각 씬은 실제 TTS 길이가 맞도록 충분한 나레이션(4~7문장)을 작성합니다. 줄거리 요약만 나열하지 말고 인물 관계, 선택의 이유, 장르적 재미, 결말 회수를 섞어 중반 반복을 막으세요.`;
 	}
 
-	return `레퍼런스 롱폼: ${sceneCount}개 내외 씬, ${formatMinutes(target)} 목표. 씬 평균 ${avg}초, 첫 ${hook}초는 강한 질문/상황으로 시작합니다. 챕터형 전개와 자료/문서/지도/영상 근거를 번갈아 사용하세요.`;
+	return `레퍼런스 롱폼: ${sceneCount}개 내외 씬, ${formatMinutes(target)} 목표, 최대 20분 초과 금지. 씬 평균 ${avg}초, 첫 ${hook}초는 강한 질문/상황으로 시작합니다. 챕터형 전개와 자료/문서/지도/영상 근거를 번갈아 사용하세요.`;
 }
 
 function buildLongformSceneRules(referencePreset?: ReferencePreset): string {
@@ -204,7 +205,7 @@ function buildLongformSceneRules(referencePreset?: ReferencePreset): string {
 - transition: crossfade. mood: "neutral" or "warm".
 
 공통:
-- 총 10~18개 씬, 6~12분 분량을 목표로 한다.
+- 총 10~18개 씬, 6~12분 분량을 목표로 하고 20분을 절대 넘기지 않는다.
 - 나레이션은 씬당 3~6문장. 짧은 구어체 문장. 접속사로 자연스럽게 연결.
 - 쇼츠식 6~8초 인터럽트를 반복하지 말고, 챕터마다 화면 문법을 바꾼다.
 - video 비율은 자료가 충분할 때 40~55% 수준. 나머지는 문서, 지도, 아카이브 이미지, 정교한 재구성으로 근거 밀도를 만든다.
@@ -214,9 +215,11 @@ function buildLongformSceneRules(referencePreset?: ReferencePreset): string {
 	const target = referencePreset!.script.targetDuration;
 	const sceneCount = referencePreset!.script.sceneCount;
 	const avg = referencePreset!.script.avgSceneDuration;
+	const minScenes = Math.max(18, Math.min(32, sceneCount - 4));
+	const maxScenes = Math.max(minScenes, Math.min(36, sceneCount + 4));
 	return `=== 장편 몰아보기 롱폼(16:9) 규칙 ===
-- 목표 길이: ${formatMinutes(target)}. 총 ${Math.max(48, sceneCount - 8)}~${sceneCount + 8}개 씬을 만든다.
-- 씬 duration 평균은 ${avg}초 전후로 잡고, 실제 TTS 길이가 너무 짧아지지 않도록 각 씬 나레이션을 6~10문장으로 충분히 작성한다.
+- 목표 길이: ${formatMinutes(target)}. 총 ${minScenes}~${maxScenes}개 씬을 만들고 20분을 절대 넘기지 않는다.
+- 씬 duration 평균은 ${avg}초 전후로 잡고, 실제 TTS 길이가 너무 짧아지지 않도록 각 씬 나레이션을 4~7문장으로 충분히 작성한다.
 - 구조는 cold open → 작품 전제 → 인물 관계 → 1막 사건 → 중반 반전 → 압박 누적 → 감정 저점 → 결말 회수 → 짧은 리뷰 순서로 간다.
 - 드라마/영화 제목이 주어지면 줄거리, 인물 관계, 장르 톤, 공개 자료를 분석해 새 해설 대본으로 재구성한다.
 - 원작 대사나 특정 장면 묘사를 그대로 베끼지 말고, 시청자가 이해할 수 있는 요약·해석·연결 설명으로 쓴다.

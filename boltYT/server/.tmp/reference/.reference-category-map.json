@@ -474,5 +474,173 @@
   "https://www.youtube.com/watch?v=ZPE9YpEt5vk": {
     "id": "money_psychology",
     "label": "돈/심리/자기계발"
+  },
+  "https://www.youtube.com/watch?v=z5kcQsqEcVo": {
+    "id": "drama_recap",
+    "label": "드라마/영화 몰아보기"
+  },
+  "https://www.youtube.com/watch?v=FvycE3dcsso": {
+    "id": "drama_recap",
+    "label": "드라마/영화 몰아보기"
+  },
+  "https://www.youtube.com/watch?v=IEolpq6qjVg": {
+    "id": "drama_recap",
+    "label": "드라마/영화 몰아보기"
+  },
+  "https://www.youtube.com/watch?v=rZPaKlhP2XA": {
+    "id": "drama_recap",
+    "label": "드라마/영화 몰아보기"
+  },
+  "https://www.youtube.com/watch?v=Blr_HMqYv2c": {
+    "id": "drama_recap",
+    "label": "드라마/영화 몰아보기"
+  },
+  "https://www.youtube.com/watch?v=PFLz1B6XjtI": {
+    "id": "drama_recap",
+    "label": "드라마/영화 몰아보기"
+  },
+  "https://www.youtube.com/watch?v=hRQnP4gAmNU": {
+    "id": "drama_recap",
+    "label": "드라마/영화 몰아보기"
+  },
+  "https://www.youtube.com/watch?v=vFf6sL_igtQ": {
+    "id": "drama_recap",
+    "label": "드라마/영화 몰아보기"
+  },
+  "https://www.youtube.com/watch?v=Akrrq2cFwrE": {
+    "id": "drama_recap",
+    "label": "드라마/영화 몰아보기"
+  },
+  "https://www.youtube.com/watch?v=CUVJHDBm8o8": {
+    "id": "drama_recap",
+    "label": "드라마/영화 몰아보기"
+  },
+  "https://www.youtube.com/watch?v=cONnX0S6rI4": {
+    "id": "drama_recap",
+    "label": "드라마/영화 몰아보기"
+  },
+  "https://www.youtube.com/watch?v=QhXHllPcuII": {
+    "id": "mystery_doc",
+    "label": "미스터리/사건 다큐"
+  },
+  "https://www.youtube.com/watch?v=5C5TcZ7ngcc": {
+    "id": "mystery_doc",
+    "label": "미스터리/사건 다큐"
+  },
+  "https://www.youtube.com/watch?v=NRiseJ5Bb5w": {
+    "id": "mystery_doc",
+    "label": "미스터리/사건 다큐"
+  },
+  "https://www.youtube.com/watch?v=eTiUwDUcLEk": {
+    "id": "mystery_doc",
+    "label": "미스터리/사건 다큐"
+  },
+  "https://www.youtube.com/watch?v=k06jX3uo4Mo": {
+    "id": "mystery_doc",
+    "label": "미스터리/사건 다큐"
+  },
+  "https://www.youtube.com/watch?v=DkUfclY4-_w": {
+    "id": "mystery_doc",
+    "label": "미스터리/사건 다큐"
+  },
+  "https://www.youtube.com/watch?v=OtDTN2t0gM4": {
+    "id": "mystery_doc",
+    "label": "미스터리/사건 다큐"
+  },
+  "https://www.youtube.com/watch?v=OH55rYbQYu4": {
+    "id": "mystery_doc",
+    "label": "미스터리/사건 다큐"
+  },
+  "https://www.youtube.com/watch?v=quWOa5NM-Eo": {
+    "id": "mystery_doc",
+    "label": "미스터리/사건 다큐"
+  },
+  "https://www.youtube.com/watch?v=rCzA1ejnjtw": {
+    "id": "automation_business",
+    "label": "AI/비즈니스 자동화"
+  },
+  "https://www.youtube.com/watch?v=yRsqDDobVQc": {
+    "id": "news_issue",
+    "label": "뉴스/이슈 해설"
+  },
+  "https://www.youtube.com/watch?v=AQL0AtwovJA": {
+    "id": "news_issue",
+    "label": "뉴스/이슈 해설"
+  },
+  "https://www.youtube.com/watch?v=eOqPjPrdw8A": {
+    "id": "news_issue",
+    "label": "뉴스/이슈 해설"
+  },
+  "https://www.youtube.com/watch?v=UeakBxhCG4g": {
+    "id": "news_issue",
+    "label": "뉴스/이슈 해설"
+  },
+  "https://www.youtube.com/watch?v=eqVsuuh_x0I": {
+    "id": "news_issue",
+    "label": "뉴스/이슈 해설"
+  },
+  "https://www.youtube.com/watch?v=e7DQeoDpYWQ": {
+    "id": "automation_business",
+    "label": "AI/비즈니스 자동화"
+  },
+  "https://www.youtube.com/watch?v=zS9nXAaWcac": {
+    "id": "automation_business",
+    "label": "AI/비즈니스 자동화"
+  },
+  "https://www.youtube.com/watch?v=GzGcQzMo_Rw": {
+    "id": "automation_business",
+    "label": "AI/비즈니스 자동화"
+  },
+  "https://www.youtube.com/watch?v=fP83VwBdWXw": {
+    "id": "automation_business",
+    "label": "AI/비즈니스 자동화"
+  },
+  "https://www.youtube.com/watch?v=3eDguAZOFsA": {
+    "id": "automation_business",
+    "label": "AI/비즈니스 자동화"
+  },
+  "https://www.youtube.com/watch?v=-84DYZp8V4U": {
+    "id": "automation_business",
+    "label": "AI/비즈니스 자동화"
+  },
+  "https://www.youtube.com/watch?v=WRVpjzW-xYE": {
+    "id": "automation_business",
+    "label": "AI/비즈니스 자동화"
+  },
+  "https://www.youtube.com/watch?v=HCkohqnryGg": {
+    "id": "money_psychology",
+    "label": "돈/심리/자기계발"
+  },
+  "https://www.youtube.com/watch?v=S-IaULnKPRM": {
+    "id": "money_psychology",
+    "label": "돈/심리/자기계발"
+  },
+  "https://www.youtube.com/watch?v=d3kUcaamB84": {
+    "id": "money_psychology",
+    "label": "돈/심리/자기계발"
+  },
+  "https://www.youtube.com/watch?v=PQ3X603EV-A": {
+    "id": "money_psychology",
+    "label": "돈/심리/자기계발"
+  },
+  "https://www.youtube.com/watch?v=gadedKEuLaQ": {
+    "id": "money_psychology",
+    "label": "돈/심리/자기계발"
+  },
+  "https://www.youtube.com/watch?v=z3gP8IkGkeU": {
+    "id": "money_psychology",
+    "label": "돈/심리/자기계발"
+  },
+  "https://www.youtube.com/watch?v=1ZBJ2c1Pu5o": {
+    "id": "money_psychology",
+    "label": "돈/심리/자기계발"
+  },
+  "https://www.youtube.com/watch?v=CWTvH2KlwPo": {
+    "id": "money_psychology",
+    "label": "돈/심리/자기계발"
+  },
+  "https://www.youtube.com/watch?v=z9Yi7oshXY8": {
+    "id": "news_issue",
+    "label": "뉴스/이슈 해설"
   }
 }

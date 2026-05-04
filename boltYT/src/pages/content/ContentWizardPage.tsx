@@ -8,11 +8,17 @@ import {
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { DEMO_CHANNELS } from "../../lib/demo-data";
+import type { ContentPerformanceSample } from "../../lib/content-recommendation-ranker";
 import {
 	loadNicheResearchHandoff,
 	type NicheResearchHandoff,
 } from "../../lib/niche-research";
 import { getReferenceTemplate } from "../../lib/reference-import";
+import { buildReferenceKnowledgeProfile } from "../../lib/knowledge-system";
+import {
+	getReferenceTemplateQuality,
+	getReferenceTemplateReadiness,
+} from "../../lib/reference-template-presets";
 import { DEMO_MODE, supabase } from "../../lib/supabase";
 import type { Channel, ReferenceTemplate } from "../../types/database";
 import StepBrief from "./StepBrief";
@@ -91,9 +97,13 @@ export default function ContentWizardPage() {
 		DEMO_MODE ? DEMO_CHANNELS[0].id : "",
 	);
 	const [topicId, setTopicId] = useState("");
+	const [topicTitle, setTopicTitle] = useState(initialTitle);
 	const [briefId, setBriefId] = useState("");
 	const [scriptId, setScriptId] = useState("");
 	const [sources, setSources] = useState<CollectedSource[]>([]);
+	const [performanceHistory, setPerformanceHistory] = useState<
+		ContentPerformanceSample[]
+	>([]);
 	const [referenceTemplate, setReferenceTemplate] =
 		useState<ReferenceTemplate | null>(null);
 	const [loading, setLoading] = useState(!DEMO_MODE);
@@ -106,6 +116,7 @@ export default function ContentWizardPage() {
 			});
 		}
 		if (DEMO_MODE) return;
+		void loadContentPerformanceSamples().then(setPerformanceHistory);
 		supabase
 			.from("channels")
 			.select("*")
@@ -245,12 +256,9 @@ export default function ContentWizardPage() {
 			</PText>
 
 			{referenceTemplate && (
-				<PInlineNotification
-					state="info"
-					heading={`레퍼런스 템플릿 적용 중: ${referenceTemplate.name || referenceTemplate.source_title}`}
-					description={`무드: ${referenceTemplate.visual_mood} · 페이싱: ${referenceTemplate.pacing_preset} · 씬 ${referenceTemplate.scene_count}개 · 평균 ${referenceTemplate.avg_scene_duration}초`}
+				<ReferenceTemplateStatusNotice
+					template={referenceTemplate}
 					onDismiss={() => setReferenceTemplate(null)}
-					className="mb-fluid-sm"
 				/>
 			)}
 
@@ -266,8 +274,10 @@ export default function ContentWizardPage() {
 						initialTitle={initialTitle}
 						source={initialSource}
 						nicheHandoff={nicheHandoff}
-						onNext={(id) => {
+						performanceHistory={performanceHistory}
+						onNext={(id, title) => {
 							setTopicId(id);
+							setTopicTitle(title);
 							setStep(1);
 						}}
 					/>
@@ -303,6 +313,8 @@ export default function ContentWizardPage() {
 						sources={sources}
 						referenceTemplate={referenceTemplate}
 						nicheHandoff={nicheHandoff}
+						topicTitle={topicTitle}
+						performanceHistory={performanceHistory}
 						onNext={(id) => {
 							setScriptId(id);
 							setStep(3);
@@ -333,5 +345,134 @@ export default function ContentWizardPage() {
 				)}
 			</div>
 		</div>
+	);
+}
+
+interface PerformanceUploadRow {
+	id: string;
+	title?: string | null;
+	description?: string | null;
+	tags?: string[] | null;
+	render_id?: string | null;
+	published_at?: string | null;
+}
+
+type PerformanceRetentionCurve =
+	NonNullable<ContentPerformanceSample["metrics"]>["retentionCurve"];
+
+interface PerformanceAnalyticsRow {
+	upload_id: string;
+	views?: number | null;
+	ctr?: number | null;
+	avg_watch_duration?: number | null;
+	avg_view_percentage?: number | null;
+	likes?: number | null;
+	comments?: number | null;
+	subscribers_gained?: number | null;
+	retention_curve?: PerformanceRetentionCurve | null;
+}
+
+interface PerformanceRenderRow {
+	id: string;
+	format?: string | null;
+	duration_seconds?: number | null;
+}
+
+async function loadContentPerformanceSamples(): Promise<ContentPerformanceSample[]> {
+	try {
+		const { data: uploads, error: uploadsError } = await supabase
+			.from("uploads")
+			.select("id,title,description,tags,render_id,published_at,status")
+			.order("published_at", { ascending: false })
+			.limit(80);
+		if (uploadsError) return [];
+		const uploadRows = ((uploads ?? []) as PerformanceUploadRow[]).filter(
+			(upload) => upload.id,
+		);
+		const uploadIds = uploadRows.map((upload) => upload.id);
+		const renderIds = uploadRows
+			.map((upload) => upload.render_id)
+			.filter((id): id is string => Boolean(id));
+		if (uploadIds.length === 0) return [];
+		const [analyticsRes, rendersRes] = await Promise.all([
+			supabase
+				.from("analytics")
+				.select(
+					"upload_id,views,ctr,avg_watch_duration,avg_view_percentage,likes,comments,subscribers_gained,retention_curve,fetched_at",
+				)
+				.in("upload_id", uploadIds)
+				.order("fetched_at", { ascending: false }),
+			renderIds.length
+				? supabase
+						.from("renders")
+						.select("id,format,duration_seconds")
+						.in("id", renderIds)
+				: Promise.resolve({ data: [], error: null }),
+		]);
+		if (analyticsRes.error || rendersRes.error) return [];
+		const analyticsByUploadId = new Map<string, PerformanceAnalyticsRow>();
+		for (const row of (analyticsRes.data ?? []) as PerformanceAnalyticsRow[]) {
+			if (row.upload_id && !analyticsByUploadId.has(row.upload_id)) {
+				analyticsByUploadId.set(row.upload_id, row);
+			}
+		}
+		const rendersById = new Map<string, PerformanceRenderRow>();
+		for (const row of (rendersRes.data ?? []) as PerformanceRenderRow[]) {
+			if (row.id) rendersById.set(row.id, row);
+		}
+
+		const samples: ContentPerformanceSample[] = [];
+		for (const upload of uploadRows) {
+			const analytics = analyticsByUploadId.get(upload.id);
+			if (!analytics) continue;
+			const render = upload.render_id ? rendersById.get(upload.render_id) : undefined;
+			samples.push({
+				uploadId: upload.id,
+				title: upload.title,
+				description: upload.description,
+				tags: upload.tags,
+				format: render?.format,
+				durationSeconds: render?.duration_seconds,
+				publishedAt: upload.published_at,
+				metrics: {
+					views: analytics.views,
+					ctr: analytics.ctr,
+					avgWatchDuration: analytics.avg_watch_duration,
+					avgViewPercentage: analytics.avg_view_percentage,
+					likes: analytics.likes,
+					comments: analytics.comments,
+					subscribersGained: analytics.subscribers_gained,
+					retentionCurve: analytics.retention_curve,
+				},
+			});
+		}
+		return samples;
+	} catch {
+		return [];
+	}
+}
+
+function ReferenceTemplateStatusNotice({
+	template,
+	onDismiss,
+}: {
+	template: ReferenceTemplate;
+	onDismiss: () => void;
+}) {
+	const quality = getReferenceTemplateQuality(template);
+	const readiness = getReferenceTemplateReadiness(template);
+	const knowledge = buildReferenceKnowledgeProfile(template);
+	const gaps =
+		quality.gaps.length > 0
+			? ` · 보강: ${quality.gaps.slice(0, 2).join(", ")}`
+			: "";
+	return (
+		<PInlineNotification
+			state={readiness.state}
+			heading={`레퍼런스 적용 중: ${template.name || template.source_title}`}
+			description={`Q${quality.score}/${quality.grade} · K${knowledge.score}/${knowledge.maturity} · ${readiness.label} · 무드 ${template.visual_mood} · 페이싱 ${template.pacing_preset} · 씬 ${template.scene_count}개 · 평균 ${template.avg_scene_duration}초${gaps}. ${readiness.action}`}
+			onDismiss={onDismiss}
+			className="mb-fluid-sm"
+		/>
 	);
 }

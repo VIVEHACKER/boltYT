@@ -5,10 +5,12 @@ import {
 	listReferenceTemplates,
 } from "../../lib/reference-import";
 import {
+	calculateGeneratedReferenceTemplateCoverage,
 	formatReferenceOutputFormats,
-	getGeneratedReferenceTemplateCoverage,
+	getReferenceTemplateQuality,
 	getReferenceTemplateMethodDescription,
 	getReferenceTemplateMethodLabel,
+	getReferenceTemplateReadiness,
 	getReferenceTemplateRecommendedMode,
 	isBuiltInReference,
 } from "../../lib/reference-template-presets";
@@ -116,6 +118,16 @@ function transitionLabel(
 	return labels[transition] ?? transition;
 }
 
+function isGeneratedReference(template: ReferenceTemplate): boolean {
+	const raw = template.raw_analysis;
+	return Boolean(
+		raw &&
+			typeof raw === "object" &&
+			!Array.isArray(raw) &&
+			(raw as { generated_reference?: unknown }).generated_reference === true,
+	);
+}
+
 export default function ReferenceListPage() {
 	const navigate = useNavigate();
 	const [searchParams, setSearchParams] = useSearchParams();
@@ -165,7 +177,9 @@ export default function ReferenceListPage() {
 
 	const stats = useMemo(() => {
 		const builtInCount = templates.filter(isBuiltInReference).length;
-		const generatedCoverage = getGeneratedReferenceTemplateCoverage();
+		const generatedCoverage = calculateGeneratedReferenceTemplateCoverage(
+			templates.filter(isGeneratedReference),
+		);
 		const avgScenes =
 			templates.length > 0
 				? Math.round(
@@ -173,11 +187,21 @@ export default function ReferenceListPage() {
 							templates.length,
 					)
 				: 0;
+		const avgQuality =
+			templates.length > 0
+				? Math.round(
+						templates.reduce(
+							(sum, template) => sum + getReferenceTemplateQuality(template).score,
+							0,
+						) / templates.length,
+					)
+				: 0;
 		return {
 			total: templates.length,
 			builtInCount,
 			savedCount: Math.max(0, templates.length - builtInCount),
 			avgScenes,
+			avgQuality,
 			generatedCoverage,
 		};
 	}, [templates]);
@@ -256,7 +280,7 @@ export default function ReferenceListPage() {
 							</button>
 							<div className="text-[12px] font-medium text-[#8d877c]">
 								내장 {stats.builtInCount}개 · 저장 {stats.savedCount}개 · 평균{" "}
-								{stats.avgScenes || 0}씬
+								{stats.avgScenes || 0}씬 · Q{stats.avgQuality || 0}
 							</div>
 						</div>
 					</div>
@@ -294,7 +318,7 @@ export default function ReferenceListPage() {
 						<div className="mt-5 grid grid-cols-3 gap-2">
 							<Metric value={String(stats.total)} label="전체" />
 							<Metric value={String(stats.builtInCount)} label="내장" />
-							<Metric value={String(stats.savedCount)} label="저장" />
+							<Metric value={`Q${stats.avgQuality || 0}`} label="평균 품질" />
 						</div>
 						<GeneratedCoveragePanel coverage={stats.generatedCoverage} />
 					</aside>
@@ -337,7 +361,7 @@ export default function ReferenceListPage() {
 function GeneratedCoveragePanel({
 	coverage,
 }: {
-	coverage: ReturnType<typeof getGeneratedReferenceTemplateCoverage>;
+	coverage: ReturnType<typeof calculateGeneratedReferenceTemplateCoverage>;
 }) {
 	return (
 		<div
@@ -349,28 +373,62 @@ function GeneratedCoveragePanel({
 					<div className="text-[10px] font-black uppercase tracking-[.18em] text-[#f1c75b]">
 						auto references
 					</div>
-					<div className="mt-1 text-[13px] font-black text-[#fffaf0]">
-						자동 생성 레퍼런스 {coverage.total}개
+						<div className="mt-1 text-[13px] font-black text-[#fffaf0]">
+							자동 생성 레퍼런스 {coverage.total}개 · Q{coverage.qualityAvg} · K
+							{coverage.knowledgeAvg}
 					</div>
 				</div>
 				<div className="rounded-full bg-[#f1c75b] px-3 py-1 text-[11px] font-black text-[#11100c]">
-					{coverage.categories.filter((category) => category.count >= 3).length}/
+					{coverage.deep}/{coverage.total} deep
+				</div>
+				<div className="rounded-full bg-white/10 px-3 py-1 text-[11px] font-black text-[#fffaf0]">
+					{coverage.categories.filter((category) => category.count >= 22).length}/
 					{coverage.categories.length} 완료
 				</div>
+				</div>
+				<div className="mt-3 grid grid-cols-3 gap-2">
+					<MiniMetric value={`${coverage.shorts}`} label="쇼츠" />
+					<MiniMetric value={`${coverage.longform}`} label="롱폼" />
+					<MiniMetric value={`${coverage.over20}`} label="20분초과" />
+				</div>
+				<div className="mt-2 grid grid-cols-3 gap-2">
+					<MiniMetric value={`${coverage.ready}`} label="즉시 사용" />
+					<MiniMetric value={`${coverage.review}`} label="보강 검토" />
+					<MiniMetric
+						value={`${coverage.outcomeCalibrated}`}
+						label="성과 반영"
+					/>
+				</div>
+				<div className="mt-3 grid gap-2">
+					{coverage.categories.map((category) => (
+						<div
+							key={category.id}
+							className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-2 rounded-full bg-black/18 px-3 py-1.5 text-[11px]"
+						>
+							<span className="font-bold text-[#d8d0c2]">{category.label}</span>
+							<span className="font-black tabular-nums text-[#f1c75b]">
+								{category.deep}/{category.count}
+							</span>
+							<span className="font-black tabular-nums text-[#9de2d3]">
+								Q{category.qualityAvg}
+							</span>
+							<span className="font-black tabular-nums text-[#fffaf0]">
+								K{category.knowledgeAvg}
+							</span>
+						</div>
+					))}
+				</div>
+		</div>
+	);
+}
+
+function MiniMetric({ value, label }: { value: string; label: string }) {
+	return (
+		<div className="rounded-2xl bg-black/18 px-3 py-2">
+			<div className="text-[15px] font-black tabular-nums text-[#fffaf0]">
+				{value}
 			</div>
-			<div className="mt-3 grid gap-2">
-				{coverage.categories.map((category) => (
-					<div
-						key={category.id}
-						className="flex items-center justify-between gap-2 rounded-full bg-black/18 px-3 py-1.5 text-[11px]"
-					>
-						<span className="font-bold text-[#d8d0c2]">{category.label}</span>
-						<span className="font-black tabular-nums text-[#f1c75b]">
-							{category.count}개
-						</span>
-					</div>
-				))}
-			</div>
+			<div className="text-[10px] font-bold text-[#8d877c]">{label}</div>
 		</div>
 	);
 }
@@ -406,6 +464,8 @@ function TemplateCard({
 	const builtIn = isBuiltInReference(template);
 	const methodLabel = getReferenceTemplateMethodLabel(template);
 	const methodDescription = getReferenceTemplateMethodDescription(template);
+	const quality = getReferenceTemplateQuality(template);
+	const readiness = getReferenceTemplateReadiness(template);
 	const tone = getTone(template, index);
 
 	function handleKeyDown(event: React.KeyboardEvent<HTMLElement>) {
@@ -429,7 +489,10 @@ function TemplateCard({
 				<div className="flex flex-1 flex-col p-5 sm:p-6">
 					<div className="mb-4 flex flex-wrap gap-2">
 						{builtIn && <Tag>내장</Tag>}
-						<Tag>{formatReferenceOutputFormats(template)}</Tag>
+							<Tag>Q{quality.score}</Tag>
+							<Tag>{quality.grade}</Tag>
+							<Tag>{readiness.label}</Tag>
+							<Tag>{formatReferenceOutputFormats(template)}</Tag>
 						<Tag>{moodLabel(template.visual_mood)}</Tag>
 						<Tag>{pacingLabel(template.pacing_preset)}</Tag>
 					</div>
@@ -458,10 +521,28 @@ function TemplateCard({
 						/>
 						<CardMetric value={`${template.scene_count}`} label="씬" />
 						<CardMetric
-							value={transitionLabel(template.transition_style)}
-							label="전환"
+							value={quality.deep ? "deep" : transitionLabel(template.transition_style)}
+							label="분석"
 						/>
-					</div>
+						</div>
+						<div className="mt-3 flex flex-wrap gap-1.5">
+							{quality.strengths.slice(0, 3).map((strength) => (
+							<span
+								key={strength}
+								className="rounded-full bg-[#8fd6c8]/10 px-2.5 py-1 text-[10px] font-black text-[#8fd6c8]"
+							>
+									{strength}
+								</span>
+							))}
+							{quality.gaps.slice(0, 2).map((gap) => (
+								<span
+									key={gap}
+									className="rounded-full bg-[#f1c75b]/10 px-2.5 py-1 text-[10px] font-black text-[#f1c75b]"
+								>
+									보강: {gap}
+								</span>
+							))}
+						</div>
 
 					<div className="mt-5 flex items-center justify-between gap-3">
 						<button

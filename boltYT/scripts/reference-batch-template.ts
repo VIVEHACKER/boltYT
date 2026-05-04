@@ -4,6 +4,13 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import { buildMetadataProductionDna } from "../server/lib/reference-production-dna.ts";
+import {
+	LONGFORM_MIN_DURATION_SECONDS,
+	LONGFORM_MAX_DURATION_SECONDS,
+	SHORTS_MAX_DURATION_SECONDS,
+	referenceFormatForDuration,
+} from "../src/lib/reference-duration-policy.ts";
+import { scoreReferenceQuality } from "../src/lib/reference-quality.ts";
 
 type ReferenceAnalysisMode = "auto" | "shortform" | "longform" | "deep";
 type ReferenceTargetFormat = "auto" | "shorts" | "longform";
@@ -113,6 +120,10 @@ const categoryMapPath = path.join(
 const generatedPath = path.join(
 	repoRoot,
 	"src/lib/generated-reference-template-presets.ts",
+);
+const generatedJsonPath = path.join(
+	repoRoot,
+	"public/generated-reference-template-presets.json",
 );
 const execFileAsync = promisify(execFile);
 const analyzerBase = process.env.REFERENCE_ANALYZER_URL ?? "http://localhost:3460";
@@ -638,9 +649,7 @@ function matchesTargetFormat(
 }
 
 function targetFormatForDuration(durationSeconds: number) {
-	if (durationSeconds > 0 && durationSeconds <= 180) return "shorts" as const;
-	if (durationSeconds >= 8 * 60) return "longform" as const;
-	return "other" as const;
+	return referenceFormatForDuration(durationSeconds);
 }
 
 function formatLabel(format: Exclude<ReferenceTargetFormat, "auto">) {
@@ -1176,6 +1185,9 @@ function buildGeneratedTemplates(
 	const latestByUrl = new Map<string, StoredJob>();
 	for (const job of jobs) {
 		if (job.status !== "complete" || !job.result?.source_url) continue;
+		if (referenceFormatForDuration(job.result.duration_seconds) === "other") {
+			continue;
+		}
 		const previous = latestByUrl.get(job.result.source_url);
 		if (
 			!previous ||
@@ -1204,6 +1216,7 @@ function templateFromJob(
 ) {
 	const result = mustResult(job);
 	const createdAt = job.completedAt ?? job.createdAt;
+	const durationSeconds = templateDurationSeconds(result.duration_seconds);
 	const mappedCategory = categoryMap[result.source_url];
 	const categoryId =
 		mappedCategory?.id ?? job.referenceCategoryId ?? inferCategoryId(result);
@@ -1216,7 +1229,7 @@ function templateFromJob(
 			: `자동 레퍼런스 · ${cleanTitle(result.source_title, 48)}`;
 	const rawAnalysis = sanitizeRawAnalysis(result.raw_analysis, job, categoryId, categoryLabel);
 
-	return {
+	const template = {
 		id: `builtin-auto-${stableSlug(categoryId || "reference")}-${stableSlug(youtubeId)}`,
 		channel_id: "__builtin_reference__",
 		name,
@@ -1225,7 +1238,7 @@ function templateFromJob(
 		source_title: result.source_title,
 		source_creator: result.source_creator,
 		thumbnail_url: result.thumbnail_url,
-		duration_seconds: result.duration_seconds,
+		duration_seconds: durationSeconds,
 		dominant_colors: result.dominant_colors,
 		visual_mood: result.visual_mood,
 		visual_prompt_template: result.visual_prompt_template,
@@ -1256,6 +1269,13 @@ function templateFromJob(
 		analysis_error: "",
 		created_at: createdAt,
 		updated_at: createdAt,
+	};
+	return {
+		...template,
+		raw_analysis: {
+			...rawAnalysis,
+			reference_quality: scoreReferenceQuality(template),
+		},
 	};
 }
 
@@ -1291,6 +1311,13 @@ function sanitizeRawAnalysis(
 	);
 	return {
 		...copy,
+		source_duration_seconds: result.duration_seconds,
+		duration_policy: {
+			shorts_max_seconds: SHORTS_MAX_DURATION_SECONDS,
+			longform_min_seconds: LONGFORM_MIN_DURATION_SECONDS,
+			longform_max_seconds: LONGFORM_MAX_DURATION_SECONDS,
+			output_duration_seconds: templateDurationSeconds(result.duration_seconds),
+		},
 		analysis_depth:
 			typeof copy.analysis_depth === "string"
 				? copy.analysis_depth
@@ -1311,6 +1338,14 @@ function sanitizeRawAnalysis(
 			categoryLabel,
 		),
 	};
+}
+
+function templateDurationSeconds(durationSeconds: number) {
+	const duration = Math.max(1, Math.round(Number(durationSeconds) || 1));
+	if (duration > SHORTS_MAX_DURATION_SECONDS) {
+		return Math.min(duration, LONGFORM_MAX_DURATION_SECONDS);
+	}
+	return duration;
 }
 
 function sanitizeProductionDna(dna: Record<string, unknown>) {
@@ -1342,7 +1377,8 @@ function normalizeProductionMethod(
 	categoryId: string,
 	categoryLabel: string,
 ) {
-	const supportedFormats = result.duration_seconds > 180 ? ["longform"] : ["shorts"];
+	const supportedFormats =
+		result.duration_seconds > SHORTS_MAX_DURATION_SECONDS ? ["longform"] : ["shorts"];
 	const defaultSceneLayouts = Object.fromEntries(
 		supportedFormats.map((format) => [format, "full"]),
 	);
@@ -1358,6 +1394,11 @@ function normalizeProductionMethod(
 		return {
 			...method,
 			supportedFormats: normalizedFormats,
+			formatProfiles: normalizeFormatProfiles(
+				method.formatProfiles,
+				result,
+				normalizedFormats,
+			),
 			sceneLayout:
 				typeof method.sceneLayout === "string" ? method.sceneLayout : "full",
 			sceneLayouts: {
@@ -1379,9 +1420,9 @@ function normalizeProductionMethod(
 		supportedFormats,
 		formatProfiles: {
 			[supportedFormats[0]]: {
-				durationSeconds: Math.round(result.duration_seconds),
-				sceneCount: result.scene_count,
-				avgSceneDuration: result.avg_scene_duration,
+				durationSeconds: templateDurationSeconds(result.duration_seconds),
+				sceneCount: normalizedSceneCount(result),
+				avgSceneDuration: normalizedAvgSceneDuration(result),
 				hookDuration: result.hook_duration,
 			},
 		},
@@ -1399,6 +1440,64 @@ function normalizeProductionMethod(
 	};
 }
 
+function normalizeFormatProfiles(
+	value: unknown,
+	result: AnalysisJobResult,
+	formats: string[],
+) {
+	const profiles = isRecord(value) ? value : {};
+	return Object.fromEntries(
+		formats.map((format) => {
+			const current = isRecord(profiles[format]) ? profiles[format] : {};
+			if (format !== "longform") return [format, current];
+			const durationSeconds = templateDurationSeconds(
+				typeof current.durationSeconds === "number"
+					? current.durationSeconds
+					: result.duration_seconds,
+			);
+			const sceneCount = normalizedSceneCount(result, durationSeconds, current);
+			const avgSceneDuration = normalizedAvgSceneDuration(
+				result,
+				durationSeconds,
+				sceneCount,
+			);
+			return [
+				format,
+				{
+					...current,
+					durationSeconds,
+					sceneCount,
+					avgSceneDuration,
+				},
+			];
+		}),
+	);
+}
+
+function normalizedSceneCount(
+	result: AnalysisJobResult,
+	durationSeconds = templateDurationSeconds(result.duration_seconds),
+	profile: Record<string, unknown> = {},
+) {
+	const current =
+		typeof profile.sceneCount === "number" && Number.isFinite(profile.sceneCount)
+			? profile.sceneCount
+			: result.scene_count;
+	if (durationSeconds < LONGFORM_MIN_DURATION_SECONDS) return Math.max(1, Math.round(current));
+	return Math.max(12, Math.min(36, Math.round(current || durationSeconds / 40)));
+}
+
+function normalizedAvgSceneDuration(
+	result: AnalysisJobResult,
+	durationSeconds = templateDurationSeconds(result.duration_seconds),
+	sceneCount = normalizedSceneCount(result, durationSeconds),
+) {
+	if (durationSeconds < LONGFORM_MIN_DURATION_SECONDS) {
+		return result.avg_scene_duration;
+	}
+	return Math.max(12, Math.round(durationSeconds / Math.max(1, sceneCount)));
+}
+
 function normalizeReferenceSources(value: unknown, sourceUrl: string) {
 	if (Array.isArray(value) && value.length > 0) return value;
 	return [{ url: sourceUrl, purpose: "구조와 제작 규칙만 참조" }];
@@ -1413,7 +1512,10 @@ async function writeGeneratedTemplates(templates: unknown[]) {
 		`export const GENERATED_REFERENCE_TEMPLATES: BuiltInReferenceTemplateInput[] = ${JSON.stringify(templates, null, "\t")};`,
 		"",
 	].join("\n");
-	await fs.writeFile(generatedPath, contents);
+	await Promise.all([
+		fs.writeFile(generatedPath, contents),
+		fs.writeFile(generatedJsonPath, JSON.stringify(templates)),
+	]);
 }
 
 function mustResult(job: StoredJob): AnalysisJobResult {

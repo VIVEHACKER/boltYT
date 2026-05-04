@@ -1,6 +1,10 @@
 import type { LayoutVariant } from "../remotion/types";
 import type { ReferenceTemplate } from "../types/database";
-import { GENERATED_REFERENCE_TEMPLATES } from "./generated-reference-template-presets";
+import { buildReferenceKnowledgeProfile } from "./knowledge-system";
+import {
+	scoreReferenceQuality,
+	type ReferenceQualityReport,
+} from "./reference-quality";
 
 export const BUILT_IN_REFERENCE_TEMPLATE_CHANNEL_ID = "__builtin_reference__";
 
@@ -11,6 +15,28 @@ export interface GeneratedReferenceCategoryCoverage {
 	id: string;
 	label: string;
 	count: number;
+	deep: number;
+	shorts: number;
+	longform: number;
+	over20: number;
+	qualityAvg: number;
+	qualityMin: number;
+	ready: number;
+	review: number;
+	blocked: number;
+	knowledgeAvg: number;
+	outcomeCalibrated: number;
+}
+
+export type ReferenceTemplateReadinessStatus = "ready" | "review" | "blocked";
+
+export interface ReferenceTemplateReadiness {
+	status: ReferenceTemplateReadinessStatus;
+	label: string;
+	state: "info" | "warning" | "error";
+	priority: number;
+	summary: string;
+	action: string;
 }
 
 interface ProductionFormatProfile {
@@ -445,9 +471,9 @@ const CURATED_REFERENCE_TEMPLATES: BuiltInReferenceTemplateInput[] = [
 		id: "builtin-drama-recap-longform",
 		name: "드라마/영화 몰아보기 · 롱폼 해설",
 		source_title:
-			"드라마나 영화 주제를 입력하면 줄거리·인물·장르를 분석해 60~90분 몰아보기로 구성하는 포맷",
+			"드라마나 영화 주제를 입력하면 줄거리·인물·장르를 분석해 20분 이내 몰아보기로 구성하는 포맷",
 		source_url: "internal://reference-method/drama-recap-longform",
-		duration_seconds: 5160,
+		duration_seconds: 1200,
 		dominant_colors: ["#111827", "#f5f0e8", "#b7793f", "#3b82f6"],
 		visual_mood: "mystery",
 		visual_prompt_template:
@@ -457,9 +483,9 @@ const CURATED_REFERENCE_TEMPLATES: BuiltInReferenceTemplateInput[] = [
 		subtitle_size_preset: "md",
 		subtitle_bg_style: "stroke",
 		subtitle_accent_color: "#E6B35A",
-		scene_count: 64,
-		avg_scene_duration: 80,
-		hook_duration: 18,
+		scene_count: 30,
+		avg_scene_duration: 40,
+		hook_duration: 16,
 		transition_style: "crossfade",
 		pacing_preset: "medium",
 		tts_speed: 1.06,
@@ -482,62 +508,62 @@ const CURATED_REFERENCE_TEMPLATES: BuiltInReferenceTemplateInput[] = [
 		script_structure: [
 			{
 				role: "cold_open",
-				duration: 35,
+				duration: 24,
 				note: "작품의 가장 강한 아이러니나 비밀을 먼저 던지고 바로 본편으로 들어간다.",
 			},
 			{
 				role: "premise",
-				duration: 260,
+				duration: 70,
 				note: "주인공, 관계, 장르 약속, 시청자가 따라가야 할 핵심 질문을 정리한다.",
 			},
 			{
 				role: "relationship_board",
-				duration: 360,
+				duration: 90,
 				note: "부부/가족/동료/적대 관계를 인물 카드와 사건 컷으로 연결한다.",
 			},
 			{
 				role: "act_1_incident",
-				duration: 620,
+				duration: 125,
 				note: "첫 사건과 오해를 세팅하고 코미디/첩보/멜로 톤을 번갈아 만든다.",
 			},
 			{
 				role: "act_1_turn",
-				duration: 520,
+				duration: 105,
 				note: "작은 단서가 커지는 구간. 대사 요약보다 행동과 선택의 결과를 설명한다.",
 			},
 			{
 				role: "act_2_pressure",
-				duration: 720,
+				duration: 160,
 				note: "정체 은폐, 추적, 가족 갈등처럼 압박이 누적되는 구간을 챕터로 나눈다.",
 			},
 			{
 				role: "midpoint_reveal",
-				duration: 520,
+				duration: 105,
 				note: "시청자가 다시 보게 되는 중간 반전을 가장 밀도 높은 편집으로 배치한다.",
 			},
 			{
 				role: "act_2_escalation",
-				duration: 700,
+				duration: 145,
 				note: "적대 세력, 임무, 가족 위기가 겹치는 구간을 빠른 교차편집으로 만든다.",
 			},
 			{
 				role: "emotional_low",
-				duration: 420,
+				duration: 90,
 				note: "인물의 선택이 흔들리는 감정 저점을 BGM과 TTS 톤으로 낮춘다.",
 			},
 			{
 				role: "finale_setup",
-				duration: 520,
+				duration: 105,
 				note: "결말 직전 필요한 단서와 인물 동선을 다시 정렬한다.",
 			},
 			{
 				role: "finale_payoff",
-				duration: 650,
+				duration: 130,
 				note: "클라이맥스와 결말을 액션, 관계 회수, 반전 순서로 설명한다.",
 			},
 			{
 				role: "ending_review",
-				duration: 335,
+				duration: 51,
 				note: "작품이 남긴 감정, 장단점, 다음에 볼 포인트를 짧게 정리한다.",
 			},
 		],
@@ -556,10 +582,10 @@ const CURATED_REFERENCE_TEMPLATES: BuiltInReferenceTemplateInput[] = [
 				supportedFormats: ["longform"],
 				formatProfiles: {
 					longform: {
-						durationSeconds: 5160,
-						sceneCount: 64,
-						avgSceneDuration: 80,
-						hookDuration: 18,
+						durationSeconds: 1200,
+						sceneCount: 30,
+						avgSceneDuration: 40,
+						hookDuration: 16,
 					},
 				},
 				manualVideoInsert: true,
@@ -568,7 +594,7 @@ const CURATED_REFERENCE_TEMPLATES: BuiltInReferenceTemplateInput[] = [
 					{
 						url: "https://www.youtube.com/watch?v=riYzzUg7KbI",
 						purpose:
-							"86분대 드라마 결말까지 몰아보기의 챕터 호흡, 내레이션 밀도, BGM 긴장감 참고",
+							"드라마 결말까지 몰아보기의 챕터 호흡, 내레이션 밀도, BGM 긴장감을 20분 이하 구조로 압축 참고",
 					},
 				],
 				rules: [
@@ -586,10 +612,9 @@ const CURATED_REFERENCE_TEMPLATES: BuiltInReferenceTemplateInput[] = [
 
 const BUILT_IN_REFERENCE_TEMPLATES: BuiltInReferenceTemplateInput[] = [
 	...CURATED_REFERENCE_TEMPLATES,
-	...GENERATED_REFERENCE_TEMPLATES,
 ];
 
-const GENERATED_REFERENCE_CATEGORY_LABELS: Record<string, string> = {
+export const GENERATED_REFERENCE_CATEGORY_LABELS: Record<string, string> = {
 	drama_recap: "드라마/영화",
 	mystery_doc: "미스터리/사건",
 	news_issue: "뉴스/이슈",
@@ -597,16 +622,27 @@ const GENERATED_REFERENCE_CATEGORY_LABELS: Record<string, string> = {
 	money_psychology: "돈/심리",
 };
 
-function cloneTemplate(
+export function cloneReferenceTemplateInput(
 	template: BuiltInReferenceTemplateInput,
 	channelId = BUILT_IN_REFERENCE_TEMPLATE_CHANNEL_ID,
 ): ReferenceTemplate {
+	const cloned = JSON.parse(JSON.stringify(template)) as ReferenceTemplate;
 	return {
-		...(JSON.parse(JSON.stringify(template)) as ReferenceTemplate),
+		...cloned,
 		channel_id: channelId || BUILT_IN_REFERENCE_TEMPLATE_CHANNEL_ID,
 		created_at: template.created_at ?? BUILT_IN_CREATED_AT,
 		updated_at: template.updated_at ?? BUILT_IN_CREATED_AT,
+		raw_analysis: {
+			...(cloned.raw_analysis ?? {}),
+			built_in_reference: true,
+		},
 	};
+}
+
+function timestamp(value: unknown): number {
+	if (typeof value !== "string" && typeof value !== "number") return 0;
+	const parsed = new Date(value).getTime();
+	return Number.isFinite(parsed) ? parsed : 0;
 }
 
 function productionMethodOf(
@@ -627,31 +663,244 @@ function productionMethodOf(
 export function listBuiltInReferenceTemplates(
 	channelId = BUILT_IN_REFERENCE_TEMPLATE_CHANNEL_ID,
 ): ReferenceTemplate[] {
-	return BUILT_IN_REFERENCE_TEMPLATES.map((template) =>
-		cloneTemplate(template, channelId),
+	return sortReferenceTemplatesByQuality(
+		BUILT_IN_REFERENCE_TEMPLATES.map((template) =>
+			cloneReferenceTemplateInput(template, channelId),
+		),
 	);
 }
 
-export function getGeneratedReferenceTemplateCoverage(): {
+export function calculateGeneratedReferenceTemplateCoverage(
+	templates: ReferenceTemplate[],
+): {
 	total: number;
+	deep: number;
+	shorts: number;
+	longform: number;
+	over20: number;
+	qualityAvg: number;
+	qualityMin: number;
+	ready: number;
+	review: number;
+	blocked: number;
+	knowledgeAvg: number;
+	outcomeCalibrated: number;
 	categories: GeneratedReferenceCategoryCoverage[];
 } {
-	const counts = new Map<string, number>();
-	for (const template of GENERATED_REFERENCE_TEMPLATES) {
-		const categoryId = stringField(template.raw_analysis.reference_category_id);
+	const counts = new Map<
+		string,
+		{
+			count: number;
+			deep: number;
+			shorts: number;
+			longform: number;
+			over20: number;
+			qualityTotal: number;
+			qualityMin: number;
+			ready: number;
+			review: number;
+			blocked: number;
+			knowledgeTotal: number;
+			outcomeCalibrated: number;
+		}
+	>();
+	let deep = 0;
+	let shorts = 0;
+	let longform = 0;
+	let over20 = 0;
+	let qualityTotal = 0;
+	let qualityMin = Number.POSITIVE_INFINITY;
+	let ready = 0;
+	let review = 0;
+	let blocked = 0;
+	let knowledgeTotal = 0;
+	let outcomeCalibrated = 0;
+	for (const template of templates) {
+		const raw = isRecord(template.raw_analysis) ? template.raw_analysis : {};
+		const categoryId = stringField(raw.reference_category_id);
 		if (!categoryId) continue;
-		counts.set(categoryId, (counts.get(categoryId) ?? 0) + 1);
+		const current = counts.get(categoryId) ?? {
+			count: 0,
+			deep: 0,
+			shorts: 0,
+			longform: 0,
+			over20: 0,
+			qualityTotal: 0,
+			qualityMin: Number.POSITIVE_INFINITY,
+			ready: 0,
+			review: 0,
+			blocked: 0,
+			knowledgeTotal: 0,
+			outcomeCalibrated: 0,
+		};
+		const quality = scoreReferenceQuality(template);
+		const readiness = getReferenceTemplateReadiness(template);
+		const knowledge = buildReferenceKnowledgeProfile(template);
+		const sourceDuration =
+			numberField(raw.source_duration_seconds) ??
+			numberField(template.duration_seconds) ??
+			0;
+		const isDeep = quality.deep;
+		const isShorts = sourceDuration > 0 && sourceDuration <= 180;
+		const isLongform = sourceDuration >= 8 * 60 && sourceDuration <= 20 * 60;
+		const isOver20 = sourceDuration > 20 * 60;
+		current.count += 1;
+		current.deep += isDeep ? 1 : 0;
+		current.shorts += isShorts ? 1 : 0;
+		current.longform += isLongform ? 1 : 0;
+		current.over20 += isOver20 ? 1 : 0;
+		current.qualityTotal += quality.score;
+		current.qualityMin = Math.min(current.qualityMin, quality.score);
+		current.ready += readiness.status === "ready" ? 1 : 0;
+		current.review += readiness.status === "review" ? 1 : 0;
+		current.blocked += readiness.status === "blocked" ? 1 : 0;
+		current.knowledgeTotal += knowledge.score;
+		current.outcomeCalibrated +=
+			knowledge.maturity === "outcome-calibrated" ? 1 : 0;
+		counts.set(categoryId, current);
+		deep += isDeep ? 1 : 0;
+		shorts += isShorts ? 1 : 0;
+		longform += isLongform ? 1 : 0;
+		over20 += isOver20 ? 1 : 0;
+		qualityTotal += quality.score;
+		qualityMin = Math.min(qualityMin, quality.score);
+		ready += readiness.status === "ready" ? 1 : 0;
+		review += readiness.status === "review" ? 1 : 0;
+		blocked += readiness.status === "blocked" ? 1 : 0;
+		knowledgeTotal += knowledge.score;
+		outcomeCalibrated += knowledge.maturity === "outcome-calibrated" ? 1 : 0;
 	}
 	return {
-		total: GENERATED_REFERENCE_TEMPLATES.length,
+		total: templates.length,
+		deep,
+		shorts,
+		longform,
+		over20,
+		qualityAvg: templates.length ? Math.round(qualityTotal / templates.length) : 0,
+		qualityMin: Number.isFinite(qualityMin) ? qualityMin : 0,
+		ready,
+		review,
+		blocked,
+		knowledgeAvg: templates.length
+			? Math.round(knowledgeTotal / templates.length)
+			: 0,
+		outcomeCalibrated,
 		categories: Object.entries(GENERATED_REFERENCE_CATEGORY_LABELS).map(
-			([id, label]) => ({
-				id,
-				label,
-				count: counts.get(id) ?? 0,
-			}),
+			([id, label]) => {
+				const current = counts.get(id) ?? {
+					count: 0,
+					deep: 0,
+					shorts: 0,
+					longform: 0,
+					over20: 0,
+					qualityTotal: 0,
+					qualityMin: Number.POSITIVE_INFINITY,
+					ready: 0,
+					review: 0,
+					blocked: 0,
+					knowledgeTotal: 0,
+					outcomeCalibrated: 0,
+				};
+				return {
+					id,
+					label,
+					count: current.count,
+					deep: current.deep,
+					shorts: current.shorts,
+					longform: current.longform,
+					over20: current.over20,
+					qualityAvg: current.count
+						? Math.round(current.qualityTotal / current.count)
+						: 0,
+					qualityMin: Number.isFinite(current.qualityMin)
+						? current.qualityMin
+						: 0,
+					ready: current.ready,
+					review: current.review,
+					blocked: current.blocked,
+					knowledgeAvg: current.count
+						? Math.round(current.knowledgeTotal / current.count)
+						: 0,
+					outcomeCalibrated: current.outcomeCalibrated,
+				};
+			},
 		),
 	};
+}
+
+export function getReferenceTemplateQuality(
+	template?: ReferenceTemplate | null,
+): ReferenceQualityReport {
+	return scoreReferenceQuality(template ?? {});
+}
+
+export function getReferenceTemplateReadiness(
+	template?: ReferenceTemplate | null,
+): ReferenceTemplateReadiness {
+	const quality = getReferenceTemplateQuality(template);
+	const primaryGap = quality.gaps[0] ?? "";
+	const primaryStrength = quality.strengths[0] ?? "기본 제작 신호";
+
+	if (
+		!quality.sourceDurationOk ||
+		!quality.outputDurationOk ||
+		quality.grade === "C" ||
+		quality.grade === "D"
+	) {
+		return {
+			status: "blocked",
+			label: "생성 차단 권장",
+			state: "error",
+			priority: 0,
+			summary: `Q${quality.score} · ${quality.grade} · ${primaryGap || "품질 기준 미달"}`,
+			action:
+				"이 레퍼런스는 바로 생성에 쓰지 말고 deep 분석, 전사, 길이 정책을 먼저 보강하세요.",
+		};
+	}
+
+	if (quality.grade === "B" || quality.gaps.length > 0) {
+		return {
+			status: "review",
+			label: "검토 후 사용",
+			state: "warning",
+			priority: 1,
+			summary: `Q${quality.score} · ${quality.grade} · ${primaryGap || "보강 여지 있음"}`,
+			action:
+				"생성은 가능하지만 약한 신호가 있으므로 같은 카테고리의 S/A 레퍼런스를 우선 비교하세요.",
+		};
+	}
+
+	return {
+		status: "ready",
+		label: "생성 우선 사용",
+		state: "info",
+		priority: 2,
+		summary: `Q${quality.score} · ${quality.grade} · ${primaryStrength}`,
+		action:
+			"대본, 컷 호흡, 화면 배치, BGM/TTS 톤을 생성 프리셋으로 바로 적용할 수 있습니다.",
+	};
+}
+
+export function sortReferenceTemplatesByQuality<T extends ReferenceTemplate>(
+	templates: T[],
+): T[] {
+	return [...templates].sort((a, b) => {
+		const aQuality = getReferenceTemplateQuality(a);
+		const bQuality = getReferenceTemplateQuality(b);
+		const aReadiness = getReferenceTemplateReadiness(a);
+		const bReadiness = getReferenceTemplateReadiness(b);
+		const aKnowledge = buildReferenceKnowledgeProfile(a);
+		const bKnowledge = buildReferenceKnowledgeProfile(b);
+		return (
+			bReadiness.priority - aReadiness.priority ||
+			bKnowledge.score - aKnowledge.score ||
+			Number(bKnowledge.maturity === "outcome-calibrated") -
+				Number(aKnowledge.maturity === "outcome-calibrated") ||
+			Number(bQuality.deep) - Number(aQuality.deep) ||
+			bQuality.score - aQuality.score ||
+			timestamp(b.created_at) - timestamp(a.created_at)
+		);
+	});
 }
 
 export function getBuiltInReferenceTemplate(
@@ -659,11 +908,14 @@ export function getBuiltInReferenceTemplate(
 	channelId = BUILT_IN_REFERENCE_TEMPLATE_CHANNEL_ID,
 ): ReferenceTemplate | null {
 	const template = BUILT_IN_REFERENCE_TEMPLATES.find((item) => item.id === id);
-	return template ? cloneTemplate(template, channelId) : null;
+	return template ? cloneReferenceTemplateInput(template, channelId) : null;
 }
 
 export function isBuiltInReferenceTemplate(id: string): boolean {
-	return BUILT_IN_REFERENCE_TEMPLATES.some((template) => template.id === id);
+	return (
+		BUILT_IN_REFERENCE_TEMPLATES.some((template) => template.id === id) ||
+		id.startsWith("builtin-auto-")
+	);
 }
 
 export function isBuiltInReference(template?: ReferenceTemplate | null): boolean {
@@ -714,4 +966,12 @@ export function formatReferenceOutputFormats(
 
 function stringField(value: unknown): string {
 	return typeof value === "string" ? value.trim() : "";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function numberField(value: unknown): number | undefined {
+	return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }

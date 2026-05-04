@@ -463,4 +463,41 @@ describe("analyzeProductionQuality", () => {
 			report.issues.some((issue) => issue.code === "abrupt_ending_duration"),
 		).toBe(true);
 	});
+
+	it("롱폼이 20분을 넘으면 critical로 막는다", () => {
+		const report = analyzeProductionQuality({
+			title: "긴 분석 영상",
+			format: "longform",
+			scenes: Array.from({ length: 31 }, (_, index) => ({
+				narration_text:
+					index === 30
+						? "현재까지 확인된 결론은 이 변화가 구조적이라는 점입니다."
+						: "확인된 자료를 바탕으로 다음 근거를 살펴보겠습니다.",
+				scene_type: "image",
+				duration_seconds: 40,
+				imageUrl: `blob:image-${index}`,
+				audioUrl: `blob:audio-${index}`,
+				wordTimings: timedWords("확인된 자료를 바탕으로 다음 근거를 살펴보겠습니다"),
+				shots: [
+					{
+						media_type: "image" as const,
+						source_url: `scenes/evidence-${index}.jpg`,
+						selection_provider: "generated",
+						visual_role: "evidence",
+						motion: "slow_zoom_in",
+						source_confidence: 88,
+						quality_score: 88,
+					},
+				],
+			})),
+			narrationUrl: "blob:narration",
+			bgmUrl: "blob:bgm",
+			thumbnailPlanned: true,
+		});
+
+		expect(report.passed).toBe(false);
+		expect(
+			report.issues.some((issue) => issue.code === "longform_runtime_over_cap"),
+		).toBe(true);
+	});
 });

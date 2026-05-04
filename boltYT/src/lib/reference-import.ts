@@ -6,13 +6,23 @@
  */
 
 import type { ReferenceTemplate } from "../types/database";
+import {
+	readRenderKnowledgeEvent,
+	type RenderKnowledgeEvent,
+} from "./knowledge-system";
 import { getReferenceAnalyzerUrl } from "./proxy";
+import {
+	getGeneratedReferenceTemplate,
+	loadGeneratedReferenceTemplates,
+} from "./generated-reference-loader";
 import {
 	getBuiltInReferenceTemplate,
 	isBuiltInReferenceTemplate,
 	listBuiltInReferenceTemplates,
+	sortReferenceTemplatesByQuality,
 } from "./reference-template-presets";
 import { supabase } from "./supabase";
+import { finalizeReferenceThumbnailDna } from "./thumbnail-intelligence";
 
 export type ReferenceAnalysisMode = "auto" | "shortform" | "longform" | "deep";
 
@@ -156,6 +166,48 @@ export async function saveReferenceTemplate(
 	name: string,
 	result: AnalysisJobResult,
 ): Promise<ReferenceTemplate> {
+	const templateForThumbnailDna: ReferenceTemplate = {
+		id: `pending-${Date.now()}`,
+		channel_id: channelId,
+		name,
+		source_type: result.source_type,
+		source_url: result.source_url,
+		source_title: result.source_title,
+		source_creator: result.source_creator,
+		thumbnail_url: result.thumbnail_url,
+		duration_seconds: result.duration_seconds,
+		dominant_colors: result.dominant_colors,
+		visual_mood: result.visual_mood,
+		visual_prompt_template: result.visual_prompt_template,
+		lighting_style: result.lighting_style,
+		subtitle_position: result.subtitle_position,
+		subtitle_size_preset: result.subtitle_size_preset,
+		subtitle_bg_style: result.subtitle_bg_style,
+		subtitle_accent_color: result.subtitle_accent_color,
+		scene_count: result.scene_count,
+		avg_scene_duration: result.avg_scene_duration,
+		hook_duration: result.hook_duration,
+		transition_style: result.transition_style,
+		pacing_preset: result.pacing_preset,
+		tts_voice_id: result.tts_voice_id,
+		tts_provider: result.tts_provider,
+		tts_speed: result.tts_speed,
+		tts_tone_keywords: result.tts_tone_keywords,
+		bgm_mood: result.bgm_mood,
+		bgm_keywords: result.bgm_keywords,
+		bgm_tempo: result.bgm_tempo,
+		bgm_reference_url: "",
+		hook_pattern: result.hook_pattern,
+		script_structure: result.script_structure,
+		transcript: result.transcript,
+		frame_urls: result.frame_urls,
+		raw_analysis: result.raw_analysis,
+		analysis_status: "complete",
+		analysis_error: "",
+		created_at: "",
+		updated_at: "",
+	};
+	const thumbnailDna = finalizeReferenceThumbnailDna(templateForThumbnailDna);
 	const payload = {
 		channel_id: channelId,
 		name,
@@ -196,7 +248,10 @@ export async function saveReferenceTemplate(
 
 		transcript: result.transcript,
 		frame_urls: result.frame_urls,
-		raw_analysis: result.raw_analysis,
+		raw_analysis: {
+			...result.raw_analysis,
+			thumbnail_dna: thumbnailDna,
+		},
 
 		analysis_status: "complete" as const,
 	};
@@ -215,13 +270,24 @@ export async function listReferenceTemplates(
 	channelId: string,
 ): Promise<ReferenceTemplate[]> {
 	const builtIns = listBuiltInReferenceTemplates(channelId);
-	const { data, error } = await supabase
+	const generatedPromise = loadGeneratedReferenceTemplates(channelId);
+	const savedTemplatesPromise = supabase
 		.from("reference_templates")
 		.select("*")
 		.eq("channel_id", channelId)
 		.order("created_at", { ascending: false });
+	const [generated, { data, error }] = await Promise.all([
+		generatedPromise,
+		savedTemplatesPromise,
+	]);
 	if (error) throw new Error(error.message);
-	return [...builtIns, ...((data ?? []) as ReferenceTemplate[])];
+	const templates = [
+		...builtIns,
+		...generated,
+		...((data ?? []) as ReferenceTemplate[]),
+	];
+	const events = await loadReferenceKnowledgeEvents(templates.map((item) => item.id));
+	return sortReferenceTemplatesByQuality(attachKnowledgeEvents(templates, events));
 }
 
 export async function getReferenceTemplate(
@@ -230,13 +296,92 @@ export async function getReferenceTemplate(
 	const builtIn = getBuiltInReferenceTemplate(id);
 	if (builtIn) return builtIn;
 
+	if (id.startsWith("builtin-auto-")) {
+		const generated = await getGeneratedReferenceTemplate(id);
+		if (generated) {
+			const events = await loadReferenceKnowledgeEvents([generated.id]);
+			return attachKnowledgeEvents([generated], events)[0] ?? generated;
+		}
+		return null;
+	}
+
 	const { data, error } = await supabase
 		.from("reference_templates")
 		.select("*")
 		.eq("id", id)
 		.maybeSingle();
 	if (error) throw new Error(error.message);
-	return (data as ReferenceTemplate | null) ?? null;
+	const template = (data as ReferenceTemplate | null) ?? null;
+	if (!template) return null;
+	const events = await loadReferenceKnowledgeEvents([template.id]);
+	return attachKnowledgeEvents([template], events)[0] ?? template;
+}
+
+async function loadReferenceKnowledgeEvents(
+	templateIds: string[],
+): Promise<Map<string, RenderKnowledgeEvent[]>> {
+	const uniqueIds = [...new Set(templateIds.filter(Boolean))];
+	if (uniqueIds.length === 0) return new Map();
+	try {
+		const { data: scripts } = await supabase
+			.from("scripts")
+			.select("id, reference_template_id")
+			.in("reference_template_id", uniqueIds);
+		const scriptRows = (scripts ?? []) as Array<{
+			id?: string;
+			reference_template_id?: string | null;
+		}>;
+		const scriptToReference = new Map<string, string>();
+		for (const script of scriptRows) {
+			if (script.id && script.reference_template_id) {
+				scriptToReference.set(script.id, script.reference_template_id);
+			}
+		}
+		const scriptIds = [...scriptToReference.keys()];
+		if (scriptIds.length === 0) return new Map();
+
+		const { data: renders } = await supabase
+			.from("renders")
+			.select("script_id, format, status, qc_result_json, created_at")
+			.in("script_id", scriptIds)
+			.order("created_at", { ascending: false });
+		const map = new Map<string, RenderKnowledgeEvent[]>();
+		for (const render of (renders ?? []) as Array<{
+			script_id?: string;
+			qc_result_json?: Record<string, unknown> | null;
+		}>) {
+			const referenceId = render.script_id
+				? scriptToReference.get(render.script_id)
+				: undefined;
+			const event = readRenderKnowledgeEvent(
+				render.qc_result_json?.knowledge_event,
+			);
+			if (!referenceId || !event) continue;
+			const current = map.get(referenceId) ?? [];
+			current.push(event);
+			map.set(referenceId, current.slice(0, 10));
+		}
+		return map;
+	} catch {
+		return new Map();
+	}
+}
+
+function attachKnowledgeEvents(
+	templates: ReferenceTemplate[],
+	events: Map<string, RenderKnowledgeEvent[]>,
+): ReferenceTemplate[] {
+	return templates.map((template) => {
+		const knowledgeEvents = events.get(template.id);
+		if (!knowledgeEvents?.length) return template;
+		return {
+			...template,
+			raw_analysis: {
+				...(template.raw_analysis ?? {}),
+				knowledge_events: knowledgeEvents,
+			},
+		};
+	});
 }
 
 export async function updateReferenceTemplate(

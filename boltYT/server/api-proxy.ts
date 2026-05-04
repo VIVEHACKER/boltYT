@@ -20,6 +20,7 @@ import {
 } from "./lib/diag.ts";
 import { runAgent } from "./lib/diag-agent.ts";
 import {
+	EDITABLE_ENV_KEYS,
 	loadEnv,
 	reloadEnv,
 	saveEnvValues,
@@ -43,6 +44,12 @@ import {
 	counter as metricCounter,
 	snapshot as metricsSnapshot,
 } from "./lib/metrics.ts";
+import {
+	getOpenAiRuntimeHealth,
+	isOpenAiQuotaError,
+	markOpenAiOk,
+	markOpenAiQuotaBlocked,
+} from "./lib/openai-runtime-health.ts";
 import { trackRequest } from "./lib/request-metrics.ts";
 import { setupGracefulShutdown } from "./lib/shutdown.ts";
 import {
@@ -91,6 +98,17 @@ function reloadKeys() {
 }
 
 function keyStatusPayload() {
+	const editable = Object.fromEntries(
+		EDITABLE_ENV_KEYS.map((key) => {
+			const configured =
+				key === "OPENAI_API_KEY"
+					? Boolean(KEYS.openai)
+					: key === "YOUTUBE_API_KEY"
+						? Boolean(KEYS.youtube)
+						: Boolean(process.env[key]);
+			return [key, configured];
+		}),
+	);
 	return {
 		openai: Boolean(KEYS.openai),
 		elevenlabs: Boolean(KEYS.elevenlabs),
@@ -100,6 +118,8 @@ function keyStatusPayload() {
 		naver: Boolean(KEYS.naverClientId && KEYS.naverClientSecret),
 		fal: Boolean(KEYS.fal),
 		google: Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
+		editable,
+		openaiRuntime: getOpenAiRuntimeHealth(),
 	};
 }
 
@@ -248,6 +268,16 @@ function requireKey(
 		return false;
 	}
 	return true;
+}
+
+function recordOpenAiResult(ok: boolean, errorText: string, source: string) {
+	if (ok) {
+		markOpenAiOk();
+		return;
+	}
+	if (isOpenAiQuotaError(errorText)) {
+		markOpenAiQuotaBlocked(errorText, source);
+	}
 }
 
 interface YouTubeSearchItem {
@@ -1194,6 +1224,8 @@ async function buildHealthReport(): Promise<DiagHealthReport> {
 		checkServer("video-proxy", 3456),
 		checkServer("youtube-upload", 3457),
 		checkServer("render-queue", 3458),
+		checkServer("tiktok-upload", 3461),
+		checkServer("instagram-upload", 3462),
 	]);
 	return {
 		timestamp: new Date().toISOString(),
@@ -1344,14 +1376,16 @@ const server = createServer(async (req, res) => {
 				{ timeout: 60_000 },
 			);
 
-			if (!upstream.ok) {
-				const err = await upstream.text();
-				log.error("OpenAI chat error", { status: upstream.status });
-				json(req, res, upstream.status, { error: err });
-				return;
-			}
+				if (!upstream.ok) {
+					const err = await upstream.text();
+					recordOpenAiResult(false, err, "api-proxy:chat");
+					log.error("OpenAI chat error", { status: upstream.status });
+					json(req, res, upstream.status, { error: err });
+					return;
+				}
+				recordOpenAiResult(true, "", "api-proxy:chat");
 
-			const data = await upstream.json();
+				const data = await upstream.json();
 			json(req, res, 200, data);
 		} catch (e) {
 			log.error("OpenAI chat exception", { error: (e as Error).message });
@@ -1385,14 +1419,16 @@ const server = createServer(async (req, res) => {
 				{ timeout: 60_000 },
 			);
 
-			if (!upstream.ok) {
-				const err = await upstream.text();
-				log.error("DALL-E error", { status: upstream.status });
-				json(req, res, upstream.status, { error: err });
-				return;
-			}
+				if (!upstream.ok) {
+					const err = await upstream.text();
+					recordOpenAiResult(false, err, "api-proxy:images");
+					log.error("DALL-E error", { status: upstream.status });
+					json(req, res, upstream.status, { error: err });
+					return;
+				}
+				recordOpenAiResult(true, "", "api-proxy:images");
 
-			const data = await upstream.json();
+				const data = await upstream.json();
 			json(req, res, 200, data);
 		} catch (e) {
 			log.error("DALL-E exception", { error: (e as Error).message });
@@ -1426,14 +1462,16 @@ const server = createServer(async (req, res) => {
 				{ timeout: 60_000 },
 			);
 
-			if (!upstream.ok) {
-				const err = await upstream.text();
-				log.error("TTS error", { status: upstream.status });
-				json(req, res, upstream.status, { error: err });
-				return;
-			}
+				if (!upstream.ok) {
+					const err = await upstream.text();
+					recordOpenAiResult(false, err, "api-proxy:tts");
+					log.error("TTS error", { status: upstream.status });
+					json(req, res, upstream.status, { error: err });
+					return;
+				}
+				recordOpenAiResult(true, "", "api-proxy:tts");
 
-			streamUpstreamBody(req, res, upstream, "audio/mpeg");
+				streamUpstreamBody(req, res, upstream, "audio/mpeg");
 		} catch (e) {
 			log.error("TTS exception", { error: (e as Error).message });
 			json(req, res, 500, {
@@ -1490,14 +1528,16 @@ const server = createServer(async (req, res) => {
 				{ timeout: 120_000 },
 			);
 
-			if (!upstream.ok) {
-				const err = await upstream.text();
-				log.error("Whisper error", { status: upstream.status });
-				json(req, res, upstream.status, { error: err });
-				return;
-			}
+				if (!upstream.ok) {
+					const err = await upstream.text();
+					recordOpenAiResult(false, err, "api-proxy:transcribe");
+					log.error("Whisper error", { status: upstream.status });
+					json(req, res, upstream.status, { error: err });
+					return;
+				}
+				recordOpenAiResult(true, "", "api-proxy:transcribe");
 
-			const data = await upstream.json();
+				const data = await upstream.json();
 			json(req, res, 200, data);
 		} catch (e) {
 			log.error("Whisper exception", { error: (e as Error).message });

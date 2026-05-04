@@ -2,11 +2,21 @@
  * .env 로더 + 시작 시 필수 키 검증 + 런타임 파일 감시
  */
 
-import { existsSync, readFileSync, unwatchFile, watchFile, writeFileSync } from "node:fs";
+import {
+	existsSync,
+	mkdirSync,
+	readFileSync,
+	unwatchFile,
+	watchFile,
+	writeFileSync,
+} from "node:fs";
+import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ENV_URL = new URL("../../.env", import.meta.url);
 const ENV_PATH = fileURLToPath(ENV_URL);
+const RUNTIME_ENV_URL = new URL("../.tmp/local-api-keys.env", import.meta.url);
+const RUNTIME_ENV_PATH = fileURLToPath(RUNTIME_ENV_URL);
 const ENV_ALIASES: Record<string, string[]> = {
 	OPENAI_API_KEY: ["VITE_OPENAI_API_KEY"],
 	YOUTUBE_API_KEY: ["VITE_YOUTUBE_API_KEY"],
@@ -39,10 +49,10 @@ function applyAliases(overwrite: boolean): string[] {
 	return applied;
 }
 
-function parseAndApply(overwrite: boolean): string[] {
+function parseAndApplyFile(path: string, overwrite: boolean): string[] {
 	const applied: string[] = [];
 	try {
-		const content = readFileSync(ENV_PATH, "utf-8");
+		const content = readFileSync(path, "utf-8");
 		for (const line of content.split("\n")) {
 			const trimmed = line.trim();
 			if (!trimmed || trimmed.startsWith("#")) continue;
@@ -62,6 +72,15 @@ function parseAndApply(overwrite: boolean): string[] {
 		// .env 없으면 스킵
 	}
 	return applied;
+}
+
+function parseAndApply(overwrite: boolean): string[] {
+	return [
+		...parseAndApplyFile(ENV_PATH, overwrite),
+		// Browser-initiated key saves must not touch .env, because Vite reloads
+		// the entire app whenever .env changes in dev mode.
+		...parseAndApplyFile(RUNTIME_ENV_PATH, true),
+	];
 }
 
 export function loadEnv() {
@@ -108,10 +127,11 @@ export function saveEnvValues(
 		nextValues.set(key, value);
 	}
 
-	if (nextValues.size === 0) return { updated: [], ignored, path: ENV_PATH };
+	if (nextValues.size === 0) return { updated: [], ignored, path: RUNTIME_ENV_PATH };
 
-	const lines = existsSync(ENV_PATH)
-		? readFileSync(ENV_PATH, "utf-8").split(/\r?\n/)
+	mkdirSync(dirname(RUNTIME_ENV_PATH), { recursive: true });
+	const lines = existsSync(RUNTIME_ENV_PATH)
+		? readFileSync(RUNTIME_ENV_PATH, "utf-8").split(/\r?\n/)
 		: ["# Local API keys for boltYT", ""];
 	const seen = new Set<string>();
 	const nextLines = lines.map((line) => {
@@ -127,8 +147,8 @@ export function saveEnvValues(
 	}
 
 	const content = `${nextLines.join("\n").replace(/\n+$/g, "")}\n`;
-	writeFileSync(ENV_PATH, content, "utf-8");
-	return { updated: [...nextValues.keys()], ignored, path: ENV_PATH };
+	writeFileSync(RUNTIME_ENV_PATH, content, "utf-8");
+	return { updated: [...nextValues.keys()], ignored, path: RUNTIME_ENV_PATH };
 }
 
 /**
@@ -138,15 +158,20 @@ export function saveEnvValues(
  */
 export function watchEnv(onChange: (appliedKeys: string[]) => void) {
 	let timer: NodeJS.Timeout | null = null;
-	watchFile(ENV_PATH, { interval: 1000 }, (curr, prev) => {
+	const handleChange = (curr: { mtimeMs: number }, prev: { mtimeMs: number }) => {
 		if (curr.mtimeMs === prev.mtimeMs) return;
 		if (timer) clearTimeout(timer);
 		timer = setTimeout(() => {
 			const applied = parseAndApply(true);
 			onChange(applied);
 		}, 200);
-	});
-	return () => unwatchFile(ENV_PATH);
+	};
+	watchFile(ENV_PATH, { interval: 1000 }, handleChange);
+	watchFile(RUNTIME_ENV_PATH, { interval: 1000 }, handleChange);
+	return () => {
+		unwatchFile(ENV_PATH);
+		unwatchFile(RUNTIME_ENV_PATH);
+	};
 }
 
 export function validateEnv(

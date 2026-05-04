@@ -15,7 +15,16 @@ const mocks = vi.hoisted(() => {
 		order: mockOrder,
 		maybeSingle: mockMaybeSingle,
 	}));
-	const mockSelect = vi.fn(() => ({ eq: mockEqSelect, single: mockSingle }));
+	const mockInSelect = vi.fn(() => ({
+		data: [] as unknown,
+		error: null as unknown,
+		order: mockOrder,
+	}));
+	const mockSelect = vi.fn(() => ({
+		eq: mockEqSelect,
+		in: mockInSelect,
+		single: mockSingle,
+	}));
 	const mockEqUpdate = vi.fn(() => ({
 		data: null as unknown,
 		error: null as unknown,
@@ -38,6 +47,7 @@ const mocks = vi.hoisted(() => {
 		mockMaybeSingle,
 		mockOrder,
 		mockEqSelect,
+		mockInSelect,
 		mockSelect,
 		mockEqUpdate,
 		mockUpdate,
@@ -49,6 +59,10 @@ const mocks = vi.hoisted(() => {
 });
 
 vi.mock("./supabase", () => ({ supabase: { from: mocks.mockFrom } }));
+vi.mock("./generated-reference-loader", () => ({
+	getGeneratedReferenceTemplate: vi.fn(() => Promise.resolve(null)),
+	loadGeneratedReferenceTemplates: vi.fn(() => Promise.resolve([])),
+}));
 
 import {
 	type AnalysisJob,
@@ -325,6 +339,12 @@ describe("saveReferenceTemplate", () => {
 		expect(result).toEqual(template);
 		expect(mocks.mockFrom).toHaveBeenCalledWith("reference_templates");
 		expect(mocks.mockInsert).toHaveBeenCalled();
+		const payload = (mocks.mockInsert.mock.calls.at(0)?.at(0) as unknown) as {
+			raw_analysis?: { thumbnail_dna?: { version?: string } };
+		};
+		expect(payload.raw_analysis?.thumbnail_dna?.version).toBe(
+			"thumbnail-dna-v1",
+		);
 	});
 
 	it("supabase 오류 → throw", async () => {

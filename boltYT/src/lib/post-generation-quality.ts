@@ -141,6 +141,26 @@ export const PROJECT_QUALITY_LEARNINGS: ProjectLearning[] = [
 			"src/lib/youtube-policy-risk.ts",
 		],
 	},
+	{
+		id: "reference-quality-routing",
+		title: "레퍼런스는 Q 점수로 선택하고 낮은 품질은 생성 전 차단",
+		rule: "레퍼런스 보관함은 Q/등급/보강 지점을 보여주는 데서 끝내지 말고, 생성 진입 전에 S/A를 우선 정렬하고 C/D 또는 정책 실패 레퍼런스는 차단한다.",
+		files: [
+			"src/lib/reference-quality.ts",
+			"src/lib/reference-template-presets.ts",
+			"src/pages/content/StepScript.tsx",
+		],
+	},
+	{
+		id: "tacit-explicit-knowledge-loop",
+		title: "명시지와 암묵지는 성과지로 닫는다",
+		rule: "규칙(명시지), 제작 DNA(암묵지), 렌더 QC 결과(성과지)를 하나의 knowledge profile로 묶어 다음 스크립트/미디어/렌더 선택에 반영한다.",
+		files: [
+			"src/lib/knowledge-system.ts",
+			"src/lib/reference-bridge.ts",
+			"src/pages/content/StepPreview.tsx",
+		],
+	},
 ];
 
 export function judgePostGenerationQuality(

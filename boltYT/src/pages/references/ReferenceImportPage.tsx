@@ -40,6 +40,10 @@ import {
 	type ReferenceChannelCandidate,
 } from "../../lib/reference-channel-scout";
 import { supabase } from "../../lib/supabase";
+import {
+	attachTrendReferenceLearningToAnalysisResult,
+	attachTrendReferenceSeedToAnalysisResult,
+} from "../../lib/trend-reference-learning";
 import type { Channel } from "../../types/database";
 
 const STATUS_LABEL: Record<AnalysisJob["status"], string> = {
@@ -74,8 +78,8 @@ const MODE_DETAILS: Record<
 		badge: "Pixel + audio",
 	},
 	longform: {
-		eyebrow: "긴 영상",
-		description: "다운로드 없이 제목, 챕터, heatmap으로 편집 구조화",
+		eyebrow: "8~20분",
+		description: "20분 이하 롱폼의 제목, 챕터, heatmap으로 편집 구조화",
 		badge: "Metadata map",
 	},
 	deep: {
@@ -104,17 +108,35 @@ interface CategoryBatchProgress {
 	savedCount: number;
 }
 
+function readAnalysisModeParam(value: string | null): ReferenceAnalysisMode {
+	return value === "auto" ||
+		value === "shortform" ||
+		value === "longform" ||
+		value === "deep"
+		? value
+		: "auto";
+}
+
+function splitTrendParam(value: string | null): string[] {
+	return (value ?? "")
+		.split(" / ")
+		.map((item) => item.trim())
+		.filter(Boolean)
+		.slice(0, 6);
+}
+
 export default function ReferenceImportPage() {
 	const navigate = useNavigate();
 	const [searchParams] = useSearchParams();
 	const channelParam = searchParams.get("channel") ?? "";
+	const trendReferenceImport = searchParams.get("trendReference") === "1";
 
 	const [channels, setChannels] = useState<Channel[]>([]);
 	const [channelId, setChannelId] = useState(channelParam);
-	const [url, setUrl] = useState("");
-	const [name, setName] = useState("");
+	const [url, setUrl] = useState(searchParams.get("url") ?? "");
+	const [name, setName] = useState(searchParams.get("name") ?? "");
 	const [analysisMode, setAnalysisMode] =
-		useState<ReferenceAnalysisMode>("auto");
+		useState<ReferenceAnalysisMode>(readAnalysisModeParam(searchParams.get("mode")));
 
 	const [analyzerReady, setAnalyzerReady] = useState<boolean | null>(null);
 	const [job, setJob] = useState<AnalysisJob | null>(null);
@@ -188,12 +210,21 @@ export default function ReferenceImportPage() {
 		if (!job?.result) return;
 		setSaving(true);
 		setError(null);
-		try {
-			const saved = await saveReferenceTemplate(
-				channelId,
-				name.trim() || job.result.source_title || "이름 없음",
-				job.result,
-			);
+			try {
+				const resultToSave = trendReferenceImport
+					? attachTrendReferenceSeedToAnalysisResult(job.result, {
+							label: name.trim() || job.result.source_title || "트렌드 레퍼런스",
+							sourceUrl: url.trim() || job.result.source_url,
+							categoryId: searchParams.get("trendCategory") ?? undefined,
+							evidence: splitTrendParam(searchParams.get("trendEvidence")),
+							styleSignals: splitTrendParam(searchParams.get("trendStyle")),
+						})
+					: job.result;
+				const saved = await saveReferenceTemplate(
+					channelId,
+					name.trim() || job.result.source_title || "이름 없음",
+					resultToSave,
+				);
 			void cleanupAnalysisJob(job.id);
 			navigate(`/references/${saved.id}`);
 		} catch (e) {
@@ -267,14 +298,14 @@ export default function ReferenceImportPage() {
 
 		for (const candidate of selected) {
 			try {
-				updateAutoProgress(candidate.id, {
-					status: "analyzing",
-					message: "대표 영상 분석 중",
-				});
-				updateAutoProgress(candidate.id, {
-					status: "saving",
-					message: "분석 후 템플릿 저장 중",
-				});
+					updateAutoProgress(candidate.id, {
+						status: "analyzing",
+						message: "대표 영상 deep 분석 중",
+					});
+					updateAutoProgress(candidate.id, {
+						status: "saving",
+						message: "deep 분석 후 템플릿 저장 중",
+					});
 				const saved = await analyzeAndSaveCandidate(candidate);
 				updateAutoProgress(candidate.id, {
 					status: "complete",
@@ -347,12 +378,12 @@ export default function ReferenceImportPage() {
 				let failedCount = 0;
 				for (const [index, candidate] of candidatePool.entries()) {
 					if (savedCount >= targetCount) break;
-					updateAllCategoryProgress(category.id, {
-						status: "referencing",
-						message: `${index + 1}/${candidatePool.length} ${candidate.channelTitle} 분석·저장 중`,
-						candidateCount: targetCount,
-						savedCount,
-					});
+						updateAllCategoryProgress(category.id, {
+							status: "referencing",
+							message: `${index + 1}/${candidatePool.length} ${candidate.channelTitle} deep 분석·저장 중`,
+							candidateCount: targetCount,
+							savedCount,
+						});
 					try {
 						await analyzeAndSaveCandidate(candidate);
 						savedCount += 1;
@@ -405,23 +436,21 @@ export default function ReferenceImportPage() {
 		);
 		if (existing) return { id: existing.id, skipped: true };
 
-		const started = await startYouTubeAnalysis(candidate.representativeUrl, {
-			mode: candidate.suggestedMode,
-		});
-		const final = await waitForAnalysis(started.id, undefined, {
-			timeoutMs:
-				candidate.suggestedMode === "longform"
-					? 3 * 60 * 1000
-					: 10 * 60 * 1000,
-		});
+			const analysisMode: ReferenceAnalysisMode = "deep";
+			const started = await startYouTubeAnalysis(candidate.representativeUrl, {
+				mode: analysisMode,
+			});
+			const final = await waitForAnalysis(started.id, undefined, {
+				timeoutMs: 20 * 60 * 1000,
+			});
 		if (final.status === "failed" || !final.result) {
 			throw new Error(final.error ?? "분석 실패");
 		}
-		const saved = await saveReferenceTemplate(
-			channelId,
-			buildReferenceTemplateName(candidate),
-			final.result,
-		);
+			const saved = await saveReferenceTemplate(
+				channelId,
+				buildReferenceTemplateName(candidate),
+				attachTrendReferenceLearningToAnalysisResult(final.result, candidate),
+			);
 		void cleanupAnalysisJob(final.id);
 		return { id: saved.id, skipped: false };
 	}
@@ -577,17 +606,26 @@ export default function ReferenceImportPage() {
 							</div>
 						</div>
 
-						{analyzerReady === false && (
-							<PInlineNotification
-								state="warning"
-								heading="분석 서버가 꺼져 있습니다"
-								description="터미널에서 npm run reference-analyzer 실행 후 새로고침하세요."
-								dismissButton={false}
-								className="mb-static-md"
-							/>
-						)}
+							{analyzerReady === false && (
+								<PInlineNotification
+									state="warning"
+									heading="분석 서버가 꺼져 있습니다"
+									description="터미널에서 npm run reference-analyzer 실행 후 새로고침하세요."
+									dismissButton={false}
+									className="mb-static-md"
+								/>
+							)}
+							{trendReferenceImport && (
+								<PInlineNotification
+									state="info"
+									heading="트렌드 레퍼런스 학습 모드"
+									description="이 영상은 추천 순위에서 발견된 트렌드 후보입니다. 저장 시 별도 학습 메타데이터를 남겨 다음 제작의 명시지/암묵지에 반영합니다."
+									dismissButton={false}
+									className="mb-static-md"
+								/>
+							)}
 
-						<div className="space-y-5">
+							<div className="space-y-5">
 							<PSelect
 								name="channel"
 								label="채널"
@@ -604,7 +642,7 @@ export default function ReferenceImportPage() {
 							<PInputText
 								name="url"
 								label="YouTube URL"
-								description="shorts, watch URL 모두 가능. 자동 감지는 길이를 보고 분석 경로를 선택합니다."
+								description="shorts, watch URL 모두 가능. 롱폼 레퍼런스는 최대 20분까지만 허용합니다."
 								value={url}
 								onInput={(e) => setUrl((e.target as HTMLInputElement).value)}
 								disabled={Boolean(inProgress)}
@@ -1016,10 +1054,10 @@ function CandidateCard({
 					{Math.round(candidate.longformShare * 100)}%
 				</span>
 			</div>
-			<div className="mt-3 flex flex-wrap gap-2">
-				<span className="rounded-full bg-[#f1e5d2] px-2.5 py-1 text-[11px] font-bold text-[#7a5a22]">
-					{candidate.suggestedMode}
-				</span>
+				<div className="mt-3 flex flex-wrap gap-2">
+					<span className="rounded-full bg-[#f1e5d2] px-2.5 py-1 text-[11px] font-bold text-[#7a5a22]">
+						deep 실행 · 추천 {candidate.suggestedMode}
+					</span>
 				{candidate.sourceQueries.slice(0, 2).map((query) => (
 					<span
 						key={query}

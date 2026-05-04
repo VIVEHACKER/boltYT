@@ -7,6 +7,11 @@ import {
 	type NicheResearchVideo,
 	type ScoredNicheVideo,
 } from "./niche-research";
+import {
+	isAllowedLongformDuration,
+	isShortsDuration,
+	LONGFORM_MAX_DURATION_SECONDS,
+} from "./reference-duration-policy";
 import type { ReferenceAnalysisMode } from "./reference-import";
 
 export interface ReferenceChannelCategory {
@@ -155,7 +160,7 @@ export function buildReferenceChannelCandidates(
 		.map(([channelId, group]) => buildCandidate(category, channelId, group, format))
 		.filter((candidate) =>
 			format === "longform" || (format === "auto" && category.modeHint === "longform")
-				? candidate.representativeVideo.durationSeconds >= 8 * 60
+				? isAllowedLongformDuration(candidate.representativeVideo.durationSeconds)
 				: true,
 		)
 		.sort((a, b) => scoreForFormat(b, format) - scoreForFormat(a, format))
@@ -239,12 +244,12 @@ function pickRepresentativeVideo(
 ): ScoredNicheVideo | undefined {
 	if (format === "shorts") {
 		return videos
-			.filter((video) => video.durationSeconds <= 180)
+			.filter((video) => isShortsDuration(video.durationSeconds))
 			.sort((a, b) => shortformScore(b) - shortformScore(a))[0];
 	}
 	const longformPreferred =
 		format === "longform" || (format === "auto" && category.modeHint === "longform")
-			? videos.filter((video) => video.durationSeconds >= 8 * 60)
+			? videos.filter((video) => isAllowedLongformDuration(video.durationSeconds))
 			: [];
 	return (longformPreferred.length > 0 ? longformPreferred : videos).sort(
 		(a, b) => b.score - a.score || b.viewCount - a.viewCount,
@@ -289,9 +294,9 @@ function matchesReferenceFormat(
 	durationSeconds: number,
 	format: ReferenceChannelScoutOptions["format"],
 ) {
-	if (format === "shorts") return durationSeconds > 0 && durationSeconds <= 180;
-	if (format === "longform") return durationSeconds >= 8 * 60;
-	return true;
+	if (format === "shorts") return isShortsDuration(durationSeconds);
+	if (format === "longform") return isAllowedLongformDuration(durationSeconds);
+	return durationSeconds > 0 && durationSeconds <= LONGFORM_MAX_DURATION_SECONDS;
 }
 
 function scoreForFormat(

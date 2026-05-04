@@ -10,6 +10,9 @@ import { installErrorSink } from "./lib/diag";
 const LoginPage = lazy(() => import("./pages/auth/LoginPage"));
 const SignupPage = lazy(() => import("./pages/auth/SignupPage"));
 const DashboardPage = lazy(() => import("./pages/DashboardPage"));
+const GrowthCommandCenterPage = lazy(
+	() => import("./pages/GrowthCommandCenterPage"),
+);
 const ChannelListPage = lazy(() => import("./pages/channels/ChannelListPage"));
 const ChannelFormPage = lazy(() => import("./pages/channels/ChannelFormPage"));
 const ChannelDetailPage = lazy(
@@ -64,6 +67,7 @@ export default function App() {
 
 							<Route element={<AppLayout />}>
 								<Route path="/dashboard" element={<DashboardPage />} />
+								<Route path="/growth" element={<GrowthCommandCenterPage />} />
 								<Route path="/channels" element={<ChannelListPage />} />
 								<Route path="/channels/new" element={<ChannelFormPage />} />
 								<Route path="/channels/:id" element={<ChannelDetailPage />} />

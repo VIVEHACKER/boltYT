@@ -112,13 +112,15 @@ export function createCommandRegistry(): Record<string, CommandHandler> {
 				checkServer("youtube-upload", 3457),
 				checkServer("render-queue", 3458),
 				checkServer("api-proxy", 3459),
+				checkServer("tiktok-upload", 3461),
+				checkServer("instagram-upload", 3462),
 			]);
 			const down = results.filter((r) => !r.ok);
 			return {
 				ok: down.length === 0,
 				message:
 					down.length === 0
-						? "4개 서버 모두 정상"
+						? "6개 서버 모두 정상"
 						: `${down.length}개 서버 미응답: ${down.map((r) => r.name).join(", ")}`,
 				data: { results },
 			};

@@ -6,7 +6,11 @@ import globals from "globals";
 import tseslint from "typescript-eslint";
 
 export default defineConfig([
-	globalIgnores(["dist", "coverage"]),
+	globalIgnores([
+		"dist",
+		"coverage",
+		"src/lib/generated-reference-template-presets.ts",
+	]),
 	{
 		files: ["**/*.{ts,tsx}"],
 		extends: [

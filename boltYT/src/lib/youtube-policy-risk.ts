@@ -1,3 +1,5 @@
+import { assessEnforcementSignals } from "./youtube-domain-intelligence";
+
 export type PolicyRiskSeverity = "critical" | "warning" | "info";
 
 export interface PolicyRiskIssue {
@@ -191,6 +193,7 @@ export function analyzeYouTubePolicyRisk(
 	const titleAndDescription = `${input.title ?? ""} ${input.description ?? ""}`;
 	const metadata = lower(titleAndDescription);
 	const hasDisclosure = includesAny(titleAndDescription, DISCLOSURE_TERMS);
+	const repeatedSceneRatio = repetitionRatio(input.scenes);
 
 	let syntheticSceneCount = 0;
 	let lowAnchorSceneCount = 0;
@@ -282,7 +285,7 @@ export function analyzeYouTubePolicyRisk(
 		actions.push("저신뢰 씬은 기사, 문서, 지도, 원본 이미지, 직접 관련 영상으로 재검색하세요.");
 	}
 
-	if (repetitionRatio(input.scenes) > 0.3 || includesAny(metadata, MASS_PRODUCTION_TERMS)) {
+	if (repeatedSceneRatio > 0.3 || includesAny(metadata, MASS_PRODUCTION_TERMS)) {
 		issues.push({
 			severity: "warning",
 			code: "mass_produced_pattern",
@@ -305,6 +308,26 @@ export function analyzeYouTubePolicyRisk(
 			});
 		}
 	}
+
+	const sourceAnchorRatio =
+		input.scenes.length > 0
+			? 1 - lowAnchorSceneCount / input.scenes.length
+			: 1;
+	const hasSyntheticRealClaim =
+		includesAny(metadata, REAL_FOOTAGE_CLAIMS) &&
+		input.scenes.some((scene) => hasSyntheticShot(scene) && !hasSourceAnchor(scene));
+	const enforcementSignals = assessEnforcementSignals({
+		title: input.title,
+		description: input.description,
+		sceneCount: input.scenes.length,
+		repetitionRatio: repeatedSceneRatio,
+		sourceAnchorRatio,
+		hasSyntheticRealClaim,
+	});
+	for (const issue of enforcementSignals.issues) {
+		issues.push(issue);
+	}
+	actions.push(...enforcementSignals.requiredActions);
 
 	if (actions.length === 0 && issues.length > 0) {
 		actions.push("경고 씬의 표현, 출처 앵커, 썸네일/제목 일치 여부를 업로드 전 검토하세요.");

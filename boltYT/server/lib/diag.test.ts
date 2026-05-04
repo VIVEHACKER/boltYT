@@ -144,7 +144,7 @@ describe("runCommand", () => {
 		const reg = createCommandRegistry();
 		const result = await runCommand(reg, "ping-servers", {}, ctx);
 		expect(result.ok).toBe(true);
-		expect(result.message).toContain("4개 서버 모두 정상");
+		expect(result.message).toContain("6개 서버 모두 정상");
 	});
 
 	it("ping-servers — 일부 서버 다운이면 ok false", async () => {

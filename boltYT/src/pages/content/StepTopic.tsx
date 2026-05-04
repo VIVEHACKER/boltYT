@@ -8,8 +8,12 @@ import {
 	PTag,
 	PText,
 } from "@porsche-design-system/components-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { fetchTopicSuggestions } from "../../lib/ai";
+import {
+	buildContentRecommendationPlan,
+	type ContentPerformanceSample,
+} from "../../lib/content-recommendation-ranker";
 import {
 	attachNicheHandoffToTopic,
 	formatCompactNumber,
@@ -22,10 +26,11 @@ interface StepTopicProps {
 	channels: Channel[];
 	selectedChannelId: string;
 	onChannelChange: (id: string) => void;
-	onNext: (topicId: string) => void;
+	onNext: (topicId: string, topicTitle: string) => void;
 	initialTitle?: string;
 	source?: string;
 	nicheHandoff?: NicheResearchHandoff | null;
+	performanceHistory?: ContentPerformanceSample[];
 }
 
 export default function StepTopic({
@@ -36,6 +41,7 @@ export default function StepTopic({
 	initialTitle = "",
 	source = "manual",
 	nicheHandoff,
+	performanceHistory = [],
 }: StepTopicProps) {
 	const [title, setTitle] = useState(initialTitle);
 	const [loading, setLoading] = useState(false);
@@ -43,6 +49,15 @@ export default function StepTopic({
 	const [suggestions, setSuggestions] = useState<string[]>([]);
 	const [loadingSuggestions, setLoadingSuggestions] = useState(false);
 	const [suggestionsError, setSuggestionsError] = useState("");
+	const recommendationPlan = useMemo(
+		() =>
+			buildContentRecommendationPlan({
+				topicTitle: title,
+				nicheHandoff,
+				performanceHistory,
+			}),
+		[title, nicheHandoff, performanceHistory],
+	);
 
 	const loadSuggestions = useCallback(async (channelId: string) => {
 		setLoadingSuggestions(true);
@@ -99,7 +114,7 @@ export default function StepTopic({
 			attachNicheHandoffToTopic(data.id, nicheHandoff.id);
 		}
 
-		onNext(data.id);
+		onNext(data.id, title.trim());
 	}
 
 	return (
@@ -131,6 +146,44 @@ export default function StepTopic({
 					state={error ? "error" : "none"}
 					message={error}
 				/>
+
+				{title.trim().length > 0 && (
+					<div className="rounded-[12px] bg-[#f7f3ea] border border-[#d8c8aa] p-static-md">
+						<div className="flex items-center justify-between gap-static-sm mb-static-sm">
+							<div>
+								<PText size="small" weight="semi-bold">
+									이 주제로 추천되는 대본 방향
+								</PText>
+								<PText size="x-small" color="contrast-medium">
+									카테고리 {recommendationPlan.categoryLabel} · 신뢰도{" "}
+									{recommendationPlan.confidence}
+									{recommendationPlan.performanceFeedback.sampleCount > 0
+										? ` · 성과 ${recommendationPlan.performanceFeedback.sampleCount}개 반영`
+										: ""}
+								</PText>
+							</div>
+							<PTag color="notification-info-soft">순위화</PTag>
+						</div>
+						<div className="grid grid-cols-1 md:grid-cols-3 gap-static-sm">
+							{recommendationPlan.scripts.slice(0, 3).map((script) => (
+								<div
+									key={script.id}
+									className="rounded-[10px] bg-[#fffaf0] border border-[#ead9bd] p-static-sm"
+								>
+									<div className="flex items-center justify-between mb-1">
+										<PText size="x-small" weight="semi-bold">
+											#{script.rank} {script.title}
+										</PText>
+										<PTag color="background-surface">{script.score}점</PTag>
+									</div>
+									<PText size="x-small" color="contrast-medium">
+										{script.hook}
+									</PText>
+								</div>
+							))}
+						</div>
+					</div>
+				)}
 
 				{nicheHandoff && (
 					<div className="rounded-[8px] bg-canvas p-static-md border border-contrast-low">

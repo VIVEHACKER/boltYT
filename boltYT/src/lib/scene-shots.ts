@@ -4,6 +4,7 @@ import type {
 	SceneShotMotion,
 	SceneShotVisualRole,
 } from "./scene-shot-types";
+import { LONGFORM_MAX_DURATION_SECONDS } from "./reference-duration-policy";
 
 type SceneType = "image" | "video" | "text_emphasis" | "news_overlay";
 type SourceType = "image" | "video" | "article";
@@ -1550,7 +1551,10 @@ function stretchLongformDurations<T extends ShotSceneInput>(
 ): T[] {
 	if (scenes.length < 6) return scenes;
 
-	const targetTotalSeconds = Math.max(360, options.targetTotalSeconds ?? 360);
+	const targetTotalSeconds = Math.min(
+		LONGFORM_MAX_DURATION_SECONDS,
+		Math.max(360, options.targetTotalSeconds ?? 360),
+	);
 	const total = scenes.reduce((sum, scene) => sum + Math.max(0, scene.duration), 0);
 	if (total >= targetTotalSeconds) return scenes;
 	const targetAverage = targetTotalSeconds / scenes.length;
@@ -1588,6 +1592,29 @@ function stretchLongformDurations<T extends ShotSceneInput>(
 	});
 }
 
+function capLongformTotalDuration<T extends ShotSceneInput>(
+	scenes: T[],
+	maxTotalSeconds = LONGFORM_MAX_DURATION_SECONDS,
+): T[] {
+	const total = scenes.reduce((sum, scene) => sum + Math.max(0, scene.duration), 0);
+	if (total <= maxTotalSeconds || total <= 0) return scenes;
+	const scale = maxTotalSeconds / total;
+	let used = 0;
+	return scenes.map((scene, index) => {
+		const isLast = index === scenes.length - 1;
+		const minDuration =
+			scene.type === "text_emphasis" ? 3.5 : scene.type === "news_overlay" ? 6 : 5;
+		const duration = isLast
+			? Math.max(minDuration, maxTotalSeconds - used)
+			: Math.max(minDuration, scene.duration * scale);
+		used += duration;
+		return {
+			...scene,
+			duration: Number(duration.toFixed(2)),
+		};
+	});
+}
+
 export function applyLongformVideoRules<
 	T extends ShotSceneInput & {
 		transition?: string;
@@ -1604,11 +1631,11 @@ export function applyLongformVideoRules<
 	const editFirstScenes = scenes.map((scene) =>
 		normalizeTextEmphasisToEditFirst(scene, sources),
 	);
-	const targetTotalSeconds = Math.max(
-		360,
-		options.targetTotalSeconds ?? 360,
+	const targetTotalSeconds = Math.min(
+		LONGFORM_MAX_DURATION_SECONDS,
+		Math.max(360, options.targetTotalSeconds ?? 360),
 	);
-	const featureLength = targetTotalSeconds >= 1800;
+	const featureLength = targetTotalSeconds >= LONGFORM_MAX_DURATION_SECONDS;
 	const targetAverage = targetTotalSeconds / Math.max(1, scenes.length);
 	let elapsed = 0;
 	const paced = editFirstScenes.map((scene, index) => {
@@ -1644,9 +1671,11 @@ export function applyLongformVideoRules<
 		elapsed += duration;
 		return { ...scene, duration };
 	});
-	const stretched = stretchLongformDurations(paced, {
+	const stretched = capLongformTotalDuration(
+		stretchLongformDurations(paced, {
 		targetTotalSeconds,
-	});
+		}),
+	);
 
 	const candidates = stretched
 		.map((scene, index) => ({ scene, index }))

@@ -29,6 +29,7 @@ import {
 import { autoPickBgm, inferAutoBgmPreset } from "../../lib/bgm";
 import { type BgmAnalysis, isBpmReliable } from "../../lib/bgm-analyze";
 import { buildHookFlags } from "../../lib/hook-detector";
+import { buildRenderKnowledgeEvent } from "../../lib/knowledge-system";
 import { ensureBlobUrls } from "../../lib/local-db";
 import { referenceToPreset } from "../../lib/reference-bridge";
 import { prepareRenderPayload } from "../../lib/render-assets";
@@ -51,6 +52,10 @@ import type { SceneShot } from "../../lib/scene-shot-types";
 import { assignSfxToScenes, type SfxCategory } from "../../lib/sfx";
 import { supabase } from "../../lib/supabase";
 import { generateAndSaveThumbnail } from "../../lib/thumbnail";
+import {
+	assessThumbnailReadiness,
+	type ThumbnailReadiness,
+} from "../../lib/thumbnail-intelligence";
 import {
 	buildYouTubeMetadata,
 	type YouTubeMetadata,
@@ -507,6 +512,123 @@ function ProductionMetric({ label, value }: { label: string; value: string }) {
 	);
 }
 
+function thumbnailReadinessColor(level: ThumbnailReadiness["level"]) {
+	if (level === "ready") return "notification-success-soft";
+	if (level === "warning") return "notification-warning-soft";
+	return "notification-error-soft";
+}
+
+function ThumbnailPlanPanel({
+	plan,
+	readiness,
+	isShorts,
+}: {
+	plan: YouTubeMetadata["thumbnail"] | null;
+	readiness: ThumbnailReadiness;
+	isShorts: boolean;
+}) {
+	if (!plan) {
+		return (
+			<div className="rounded-[8px] border border-contrast-low bg-canvas p-static-md">
+				<PText size="small" weight="semi-bold">
+					썸네일 제작 계획 없음
+				</PText>
+				<PText size="x-small" color="contrast-medium" className="mt-static-xs">
+					승인 전에 레퍼런스 기반 제목/이미지/배치 계획을 다시 생성해야 합니다.
+				</PText>
+			</div>
+		);
+	}
+
+	return (
+		<div className="rounded-[8px] border border-contrast-low bg-canvas p-static-lg mb-static-lg">
+			<div className="mb-static-md flex flex-col gap-static-sm lg:flex-row lg:items-start lg:justify-between">
+				<div>
+					<PHeading size="small" tag="h3">
+						레퍼런스 썸네일 패키지
+					</PHeading>
+					<PText size="small" color="contrast-medium" className="mt-static-xs">
+						제목을 반복하지 않고 썸네일은 클릭 감정, 단서, 첫 프레임 역할을
+						담당하도록 생성합니다.
+					</PText>
+				</div>
+				<div className="flex flex-wrap gap-static-xs">
+					<PTag color={thumbnailReadinessColor(readiness.level)}>
+						{readiness.label} · {readiness.score}점
+					</PTag>
+					<PTag color="notification-info-soft">
+						{isShorts ? "Shorts cover frame" : "1280x720 thumbnail"}
+					</PTag>
+				</div>
+			</div>
+
+			<div className="grid gap-static-sm lg:grid-cols-[.9fr_1.1fr]">
+				<div
+					className="relative min-h-[190px] overflow-hidden rounded-[10px] border border-contrast-low p-static-lg"
+					style={{
+						background:
+							"radial-gradient(circle at 78% 24%, rgba(245,158,11,.28), transparent 34%), linear-gradient(135deg, #0b0b0b, #21170f 58%, #090909)",
+					}}
+				>
+					<div
+						className="absolute inset-x-0 bottom-0 h-1.5"
+						style={{ backgroundColor: plan.accentColor }}
+					/>
+					<div className="relative flex h-full flex-col justify-between gap-static-md">
+						<div className="flex items-center justify-between gap-static-sm">
+							<span
+								className="rounded-full px-static-sm py-static-xs text-[11px] font-black uppercase tracking-[.12em] text-[#111]"
+								style={{ backgroundColor: plan.accentColor }}
+							>
+								{plan.badgeText}
+							</span>
+							<PTag color="background-surface">{plan.layout}</PTag>
+						</div>
+						<div>
+							<div className="max-w-[520px] text-[clamp(28px,4vw,48px)] font-black leading-[.98] tracking-[-.05em] text-white drop-shadow-[0_3px_0_rgba(0,0,0,.85)]">
+								{plan.title}
+							</div>
+							<div className="mt-static-sm text-[18px] font-black" style={{ color: plan.accentColor }}>
+								{plan.subtitle}
+							</div>
+						</div>
+					</div>
+				</div>
+
+				<div className="grid gap-static-sm">
+					<div className="rounded-[8px] bg-surface p-static-md">
+						<PText size="small" weight="semi-bold">
+							클릭 역할
+						</PText>
+						<PText size="x-small" color="contrast-medium" className="mt-static-xs">
+							{plan.referenceDna.clickPackaging.titleThumbnailRelationship}
+						</PText>
+					</div>
+					<div className="grid gap-static-xs md:grid-cols-3">
+						{plan.variants.slice(0, 3).map((variant) => (
+							<div key={variant.id} className="rounded-[8px] bg-surface p-static-sm">
+								<PText size="x-small" weight="semi-bold">
+									{variant.titlePattern}
+								</PText>
+								<PText size="x-small" color="contrast-medium" className="mt-static-xs">
+									{variant.testGoal}
+								</PText>
+							</div>
+						))}
+					</div>
+					{[...readiness.warnings, ...plan.quality.requiredActions]
+						.slice(0, 3)
+						.map((action) => (
+							<PTag key={action} color="notification-warning-soft">
+								{action}
+							</PTag>
+						))}
+				</div>
+			</div>
+		</div>
+	);
+}
+
 function buildProductionScenes(
 	scenes: SceneWithAssets[],
 	remotionScenes: RemotionScene[],
@@ -955,6 +1077,7 @@ export default function StepPreview({
 					topicTitle: scriptData.briefs?.topics?.title ?? "",
 					channelName: effectiveChannelName,
 					format: shortsMode ? "shorts" : "longform",
+					referenceTemplate,
 					scenes: beatRetimedScenes.map((scene) => ({
 						narration_text: scene.narration_text,
 						scene_type: scene.scene_type,
@@ -1054,6 +1177,17 @@ export default function StepPreview({
 			thumbnailPlan,
 			scriptId,
 		],
+	);
+	const thumbnailReadiness = useMemo(
+		() =>
+			assessThumbnailReadiness({
+				title,
+				description,
+				thumbnailPath: localStorage.getItem(`thumbnail_path_${scriptId}`) ?? "",
+				thumbnailPlan,
+				isShorts,
+			}),
+		[title, description, thumbnailPlan, isShorts, scriptId],
 	);
 	const visibleProductionIssue = productionQualityReport.issues.find(
 		(issue) =>
@@ -1355,6 +1489,9 @@ export default function StepPreview({
 				channelName,
 				accentColor: thumbnailPlan?.accentColor,
 				preset: thumbnailPlan?.preset ?? "mystery",
+				badgeText: thumbnailPlan?.badgeText,
+				textZone: thumbnailPlan?.layout,
+				referenceDna: thumbnailPlan?.referenceDna,
 			});
 			const thumbnailPath = thumbnailPathForScript(scriptId);
 			const finalReport = buildProductionReport(
@@ -1383,10 +1520,16 @@ export default function StepPreview({
 				0,
 			);
 
-			const renderFormat = isShorts ? "shorts" : "longform";
-			const { data: render } = await supabase
-				.from("renders")
-				.insert({
+				const renderFormat = isShorts ? "shorts" : "longform";
+				const initialKnowledgeEvent = buildRenderKnowledgeEvent({
+					referenceTemplate,
+					productionReport: finalReport,
+					format: renderFormat,
+					repaired: repaired.repaired,
+				});
+				const { data: render } = await supabase
+					.from("renders")
+					.insert({
 					script_id: scriptId,
 					format: renderFormat,
 					aspect_ratio: isShorts ? "9:16" : "16:9",
@@ -1406,11 +1549,12 @@ export default function StepPreview({
 						auto_repair_applied: repaired.repaired,
 						production_quality_score: finalReport.score,
 						production_quality_passed: finalReport.passed,
-						production_quality_metrics: finalReport.metrics,
-						production_quality_issues: finalReport.issues,
-						production_quality_actions: finalReport.requiredActions,
-					},
-				})
+							production_quality_metrics: finalReport.metrics,
+							production_quality_issues: finalReport.issues,
+							production_quality_actions: finalReport.requiredActions,
+							knowledge_event: initialKnowledgeEvent,
+						},
+					})
 				.select()
 				.maybeSingle();
 
@@ -1562,6 +1706,16 @@ export default function StepPreview({
 									render_output_repair_attempted: renderOutputRepairAttempted,
 									render_output_repair_succeeded:
 										renderOutputRepairAttempted || undefined,
+									knowledge_event: buildRenderKnowledgeEvent({
+										referenceTemplate,
+										productionReport: finalRenderResult.report,
+										format: renderFormat,
+										renderOutputQc:
+											completed.qcResult as RenderOutputQcLike | undefined,
+										repaired:
+											finalRenderResult.repaired ||
+											renderOutputRepairAttempted,
+									}),
 								},
 							),
 						})
@@ -1576,15 +1730,25 @@ export default function StepPreview({
 						...(failedJob?.outputPath
 							? { storage_path: failedJob.outputPath }
 							: {}),
-						qc_result_json: mergeRenderOutputQc(
-							renderQcBase,
-							failedJob?.qcResult as RenderOutputQcLike | undefined,
-							{
-								render_output_repair_attempted: renderOutputRepairAttempted,
-								render_output_repair_succeeded: false,
-							},
-						),
-					})
+							qc_result_json: mergeRenderOutputQc(
+								renderQcBase,
+								failedJob?.qcResult as RenderOutputQcLike | undefined,
+								{
+									render_output_repair_attempted: renderOutputRepairAttempted,
+									render_output_repair_succeeded: false,
+									knowledge_event: buildRenderKnowledgeEvent({
+										referenceTemplate,
+										productionReport: finalRenderResult.report,
+										format: renderFormat,
+										renderOutputQc:
+											failedJob?.qcResult as RenderOutputQcLike | undefined,
+										repaired:
+											finalRenderResult.repaired ||
+											renderOutputRepairAttempted,
+									}),
+								},
+							),
+						})
 					.eq("id", render.id);
 				throw new Error(msg);
 			}
@@ -1736,6 +1900,12 @@ export default function StepPreview({
 			<PHeading size="small" tag="h3" className="mb-static-md">
 				업로드 정보
 			</PHeading>
+
+			<ThumbnailPlanPanel
+				plan={thumbnailPlan}
+				readiness={thumbnailReadiness}
+				isShorts={isShorts}
+			/>
 
 			<div className="flex flex-col gap-static-md mb-static-lg">
 				<PInputText

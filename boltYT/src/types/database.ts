@@ -291,8 +291,55 @@ export interface Analytics {
 	views: number;
 	ctr: number;
 	avg_watch_duration: number;
+	avg_view_percentage?: number | null;
+	estimated_minutes_watched?: number | null;
 	likes: number;
 	comments: number;
+	shares?: number | null;
 	subscribers_gained: number;
+	subscribers_lost?: number | null;
+	traffic_sources?: Array<{
+		source: string;
+		views: number;
+		estimatedMinutesWatched?: number;
+		averageViewDuration?: number;
+	}> | null;
+	retention_curve?: Array<{
+		elapsedVideoTimeRatio: number;
+		audienceWatchRatio: number;
+		relativeRetentionPerformance?: number | null;
+	}> | null;
+	daily_rows?: Array<Record<string, unknown>> | null;
+	sync_warnings?: string[] | null;
 	fetched_at: string;
+}
+
+export interface GrowthExperiment {
+	[key: string]: unknown;
+	id: string;
+	upload_id: string | null;
+	type: string;
+	title: string;
+	hypothesis: string;
+	metric: string;
+	variant_a: string;
+	variant_b: string;
+	variant_c: string | null;
+	status: "draft" | "running" | "completed" | "stopped";
+	success_criteria: string;
+	result_summary: string | null;
+	created_at: string;
+	updated_at: string;
+}
+
+export interface GrowthComment {
+	[key: string]: unknown;
+	id: string;
+	video_id: string;
+	upload_id: string | null;
+	author: string;
+	text: string;
+	like_count: number;
+	published_at: string;
+	created_at: string;
 }

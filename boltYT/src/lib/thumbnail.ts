@@ -5,6 +5,10 @@
  */
 
 import { storeLocalFile } from "./local-db";
+import type {
+	ReferenceThumbnailDna,
+	ThumbnailTextZone,
+} from "./thumbnail-intelligence";
 
 const THUMB_WIDTH = 1280;
 const THUMB_HEIGHT = 720;
@@ -22,6 +26,12 @@ export interface ThumbnailOptions {
 	accentColor?: string;
 	/** 스타일 프리셋 */
 	preset?: ThumbnailPreset;
+	/** 레퍼런스 기반 클릭 패키징 배지 */
+	badgeText?: string;
+	/** 레퍼런스 기반 텍스트 안전 영역 */
+	textZone?: ThumbnailTextZone;
+	/** 레퍼런스 썸네일 DNA */
+	referenceDna?: ReferenceThumbnailDna;
 }
 
 export type ThumbnailPreset =
@@ -159,11 +169,64 @@ function fitTitleText(
 	return { lines, fontSize: 48 };
 }
 
+interface TextLayout {
+	x: number;
+	centerY: number;
+	maxWidth: number;
+	align: CanvasTextAlign;
+}
+
+function resolveTextLayout(zone: ThumbnailTextZone | undefined): TextLayout {
+	switch (zone) {
+		case "left_third":
+			return { x: 76, centerY: 375, maxWidth: 560, align: "left" };
+		case "right_third":
+			return { x: THUMB_WIDTH - 76, centerY: 375, maxWidth: 560, align: "right" };
+		case "top_left":
+			return { x: 76, centerY: 215, maxWidth: 650, align: "left" };
+		case "bottom_band":
+			return { x: THUMB_WIDTH / 2, centerY: 505, maxWidth: 960, align: "center" };
+		case "center_band":
+		default:
+			return { x: THUMB_WIDTH / 2, centerY: 360, maxWidth: THUMB_WIDTH - 160, align: "center" };
+	}
+}
+
+function drawBadge(
+	ctx: CanvasRenderingContext2D,
+	text: string | undefined,
+	accentColor: string,
+	channelName?: string,
+) {
+	const clean = text?.trim();
+	if (!clean) return;
+	ctx.font = "900 24px 'Noto Sans KR', sans-serif";
+	const width = Math.min(260, Math.max(92, ctx.measureText(clean).width + 36));
+	const x = channelName ? THUMB_WIDTH - width - 40 : 40;
+	const y = 32;
+	ctx.fillStyle = "rgba(0,0,0,0.72)";
+	ctx.fillRect(x + 4, y + 5, width, 44);
+	ctx.fillStyle = accentColor;
+	ctx.fillRect(x, y, width, 44);
+	ctx.textAlign = "center";
+	ctx.textBaseline = "middle";
+	ctx.fillStyle = "#111111";
+	ctx.fillText(clean, x + width / 2, y + 23);
+}
+
 /** 썸네일 생성 → data URL 반환 */
 export async function generateThumbnail(
 	options: ThumbnailOptions,
 ): Promise<string> {
-	const preset = PRESETS[options.preset ?? "mystery"];
+	const preset = PRESETS[
+		options.preset ?? options.referenceDna?.generation.preset ?? "mystery"
+	];
+	const accentColor =
+		options.accentColor ??
+		options.referenceDna?.color.accentColor ??
+		preset.subtitleColor;
+	const textZone = options.textZone ?? options.referenceDna?.layout.textZone;
+	const maxLines = options.referenceDna?.text.lineCount ?? 3;
 	const canvas = document.createElement("canvas");
 	canvas.width = THUMB_WIDTH;
 	canvas.height = THUMB_HEIGHT;
@@ -212,8 +275,7 @@ export async function generateThumbnail(
 
 	// ─── 4. 액센트 바 (하단) ───
 	if (preset.accentBar) {
-		const barColor = options.accentColor ?? preset.subtitleColor;
-		ctx.fillStyle = barColor;
+		ctx.fillStyle = accentColor;
 		ctx.fillRect(0, THUMB_HEIGHT - 8, THUMB_WIDTH, 8);
 	}
 
@@ -224,23 +286,26 @@ export async function generateThumbnail(
 		ctx.fillText(options.channelName, 40, 50);
 	}
 
+	// ─── 5.5. 클릭 패키징 배지 ───
+	drawBadge(ctx, options.badgeText ?? options.referenceDna?.generation.badgeText, accentColor, options.channelName);
+
 	// ─── 6. 메인 타이틀 ───
-	ctx.textAlign = "center";
+	const layout = resolveTextLayout(textZone);
+	ctx.textAlign = layout.align;
 	ctx.textBaseline = "middle";
 
-	const maxTextWidth = THUMB_WIDTH - 160;
 	const { lines, fontSize } = fitTitleText(
 		ctx,
 		options.title,
 		preset.titleSize,
-		maxTextWidth,
-		3,
+		layout.maxWidth,
+		maxLines,
 	);
 	ctx.font = `900 ${fontSize}px 'Noto Sans KR', sans-serif`;
 	const lineHeight = fontSize * 1.16;
 	const totalHeight = lines.length * lineHeight;
 	const startY =
-		(THUMB_HEIGHT - totalHeight) / 2 + (options.subtitle ? -20 : 0);
+		layout.centerY - totalHeight / 2 + (options.subtitle ? -20 : 0);
 
 	for (let i = 0; i < lines.length; i++) {
 		const y = startY + i * lineHeight + lineHeight / 2;
@@ -250,23 +315,23 @@ export async function generateThumbnail(
 			ctx.strokeStyle = preset.titleStroke;
 			ctx.lineWidth = preset.titleStrokeWidth;
 			ctx.lineJoin = "round";
-			ctx.strokeText(lines[i], THUMB_WIDTH / 2, y);
+			ctx.strokeText(lines[i], layout.x, y);
 		}
 
 		// 텍스트 채우기
 		ctx.fillStyle = preset.titleColor;
-		ctx.fillText(lines[i], THUMB_WIDTH / 2, y);
+		ctx.fillText(lines[i], layout.x, y);
 	}
 
 	// ─── 7. 서브타이틀 ───
 	if (options.subtitle) {
-		const subY = startY + totalHeight + 24;
+		const subY = Math.min(THUMB_HEIGHT - 72, startY + totalHeight + 24);
 		ctx.font = "600 32px 'Noto Sans KR', sans-serif";
 		ctx.fillStyle = preset.subtitleColor;
 		ctx.strokeStyle = "#000000";
 		ctx.lineWidth = 2;
-		ctx.strokeText(options.subtitle, THUMB_WIDTH / 2, subY);
-		ctx.fillText(options.subtitle, THUMB_WIDTH / 2, subY);
+		ctx.strokeText(options.subtitle, layout.x, subY);
+		ctx.fillText(options.subtitle, layout.x, subY);
 	}
 
 	return canvas.toDataURL("image/jpeg", 0.92);

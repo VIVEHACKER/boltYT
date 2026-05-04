@@ -13,6 +13,7 @@ import {
 	LayoutDashboard,
 	Palette,
 	Radar,
+	Rocket,
 	Settings,
 	Tv,
 	Upload,
@@ -22,6 +23,7 @@ import { supabase } from "../lib/supabase";
 
 const navItems = [
 	{ to: "/dashboard", label: "대시보드", icon: LayoutDashboard },
+	{ to: "/growth", label: "성장 지휘실", icon: Rocket },
 	{ to: "/channels", label: "채널 관리", icon: Tv },
 	{ to: "/style-bible", label: "스타일 바이블", icon: Palette },
 	{ to: "/references", label: "레퍼런스 템플릿", icon: Film },

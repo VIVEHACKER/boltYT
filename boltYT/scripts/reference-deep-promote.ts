@@ -1,6 +1,10 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+	LONGFORM_MAX_DURATION_SECONDS,
+	SHORTS_MAX_DURATION_SECONDS,
+} from "../src/lib/reference-duration-policy.ts";
 
 type ReferenceAnalysisMode = "auto" | "shortform" | "longform" | "deep";
 
@@ -82,6 +86,10 @@ const repoRoot = path.resolve(__dirname, "..");
 const generatedPath = path.join(
 	repoRoot,
 	"src/lib/generated-reference-template-presets.ts",
+);
+const generatedJsonPath = path.join(
+	repoRoot,
+	"public/generated-reference-template-presets.json",
 );
 const analyzerBase = process.env.REFERENCE_ANALYZER_URL ?? "http://localhost:3460";
 const options = parseArgs(process.argv.slice(2));
@@ -288,13 +296,28 @@ function selectTargets(
 		const needed = Math.max(0, opts.targetPerCategory - deepCount);
 		if (needed === 0 && !opts.retryDeep) continue;
 		const candidates = list
-			.filter((template) => opts.retryDeep || !isDeepTemplate(template))
+			.filter(
+				(template) =>
+					(opts.retryDeep || !isDeepTemplate(template)) &&
+					isPromotableReferenceDuration(template),
+			)
 			.sort((a, b) => scoreTemplateForDeep(a) - scoreTemplateForDeep(b))
 			.slice(0, needed || opts.targetPerCategory);
 		targets.push(...candidates);
 		if (targets.length >= opts.limit) return targets.slice(0, opts.limit);
 	}
 	return targets.slice(0, opts.limit);
+}
+
+function isPromotableReferenceDuration(template: GeneratedReferenceTemplate): boolean {
+	const sourceDuration =
+		Number(template.raw_analysis.source_duration_seconds) ||
+		Number(template.duration_seconds) ||
+		0;
+	return (
+		sourceDuration <= SHORTS_MAX_DURATION_SECONDS ||
+		sourceDuration <= LONGFORM_MAX_DURATION_SECONDS
+	);
 }
 
 function scoreTemplateForDeep(template: GeneratedReferenceTemplate): number {
@@ -305,7 +328,9 @@ function scoreTemplateForDeep(template: GeneratedReferenceTemplate): number {
 	const hasHeatmap = Array.isArray(template.raw_analysis.heatmap_peaks)
 		? template.raw_analysis.heatmap_peaks.length
 		: 0;
-	return duration - hasChapters * 60 - hasHeatmap * 90;
+	const isLocalFallback =
+		template.raw_analysis.analysis_mode === "deep_local_frame_audio_edit";
+	return duration - hasChapters * 60 - hasHeatmap * 90 - (isLocalFallback ? 1_000_000 : 0);
 }
 
 function isDeepTemplate(template: GeneratedReferenceTemplate): boolean {
@@ -324,8 +349,14 @@ function mergeDeepResult(
 	jobId: string,
 ): GeneratedReferenceTemplate {
 	const previousRaw = previous.raw_analysis;
+	const resultRaw = result.raw_analysis ?? {};
+	const productionMethod = isRecord(resultRaw.production_method)
+		? resultRaw.production_method
+		: previousRaw.production_method;
 	const raw = sanitizeRawAnalysis({
-		...(result.raw_analysis ?? {}),
+		...previousRaw,
+		...resultRaw,
+		production_method: productionMethod,
 		built_in_reference: true,
 		generated_reference: true,
 		generated_from_job_id: jobId,
@@ -402,7 +433,10 @@ async function writeGeneratedTemplates(templates: GeneratedReferenceTemplate[]) 
 		`export const GENERATED_REFERENCE_TEMPLATES: BuiltInReferenceTemplateInput[] = ${JSON.stringify(templates, null, "\t")};`,
 		"",
 	].join("\n");
-	await fs.writeFile(generatedPath, contents);
+	await Promise.all([
+		fs.writeFile(generatedPath, contents),
+		fs.writeFile(generatedJsonPath, JSON.stringify(templates)),
+	]);
 }
 
 function summarizeDepth(templates: GeneratedReferenceTemplate[]) {

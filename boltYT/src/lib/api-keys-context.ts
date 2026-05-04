@@ -14,6 +14,15 @@ export type ApiKeysStatus = {
 	naver: boolean;
 	fal: boolean;
 	google: boolean;
+	editable?: Record<string, boolean>;
+	openaiRuntime?: {
+		quotaBlocked: boolean;
+		quotaBlockedUntil?: string;
+		lastQuotaAt?: string;
+		lastQuotaSource?: string;
+		lastQuotaError?: string;
+		lastOkAt?: string;
+	};
 };
 
 export const EMPTY_STATUS: ApiKeysStatus = {

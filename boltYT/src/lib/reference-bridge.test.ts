@@ -70,6 +70,7 @@ describe("referenceToPreset", () => {
 		expect(preset.composition.subtitleStyle.fontWeight).toBe(700);
 		expect(preset.script.sceneCount).toBe(8);
 		expect(preset.script.targetDuration).toBe(32);
+		expect(preset.thumbnailDna?.version).toBe("thumbnail-dna-v1");
 	});
 
 	it("longform 포맷 → fontWeight 600", () => {
@@ -203,6 +204,30 @@ describe("referenceToPreset", () => {
 		expect(preset.script.hookDuration).toBe(10);
 	});
 
+	it("롱폼 formatProfile은 20분을 넘기지 않도록 캡", () => {
+		const preset = referenceToPreset(
+			makeRef({
+				raw_analysis: {
+					production_method: {
+						formatProfiles: {
+							longform: {
+								durationSeconds: 3600,
+								sceneCount: 64,
+								avgSceneDuration: 56,
+								hookDuration: 12,
+							},
+						},
+					},
+				},
+			}),
+			"longform",
+		);
+
+		expect(preset.script.targetDuration).toBe(1200);
+		expect(preset.script.sceneCount).toBeLessThanOrEqual(36);
+		expect(preset.script.avgSceneDuration).toBeGreaterThanOrEqual(12);
+	});
+
 	it("raw_analysis.production_dna → 프리셋에 보존", () => {
 		const preset = referenceToPreset(
 			makeRef({
@@ -305,6 +330,7 @@ describe("buildScriptConstraint", () => {
 	it("씬 수 포함", () => {
 		const result = buildScriptConstraint(preset);
 		expect(result).toContain("씬 수: 8개");
+		expect(result).toContain("썸네일 DNA");
 	});
 
 	it("목표 길이 포함", () => {
@@ -390,5 +416,8 @@ describe("buildScriptConstraint", () => {
 		expect(result).toContain("초반 3초 모션 강도: 0.58");
 		expect(result).toContain("레퍼런스 LUFS -14.2");
 		expect(result).toContain("첫 문장 끝에서 hard cut");
+		expect(result).toContain("지식 프로필");
+		expect(result).toContain("명시지");
+		expect(result).toContain("암묵지");
 	});
 });

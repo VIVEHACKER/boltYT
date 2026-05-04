@@ -11,12 +11,13 @@ vi.mock("node:fs", async (importOriginal) => {
 	const actual = await importOriginal<typeof import("node:fs")>();
 	return {
 		...actual,
+		readFileSync: vi.fn(actual.readFileSync),
 		watchFile: vi.fn(),
 		unwatchFile: vi.fn(),
 	};
 });
 
-import { unwatchFile, watchFile } from "node:fs";
+import { readFileSync, unwatchFile, watchFile } from "node:fs";
 import { loadEnv, validateEnv, watchEnv } from "./env.ts";
 
 const originalEnv = { ...process.env };
@@ -81,6 +82,11 @@ describe("loadEnv", () => {
 	});
 
 	it("VITE_ 접두 키를 서버 키 alias로 승격", () => {
+		vi.mocked(readFileSync).mockImplementation(() => {
+			throw Object.assign(new Error(".env missing in isolated alias test"), {
+				code: "ENOENT",
+			});
+		});
 		delete process.env.OPENAI_API_KEY;
 		process.env.VITE_OPENAI_API_KEY = "vite-openai-key";
 		loadEnv();

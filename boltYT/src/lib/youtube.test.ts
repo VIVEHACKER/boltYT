@@ -11,7 +11,9 @@ import {
 	getAuthStatus,
 	getAuthUrl,
 	getChannelVideos,
+	getDeepVideoAnalytics,
 	getVideoAnalytics,
+	getVideoComments,
 	openAuthPopup,
 	revokeAuth,
 	scheduleVideo,
@@ -261,6 +263,52 @@ describe("getVideoAnalytics", () => {
 		expect(await getVideoAnalytics("vid-1")).toEqual(analytics);
 		expect((fetchMock.mock.calls[0] as unknown[])[0]).toContain(
 			"/analytics/vid-1",
+		);
+	});
+});
+
+describe("getDeepVideoAnalytics", () => {
+	it("days 쿼리와 함께 심화 분석 엔드포인트 호출", async () => {
+		const analytics = {
+			videoId: "vid-1",
+			title: "제목",
+			views: 1000,
+			likes: 50,
+			comments: 10,
+			favorites: 0,
+			averageViewDuration: 42,
+			averageViewPercentage: 58,
+			trafficSources: [{ source: "YT_SEARCH", views: 120 }],
+			retentionCurve: [{ elapsedVideoTimeRatio: 0.2, audienceWatchRatio: 0.7 }],
+			warnings: ["impressions metric unavailable"],
+		};
+		const fetchMock = okFetch(analytics);
+		expect(await getDeepVideoAnalytics("vid-1", 14)).toEqual(analytics);
+		expect((fetchMock.mock.calls[0] as unknown[])[0]).toContain(
+			"/analytics/deep/vid-1?days=14",
+		);
+	});
+});
+
+describe("getVideoComments", () => {
+	it("댓글 엔드포인트를 maxResults와 함께 호출", async () => {
+		const payload = {
+			videoId: "vid-1",
+			comments: [
+				{
+					id: "c1",
+					videoId: "vid-1",
+					author: "A",
+					text: "왜 그런가요?",
+					likeCount: 3,
+					publishedAt: "2026-05-01T00:00:00Z",
+				},
+			],
+		};
+		const fetchMock = okFetch(payload);
+		expect(await getVideoComments("vid-1", 25)).toEqual(payload);
+		expect((fetchMock.mock.calls[0] as unknown[])[0]).toContain(
+			"/comments/vid-1?maxResults=25",
 		);
 	});
 });

@@ -14,7 +14,18 @@ import type {
 } from "../remotion/types";
 import type { ReferenceTemplate } from "../types/database";
 import type { BgmMood } from "./bgm";
+import {
+	buildKnowledgePrompt,
+	buildReferenceKnowledgeProfile,
+	type ProductionKnowledgeProfile,
+} from "./knowledge-system";
+import { LONGFORM_MAX_DURATION_SECONDS } from "./reference-duration-policy";
+import {
+	finalizeReferenceThumbnailDna,
+	type ReferenceThumbnailDna,
+} from "./thumbnail-intelligence";
 import type { TtsOptions } from "./tts";
+import { buildDomainKnowledgePrompt } from "./youtube-domain-intelligence";
 
 export interface ReferencePreset {
 	// 스크립트 생성 힌트
@@ -57,6 +68,10 @@ export interface ReferencePreset {
 	// 레퍼런스 분석기가 저장한 픽셀/오디오/편집 DNA 원본.
 	// 렌더러가 직접 복제하지 않고, 프롬프트/자동편집 힌트로만 소비한다.
 	productionDna?: Record<string, unknown>;
+	// 명시지/암묵지/성과지를 합친 생성 지식 프로필.
+	knowledgeProfile?: ProductionKnowledgeProfile;
+	// 제목/썸네일 역할, 문구 길이, 텍스트 안전 영역을 담은 클릭 패키징 DNA.
+	thumbnailDna?: ReferenceThumbnailDna;
 }
 
 // ─── 매핑 헬퍼 ───
@@ -124,6 +139,14 @@ function numericField(value: unknown): number | undefined {
 
 function finiteNumberField(value: unknown): number | undefined {
 	return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function clampTargetDuration(
+	durationSeconds: number,
+	format: "shorts" | "longform",
+): number {
+	if (format !== "longform") return durationSeconds;
+	return Math.min(durationSeconds, LONGFORM_MAX_DURATION_SECONDS);
 }
 
 function formatNumber(value: number, decimals = 1): string {
@@ -262,16 +285,27 @@ export function referenceToPreset(
 	const bgmMoodKey = ref.bgm_mood.toLowerCase().trim();
 	const bgmMood = BGM_MOOD_MAP[bgmMoodKey] ?? "";
 	const formatProfile = explicitFormatProfile(ref, format);
-	const sceneCount =
+	const rawSceneCount =
 		(formatProfile?.sceneCount ?? ref.scene_count) || (isShorts ? 8 : 10);
-	const avgSceneDuration =
+	const rawAvgSceneDuration =
 		(formatProfile?.avgSceneDuration ?? ref.avg_scene_duration) ||
 		(isShorts ? 4 : 10);
 	const hookDuration = (formatProfile?.hookDuration ?? ref.hook_duration) || 3;
-	const targetDuration =
+	const rawTargetDuration =
 		formatProfile?.durationSeconds ??
-		Math.round(sceneCount * avgSceneDuration);
+		Math.round(rawSceneCount * rawAvgSceneDuration);
+	const targetDuration = clampTargetDuration(rawTargetDuration, format);
+	const sceneCount =
+		!isShorts && rawTargetDuration > LONGFORM_MAX_DURATION_SECONDS
+			? Math.max(12, Math.min(36, Math.round(targetDuration / 40)))
+			: rawSceneCount;
+	const avgSceneDuration =
+		!isShorts && rawTargetDuration > LONGFORM_MAX_DURATION_SECONDS
+			? Math.max(12, Math.round(targetDuration / sceneCount))
+			: rawAvgSceneDuration;
 	const productionDna = productionDnaFromRaw(ref);
+	const knowledgeProfile = buildReferenceKnowledgeProfile(ref);
+	const thumbnailDna = finalizeReferenceThumbnailDna(ref);
 
 	return {
 		script: {
@@ -316,6 +350,8 @@ export function referenceToPreset(
 			sceneLayout: inferSceneLayout(ref, format),
 		},
 		productionDna,
+		knowledgeProfile,
+		thumbnailDna,
 	};
 }
 
@@ -429,15 +465,37 @@ export function buildScriptConstraint(preset: ReferencePreset): string {
 		? `\n훅 패턴: ${s.hookPattern} (첫 ${s.hookDuration}초에 이 패턴 사용)`
 		: "";
 	const dnaStr = buildProductionDnaScriptConstraint(preset.productionDna);
+	const thumbnailStr = buildThumbnailDnaConstraint(preset.thumbnailDna);
+	const knowledgeStr = buildKnowledgePrompt(preset.knowledgeProfile);
+	const domainKnowledgeStr = buildDomainKnowledgePrompt({
+		format: s.targetDuration > 180 ? "longform" : "shorts",
+	});
 
 	return `
-=== 레퍼런스 스타일 준수 ===
+	=== 레퍼런스 스타일 준수 ===
 - 씬 수: ${s.sceneCount}개 (±1 허용)
 - 목표 길이: ${s.targetDuration}초
 - 평균 씬 길이: ${s.avgSceneDuration}초
 - 페이싱: ${s.pacing}
-- 무드: ${s.mood}${hookStr}${toneStr}${dnaStr}${structureStr}
-`.trim();
+- 무드: ${s.mood}${hookStr}${toneStr}${thumbnailStr}${dnaStr}${knowledgeStr ? `\n${knowledgeStr}` : ""}${domainKnowledgeStr ? `\n${domainKnowledgeStr}` : ""}${structureStr}
+	`.trim();
+}
+
+function buildThumbnailDnaConstraint(
+	dna: ReferenceThumbnailDna | undefined,
+): string {
+	if (!dna) return "";
+	const variants = dna.generation.variants
+		.slice(0, 3)
+		.map((variant) => `${variant.titlePattern}(${variant.testGoal})`)
+		.join(" / ");
+	const lines = [
+		`썸네일 역할: ${dna.clickPackaging.titleThumbnailRelationship}`,
+		`썸네일 문구: ${dna.text.titleFormula}, 최대 ${dna.text.maxWords}단어/${dna.text.maxChars}자`,
+		`썸네일 배치: 텍스트 ${dna.layout.textZone}, 피사체 ${dna.layout.subjectZone}, 악센트 ${dna.color.accentColor}`,
+		variants ? `CTR 실험안: ${variants}` : "",
+	].filter(Boolean);
+	return `\n썸네일 DNA:\n${lines.map((line) => `- ${line}`).join("\n")}`;
 }
 
 function buildProductionDnaScriptConstraint(
