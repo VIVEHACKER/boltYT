@@ -23,6 +23,10 @@ import {
 	type BgmCuePlan,
 } from "../../lib/bgm-cue-plan";
 import {
+	buildFinalOutputCritique,
+	type FinalOutputCritiqueReport,
+} from "../../lib/final-output-critique";
+import {
 	loadChannelBranding,
 	type ChannelBranding,
 } from "../../lib/channel-branding";
@@ -32,6 +36,10 @@ import { buildHookFlags } from "../../lib/hook-detector";
 import { buildRenderKnowledgeEvent } from "../../lib/knowledge-system";
 import { ensureBlobUrls } from "../../lib/local-db";
 import { referenceToPreset } from "../../lib/reference-bridge";
+import {
+	assessReferenceApplicationScore,
+	type ReferenceApplicationScoreReport,
+} from "../../lib/reference-application-score";
 import { prepareRenderPayload } from "../../lib/render-assets";
 import {
 	DEFAULT_PRESET,
@@ -49,6 +57,7 @@ import {
 	type RenderJob,
 } from "../../lib/render-queue";
 import type { SceneShot } from "../../lib/scene-shot-types";
+import type { SourceSafetyReport } from "../../lib/source-safety-gate";
 import { assignSfxToScenes, type SfxCategory } from "../../lib/sfx";
 import { supabase } from "../../lib/supabase";
 import { generateAndSaveThumbnail } from "../../lib/thumbnail";
@@ -512,6 +521,111 @@ function ProductionMetric({ label, value }: { label: string; value: string }) {
 	);
 }
 
+function critiqueColor(report: FinalOutputCritiqueReport):
+	| "notification-success-soft"
+	| "notification-warning-soft"
+	| "notification-error-soft" {
+	if (report.passed) return "notification-success-soft";
+	if (report.score >= 62) return "notification-warning-soft";
+	return "notification-error-soft";
+}
+
+function FinalOutputCritiquePanel({
+	report,
+	referenceReport,
+	sourceSafetyReport,
+}: {
+	report: FinalOutputCritiqueReport;
+	referenceReport: ReferenceApplicationScoreReport;
+	sourceSafetyReport: SourceSafetyReport | null;
+}) {
+	const blockers = report.blockers.slice(0, 3);
+	const warnings = report.warnings.slice(0, 3);
+	const nextActions = report.nextActions.slice(0, 4);
+	return (
+		<div className="mb-static-lg rounded-[8px] border border-contrast-low bg-canvas p-static-lg">
+			<div className="flex flex-col gap-static-sm lg:flex-row lg:items-start lg:justify-between">
+				<div>
+					<PHeading size="small" tag="h3">
+						최종 산출물 자동 비평
+					</PHeading>
+					<PText size="small" color="contrast-medium" className="mt-static-xs">
+						레퍼런스 반영, 자료 안전, 썸네일, 정책, 제작 QC를 업로드 직전 한 번 더 합산합니다.
+					</PText>
+				</div>
+				<div className="flex flex-wrap gap-static-xs">
+					<PTag color={critiqueColor(report)}>
+						{report.label} · {report.score}점
+					</PTag>
+					<PTag color="background-surface">
+						레퍼런스 {referenceReport.score}점
+					</PTag>
+					{sourceSafetyReport && (
+						<PTag color="background-surface">
+							자료 안전 {sourceSafetyReport.score}점
+						</PTag>
+					)}
+				</div>
+			</div>
+
+			<div className="mt-static-md grid grid-cols-1 lg:grid-cols-3 gap-static-sm">
+				<div className="rounded-[8px] bg-surface p-static-md">
+					<PText size="small" weight="semi-bold" className="mb-static-xs">
+						강점
+					</PText>
+					<div className="flex flex-wrap gap-static-xs">
+						{report.strengths.length > 0 ? (
+							report.strengths.map((item) => (
+								<PTag key={item} color="notification-success-soft">
+									{item}
+								</PTag>
+							))
+						) : (
+							<PTag color="notification-warning-soft">강점 부족</PTag>
+						)}
+					</div>
+				</div>
+				<div className="rounded-[8px] bg-surface p-static-md">
+					<PText size="small" weight="semi-bold" className="mb-static-xs">
+						차단/경고
+					</PText>
+					<div className="flex flex-wrap gap-static-xs">
+						{blockers.map((item) => (
+							<PTag key={item} color="notification-error-soft">
+								{item}
+							</PTag>
+						))}
+						{warnings.map((item) => (
+							<PTag key={item} color="notification-warning-soft">
+								{item}
+							</PTag>
+						))}
+						{blockers.length === 0 && warnings.length === 0 && (
+							<PTag color="notification-success-soft">차단 없음</PTag>
+						)}
+					</div>
+				</div>
+				<div className="rounded-[8px] bg-surface p-static-md">
+					<PText size="small" weight="semi-bold" className="mb-static-xs">
+						다음 보강
+					</PText>
+					<div className="flex flex-wrap gap-static-xs">
+						{nextActions.length > 0 ? (
+							nextActions.map((item) => (
+								<PTag key={item} color="notification-warning-soft">
+									{item}
+								</PTag>
+							))
+						) : (
+							<PTag color="notification-success-soft">추가 보강 없음</PTag>
+						)}
+					</div>
+				</div>
+			</div>
+		</div>
+	);
+}
+
 function thumbnailReadinessColor(level: ThumbnailReadiness["level"]) {
 	if (level === "ready") return "notification-success-soft";
 	if (level === "warning") return "notification-warning-soft";
@@ -754,6 +868,10 @@ export default function StepPreview({
 	const [narrationUrl, setNarrationUrl] = useState("");
 	const [bgmUrl, setBgmUrl] = useState("");
 	const [bgmCuePlan, setBgmCuePlan] = useState<BgmCuePlan | null>(null);
+	const [savedReferenceApplicationReport, setSavedReferenceApplicationReport] =
+		useState<ReferenceApplicationScoreReport | null>(null);
+	const [savedSourceSafetyReport, setSavedSourceSafetyReport] =
+		useState<SourceSafetyReport | null>(null);
 
 	const referencePreset = useMemo(() => {
 		if (!referenceTemplate) return undefined;
@@ -799,6 +917,8 @@ export default function StepPreview({
 					shorts_script?: string;
 					format_selection?: string;
 					niche_research?: PreviewNicheResearch | null;
+					reference_application_report?: ReferenceApplicationScoreReport | null;
+					source_safety_report?: SourceSafetyReport | null;
 				};
 				briefs?: {
 					topics?: { title?: string; channels?: { name?: string } };
@@ -1069,6 +1189,12 @@ export default function StepPreview({
 				setIsShorts(shortsMode);
 				setShortsScript(scriptData.content_json?.shorts_script ?? "");
 				setNicheResearch(scriptData.content_json?.niche_research ?? null);
+				setSavedReferenceApplicationReport(
+					scriptData.content_json?.reference_application_report ?? null,
+				);
+				setSavedSourceSafetyReport(
+					scriptData.content_json?.source_safety_report ?? null,
+				);
 				const effectiveChannelName =
 					scriptData.briefs?.topics?.channels?.name?.trim() ||
 					branding.channelName;
@@ -1188,6 +1314,45 @@ export default function StepPreview({
 				isShorts,
 			}),
 		[title, description, thumbnailPlan, isShorts, scriptId],
+	);
+	const referenceApplicationReport = useMemo(
+		() =>
+			savedReferenceApplicationReport?.score
+				? savedReferenceApplicationReport
+				: assessReferenceApplicationScore({
+						referenceTemplate,
+						format: isShorts ? "shorts" : "longform",
+						topicTitle: title,
+						shortsScript,
+						scenes,
+						sourceCount: savedSourceSafetyReport?.metrics.sourceCount,
+					}),
+		[
+			savedReferenceApplicationReport,
+			referenceTemplate,
+			isShorts,
+			title,
+			shortsScript,
+			scenes,
+			savedSourceSafetyReport,
+		],
+	);
+	const finalOutputCritique = useMemo(
+		() =>
+			buildFinalOutputCritique({
+				production: productionQualityReport,
+				policy: uploadPolicyReport,
+				thumbnail: thumbnailReadiness,
+				reference: referenceApplicationReport,
+				sourceSafety: savedSourceSafetyReport,
+			}),
+		[
+			productionQualityReport,
+			uploadPolicyReport,
+			thumbnailReadiness,
+			referenceApplicationReport,
+			savedSourceSafetyReport,
+		],
 	);
 	const visibleProductionIssue = productionQualityReport.issues.find(
 		(issue) =>
@@ -1511,6 +1676,30 @@ export default function StepPreview({
 					}`,
 				);
 				setRenderProgress("품질 기준 미달로 렌더를 시작하지 않았습니다.");
+				return;
+			}
+			const approvalCritique = buildFinalOutputCritique({
+				production: finalReport,
+				policy: uploadPolicyReport,
+				thumbnail: assessThumbnailReadiness({
+					title,
+					description,
+					thumbnailPath,
+					thumbnailPlan,
+					isShorts,
+				}),
+				reference: referenceApplicationReport,
+				sourceSafety: savedSourceSafetyReport,
+			});
+			if (!approvalCritique.passed) {
+				setApprovalError(
+					`최종 산출물 비평 기준 미달: ${
+						approvalCritique.blockers[0] ??
+						approvalCritique.warnings[0] ??
+						"업로드 전 추가 보강이 필요합니다."
+					}`,
+				);
+				setRenderProgress("최종 비평 기준 미달로 렌더를 시작하지 않았습니다.");
 				return;
 			}
 
@@ -1850,6 +2039,11 @@ export default function StepPreview({
 			<ProductionQualityPanel
 				report={productionQualityReport}
 				nicheResearch={nicheResearch}
+			/>
+			<FinalOutputCritiquePanel
+				report={finalOutputCritique}
+				referenceReport={referenceApplicationReport}
+				sourceSafetyReport={savedSourceSafetyReport}
 			/>
 
 			{/* Remotion Player - Real Video Preview */}

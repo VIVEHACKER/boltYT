@@ -158,6 +158,24 @@ describe("fetchTopicSuggestions", () => {
 		expect(Array.isArray(result)).toBe(true);
 	});
 
+	it("AI가 회피성 추천을 반환하면 주제 기반 fallback을 쓴다", async () => {
+		mockMaybeSingle.mockResolvedValue({
+			data: {
+				name: "미스터리 채널",
+				category: "미스터리/다큐",
+				description: "기록과 현장 자료 기반 미스터리",
+			},
+		});
+		aiOk(["정보가 부족합니다. 상세 정보 필요해요."]);
+		const result = await fetchTopicSuggestions(
+			"channel-weak",
+			"기록에는 남았지만 설명되지 않은 한국의 미스터리 장소",
+		);
+		expect(result).toHaveLength(5);
+		expect(result.join(" ")).toContain("기록");
+		expect(result.join(" ")).not.toContain("정보가 부족");
+	});
+
 	it("AI HTTP 오류 → throw", async () => {
 		mockMaybeSingle.mockResolvedValue({ data: null });
 		aiFail(429);

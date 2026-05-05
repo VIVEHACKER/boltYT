@@ -54,7 +54,7 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
 	}
 
 	return (
-		<aside className="w-64 min-h-screen bg-surface flex flex-col border-r border-contrast-low">
+		<aside className="w-64 h-screen min-h-0 overflow-y-auto bg-surface flex flex-col border-r border-contrast-low">
 			<div className="p-fluid-md">
 				<div className="flex items-center gap-static-sm">
 					<PIcon name="video" size="medium" />
@@ -103,7 +103,7 @@ export default function Sidebar({ open = false, onClose }: SidebarProps) {
 	return (
 		<>
 			{/* Desktop: always visible fixed sidebar */}
-			<div className="hidden md:block">
+			<div className="hidden md:block shrink-0">
 				<SidebarContent />
 			</div>
 

@@ -2391,13 +2391,17 @@ const ALLOWED_ORIGINS = new Set([
 
 function cors(req: IncomingMessage, headers: Record<string, string> = {}) {
 	const origin = req.headers.origin ?? "";
-	const allowedOrigin = ALLOWED_ORIGINS.has(origin) ? origin : "";
-	return {
+	const baseHeaders = {
 		...headers,
-		"Access-Control-Allow-Origin": allowedOrigin,
 		"Access-Control-Allow-Methods": "GET, POST, OPTIONS",
 		"Access-Control-Allow-Headers": "Content-Type",
 		Vary: "Origin",
+	};
+	if (!ALLOWED_ORIGINS.has(origin)) return baseHeaders;
+	return {
+		...baseHeaders,
+		"Access-Control-Allow-Origin": origin,
+		"Access-Control-Allow-Credentials": "true",
 	};
 }
 

@@ -3,9 +3,10 @@ import {
 	PHeading,
 	PInlineNotification,
 	PSpinner,
+	PTag,
 	PText,
 } from "@porsche-design-system/components-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { DEMO_CHANNELS } from "../../lib/demo-data";
 import type { ContentPerformanceSample } from "../../lib/content-recommendation-ranker";
@@ -13,8 +14,16 @@ import {
 	loadNicheResearchHandoff,
 	type NicheResearchHandoff,
 } from "../../lib/niche-research";
-import { getReferenceTemplate } from "../../lib/reference-import";
+import {
+	getReferenceTemplate,
+	listReferenceTemplates,
+} from "../../lib/reference-import";
 import { buildReferenceKnowledgeProfile } from "../../lib/knowledge-system";
+import {
+	checkContentPipelineHealth,
+	type ContentPipelineHealthReport,
+	type PipelineServiceHealth,
+} from "../../lib/content-pipeline-health";
 import {
 	getReferenceTemplateQuality,
 	getReferenceTemplateReadiness,
@@ -106,7 +115,22 @@ export default function ContentWizardPage() {
 	>([]);
 	const [referenceTemplate, setReferenceTemplate] =
 		useState<ReferenceTemplate | null>(null);
+	const [referenceCandidates, setReferenceCandidates] = useState<
+		ReferenceTemplate[]
+	>([]);
+	const [pipelineHealth, setPipelineHealth] =
+		useState<ContentPipelineHealthReport | null>(null);
+	const [checkingPipeline, setCheckingPipeline] = useState(false);
 	const [loading, setLoading] = useState(!DEMO_MODE);
+
+	const refreshPipelineHealth = useCallback(async () => {
+		setCheckingPipeline(true);
+		try {
+			setPipelineHealth(await checkContentPipelineHealth());
+		} finally {
+			setCheckingPipeline(false);
+		}
+	}, []);
 
 	useEffect(() => {
 		const templateId = searchParams.get("template");
@@ -134,6 +158,30 @@ export default function ContentWizardPage() {
 				setLoading(false);
 			});
 	}, [searchParams]);
+
+	useEffect(() => {
+		if (!selectedChannelId) return;
+		let cancelled = false;
+		void listReferenceTemplates(selectedChannelId)
+			.then((templates) => {
+				if (!cancelled) setReferenceCandidates(templates);
+			})
+			.catch(() => {
+				if (!cancelled) setReferenceCandidates([]);
+			});
+		return () => {
+			cancelled = true;
+		};
+	}, [selectedChannelId]);
+
+	useEffect(() => {
+		if (!mode) return;
+		void refreshPipelineHealth();
+		const interval = window.setInterval(() => {
+			void refreshPipelineHealth();
+		}, 30_000);
+		return () => window.clearInterval(interval);
+	}, [mode, refreshPipelineHealth]);
 
 	if (loading) {
 		return (
@@ -255,6 +303,12 @@ export default function ContentWizardPage() {
 						: "자료를 수집하고 영상으로 구성합니다."}
 			</PText>
 
+			<PipelineHealthPanel
+				report={pipelineHealth}
+				checking={checkingPipeline}
+				onRefresh={refreshPipelineHealth}
+			/>
+
 			{referenceTemplate && (
 				<ReferenceTemplateStatusNotice
 					template={referenceTemplate}
@@ -312,6 +366,7 @@ export default function ContentWizardPage() {
 						mode={mode}
 						sources={sources}
 						referenceTemplate={referenceTemplate}
+						referenceCandidates={referenceCandidates}
 						nicheHandoff={nicheHandoff}
 						topicTitle={topicTitle}
 						performanceHistory={performanceHistory}
@@ -342,6 +397,96 @@ export default function ContentWizardPage() {
 						referenceTemplate={referenceTemplate}
 						onBack={() => setStep(3)}
 					/>
+				)}
+			</div>
+		</div>
+	);
+}
+
+function serviceColor(
+	service: PipelineServiceHealth,
+):
+	| "notification-success-soft"
+	| "notification-warning-soft"
+	| "notification-error-soft" {
+	if (service.ok) return "notification-success-soft";
+	if (service.status === "degraded") return "notification-warning-soft";
+	return "notification-error-soft";
+}
+
+function PipelineHealthPanel({
+	report,
+	checking,
+	onRefresh,
+}: {
+	report: ContentPipelineHealthReport | null;
+	checking: boolean;
+	onRefresh: () => void;
+}) {
+	if (!report) {
+		return (
+			<div className="mb-fluid-sm rounded-[8px] border border-contrast-low bg-canvas p-static-md">
+				<div className="flex items-center justify-between gap-static-sm">
+					<PText size="small" weight="semi-bold">
+						제작 파이프라인 상태
+					</PText>
+					<PButton compact variant="secondary" loading={checking} onClick={onRefresh}>
+						상태 확인
+					</PButton>
+				</div>
+			</div>
+		);
+	}
+
+	const notificationState =
+		report.overall === "blocked"
+			? "error"
+			: report.overall === "degraded"
+				? "warning"
+				: "info";
+	const primaryMessage =
+		report.blockers[0] ??
+		report.warnings[0] ??
+		"AI 생성, 레퍼런스, 렌더, 업로드 서버가 모두 응답 중입니다.";
+
+	return (
+		<div className="mb-fluid-sm">
+			<PInlineNotification
+				state={notificationState}
+				heading={`제작 파이프라인 ${
+					report.overall === "ready"
+						? "준비 완료"
+						: report.overall === "degraded"
+							? "일부 제한"
+							: "차단"
+				}`}
+				description={primaryMessage}
+				dismissButton={false}
+			/>
+			<div className="mt-static-sm rounded-[8px] border border-contrast-low bg-canvas p-static-md">
+				<div className="flex flex-wrap items-center justify-between gap-static-sm">
+					<div className="flex flex-wrap gap-static-xs">
+						{report.services.map((service) => (
+							<PTag key={service.id} color={serviceColor(service)}>
+								{service.label}:{" "}
+								{service.ok
+									? "ON"
+									: service.status === "degraded"
+										? "LIMITED"
+										: "OFF"}
+							</PTag>
+						))}
+					</div>
+					<PButton compact variant="secondary" loading={checking} onClick={onRefresh}>
+						다시 확인
+					</PButton>
+				</div>
+				{report.nextActions.length > 0 && (
+					<ul className="mt-static-sm list-disc pl-4 text-[12px] text-contrast-medium">
+						{report.nextActions.slice(0, 3).map((action) => (
+							<li key={action}>{action}</li>
+						))}
+					</ul>
 				)}
 			</div>
 		</div>

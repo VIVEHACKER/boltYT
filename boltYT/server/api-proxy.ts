@@ -198,6 +198,7 @@ function cors(
 	return {
 		...baseHeaders,
 		"Access-Control-Allow-Origin": origin,
+		"Access-Control-Allow-Credentials": "true",
 	};
 }
 

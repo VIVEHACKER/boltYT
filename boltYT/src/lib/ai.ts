@@ -57,8 +57,71 @@ function parseJSON<T>(raw: string): T {
 	return JSON.parse(cleaned);
 }
 
+function compactTopicSuggestion(value: string): string {
+	return value.replace(/\s+/g, " ").trim().slice(0, 34);
+}
+
+function isWeakTopicSuggestion(value: string): boolean {
+	const normalized = value.replace(/\s+/g, "").toLowerCase();
+	if (normalized.length < 2) return true;
+	return [
+		"정보가부족",
+		"상세정보",
+		"제공해주세요",
+		"추천할수없",
+		"알수없",
+		"주제가필요",
+	].some((token) => normalized.includes(token));
+}
+
+function buildFallbackTopicSuggestions(
+	channel: Record<string, string> | null,
+	seedTopic = "",
+): string[] {
+	const category = channel?.category || channel?.name || "미스터리";
+	const seed = compactTopicSuggestion(seedTopic || channel?.description || category);
+	const mysterySeed = seed.includes("미스터리") ? seed : `${seed} 미스터리`;
+	const base =
+		category.includes("드라마") || category.includes("영화")
+			? [
+					`${seed} 결말이 바뀌는 순간`,
+					`${seed} 숨겨진 복선 5가지`,
+					`${seed} 인물 관계 완전정리`,
+					`${seed} 다시 보면 소름인 장면`,
+					`${seed} 몰아보기 전 핵심요약`,
+				]
+			: [
+					`${mysterySeed}의 기록 공백`,
+					`${seed} 현장 증거 3가지`,
+					`${seed}가 아직 설명 안 된 이유`,
+					`${seed} 지도에만 남은 흔적`,
+					`${seed} 한 장의 사진이 바꾼 사건`,
+				];
+
+	return Array.from(new Set(base.map(compactTopicSuggestion))).slice(0, 5);
+}
+
+function normalizeTopicSuggestions(
+	raw: unknown,
+	channel: Record<string, string> | null,
+	seedTopic = "",
+): string[] {
+	const parsed = Array.isArray(raw) ? raw : [];
+	const usable = parsed
+		.filter((item): item is string => typeof item === "string")
+		.map(compactTopicSuggestion)
+		.filter((item) => item && !isWeakTopicSuggestion(item));
+
+	if (usable.length >= 3) {
+		return Array.from(new Set(usable)).slice(0, 5);
+	}
+
+	return buildFallbackTopicSuggestions(channel, seedTopic);
+}
+
 export async function fetchTopicSuggestions(
 	channelId: string,
+	seedTopic = "",
 ): Promise<string[]> {
 	const { data: channel } = await supabase
 		.from("channels")
@@ -78,17 +141,20 @@ export async function fetchTopicSuggestions(
 톤앤매너: ${ch?.tone ?? ""}
 언어: ${ch?.language ?? "ko"}
 기본 CTA: ${ch?.default_cta ?? ""}
+현재 입력 주제: ${seedTopic || "(없음)"}
 
 주제 작성 규칙:
 - 채널의 카테고리와 설명에 맞는 구체적인 주제
+- 현재 입력 주제가 있으면 같은 편집 문법으로 확장 가능한 후속/변형 주제
 - 시청자의 호기심을 자극하는 제목 형태 (숫자, 질문, 비교 등)
 - 최신 트렌드 반영
+- "정보 부족", "상세 정보 필요" 같은 회피 답변 금지
 - 각 주제는 30자 이내
 
 응답 형식: ["주제1", "주제2", "주제3", "주제4", "주제5"]`,
 	);
 
-	return parseJSON<string[]>(result);
+	return normalizeTopicSuggestions(parseJSON<unknown>(result), ch, seedTopic);
 }
 
 interface BriefResult {
@@ -235,6 +301,7 @@ export async function generateScript(
 	referencePreset?: ReferencePreset,
 	productionType: "standard" | "animation" = "standard",
 	animationReadiness?: AnimationProductionReadinessReport,
+	contentStrategyContext?: string,
 ): Promise<ScriptResult> {
 	const { data: brief } = await supabase
 		.from("briefs")
@@ -264,6 +331,9 @@ export async function generateScript(
 		const referenceSection = referencePreset
 			? `\n${buildScriptConstraint(referencePreset)}\n`
 			: "";
+		const contentStrategySection = contentStrategyContext
+			? `\n=== 주제 맞춤 제작 지시서 ===\n${contentStrategyContext}\n`
+			: "";
 		const result = await callOpenAI(
 			"당신은 유튜브 애니메이션 쇼츠/롱폼 작가이자 스토리보드 디렉터입니다. 반드시 지정된 JSON 형식으로만 응답하세요.",
 			`브리프:
@@ -275,6 +345,7 @@ export async function generateScript(
 ${formatAnimationReadinessForPrompt(readiness)}
 ${familyRules}
 ${referenceSection}
+${contentStrategySection}
 
 ${pacing}
 
@@ -343,10 +414,13 @@ ${pacing}
 	const referenceSection = referencePreset
 		? `\n${buildScriptConstraint(referencePreset)}\n`
 		: "";
+	const contentStrategySection = contentStrategyContext
+		? `\n=== 주제 맞춤 제작 지시서 ===\n${contentStrategyContext}\n`
+		: "";
 
 	const result = await callOpenAI(
 		"당신은 유튜브 영상 스크립트 작성 전문가입니다. 반드시 지정된 JSON 형식으로만 응답하세요.",
-		`브리프:\n핵심 메시지: ${b?.core_message ?? ""}\n타겟: ${b?.target_audience ?? ""}\n형식: ${format}\n\n${pacing}${referenceSection}
+		`브리프:\n핵심 메시지: ${b?.core_message ?? ""}\n타겟: ${b?.target_audience ?? ""}\n형식: ${format}\n\n${pacing}${referenceSection}${contentStrategySection}
 
 	씬 작성 규칙:
 	- 씬은 시간순 또는 인과순으로 흘러가야 합니다.
@@ -447,6 +521,7 @@ export async function generateResearchScript(
 	referencePreset?: ReferencePreset,
 	productionReadiness?: TopicProductionReadinessReport,
 	nichePlaybookContext?: string,
+	contentStrategyContext?: string,
 ): Promise<ScriptResult> {
 	const { data: topic } = await supabase
 		.from("topics")
@@ -539,6 +614,9 @@ ${timelineConstraint}
 	const nichePlaybookSection = nichePlaybookContext
 		? `\n=== 니치 리서치 플레이북 ===\n${nichePlaybookContext}\n`
 		: "";
+	const contentStrategySection = contentStrategyContext
+		? `\n=== 주제 맞춤 제작 지시서 ===\n${contentStrategyContext}\n`
+		: "";
 
 	const isShorts = format === "shorts";
 	const featureLengthReference = isFeatureLengthReference(referencePreset);
@@ -584,7 +662,7 @@ ${policyGuard}
 반드시 지정된 JSON 형식으로만 응답하세요.`,
 		`주제: ${t?.title ?? ""}
 형식: ${format}
-${researchSection}${productionReadinessSection}${nichePlaybookSection}${referenceSection}
+${researchSection}${productionReadinessSection}${nichePlaybookSection}${referenceSection}${contentStrategySection}
 === 수집된 자료 목록 (통합 인덱스) ===
 ${sourceList || "(없음)"}
 

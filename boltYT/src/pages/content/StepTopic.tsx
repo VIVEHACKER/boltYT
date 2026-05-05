@@ -59,12 +59,12 @@ export default function StepTopic({
 		[title, nicheHandoff, performanceHistory],
 	);
 
-	const loadSuggestions = useCallback(async (channelId: string) => {
+	const loadSuggestions = useCallback(async (channelId: string, seedTopic = "") => {
 		setLoadingSuggestions(true);
 		setSuggestionsError("");
 		setSuggestions([]);
 		try {
-			const result = await fetchTopicSuggestions(channelId);
+			const result = await fetchTopicSuggestions(channelId, seedTopic);
 			setSuggestions(result);
 		} catch (err) {
 			setSuggestionsError(
@@ -77,8 +77,8 @@ export default function StepTopic({
 
 	useEffect(() => {
 		if (!selectedChannelId) return;
-		loadSuggestions(selectedChannelId);
-	}, [selectedChannelId, loadSuggestions]);
+		loadSuggestions(selectedChannelId, initialTitle);
+	}, [selectedChannelId, initialTitle, loadSuggestions]);
 
 	useEffect(() => {
 		if (!initialTitle.trim()) return;
@@ -229,7 +229,7 @@ export default function StepTopic({
 							<button
 								type="button"
 								className="text-[12px] text-contrast-medium hover:text-primary transition-colors cursor-pointer underline"
-								onClick={() => loadSuggestions(selectedChannelId)}
+								onClick={() => loadSuggestions(selectedChannelId, title)}
 							>
 								새로고침
 							</button>
