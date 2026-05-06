@@ -87,14 +87,39 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 	return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
+function hasUnrecoveredOpenAiQuota(runtime: Record<string, unknown>): boolean {
+	const quotaAt = Date.parse(String(runtime.lastQuotaAt ?? ""));
+	const okAt = Date.parse(String(runtime.lastOkAt ?? ""));
+	return (
+		Number.isFinite(quotaAt) &&
+		quotaAt > (Number.isFinite(okAt) ? okAt : 0)
+	);
+}
+
 function serviceMessage(
 	probe: PipelineServiceProbe,
 	ok: boolean,
 	payload: unknown,
 ): string {
-	if (!ok) return `${probe.label} 연결 실패`;
 	if (!isRecord(payload)) return `${probe.label} 응답 확인`;
 	if (probe.id === "api-proxy") {
+		const runtime = isRecord(payload.openaiRuntime)
+			? payload.openaiRuntime
+			: {};
+		if (runtime.quotaBlocked === true) {
+			return typeof runtime.quotaBlockedUntil === "string"
+				? `OpenAI 쿼터 대기: ${runtime.quotaBlockedUntil}`
+				: "OpenAI 쿼터 대기 중";
+		}
+		if (hasUnrecoveredOpenAiQuota(runtime)) {
+			return "OpenAI 쿼터 실패 이후 정상 응답이 아직 없습니다.";
+		}
+		if (
+			Array.isArray(payload.missing) &&
+			payload.missing.includes("openai")
+		) {
+			return "OpenAI 키 미설정, 룰 기반 기능만 가능";
+		}
 		const configured = Array.isArray(payload.configured)
 			? payload.configured.join(", ")
 			: "";
@@ -110,7 +135,18 @@ function serviceMessage(
 		if (payload.configured === true) return "키 설정됨, OAuth 필요";
 		return "업로드 서버 준비 상태 확인 필요";
 	}
+	if (!ok) return `${probe.label} 연결 실패`;
 	return "서버 준비";
+}
+
+function isApiProxyDegraded(payload: unknown): boolean {
+	if (!isRecord(payload)) return false;
+	const runtime = isRecord(payload.openaiRuntime) ? payload.openaiRuntime : {};
+	return (
+		runtime.quotaBlocked === true ||
+		hasUnrecoveredOpenAiQuota(runtime) ||
+		(Array.isArray(payload.missing) && payload.missing.includes("openai"))
+	);
 }
 
 async function probeService(
@@ -138,8 +174,9 @@ async function probeService(
 				payload.configured === true);
 		const degraded =
 			isRecord(payload) &&
-			probe.id === "youtube-upload" &&
-			(payload.configured !== true || payload.authenticated !== true);
+			((probe.id === "youtube-upload" &&
+				(payload.configured !== true || payload.authenticated !== true)) ||
+				(probe.id === "api-proxy" && isApiProxyDegraded(payload)));
 		const ok = baseOk && !degraded;
 		return {
 			...probe,
@@ -187,9 +224,12 @@ export function summarizeContentPipelineHealth(
 	const reference = byId.get("reference-analyzer");
 	const youtube = byId.get("youtube-upload");
 
-	if (!api?.ok) {
+	if (api?.status === "offline" || !api) {
 		blockers.push("AI 추천, 대본 생성, TTS/이미지 생성에 필요한 api-proxy가 꺼져 있습니다.");
 		nextActions.push("`npm run api-proxy`를 실행하고 설정 페이지에서 키 상태를 확인하세요.");
+	} else if (api.status === "degraded") {
+		warnings.push("api-proxy는 켜져 있지만 OpenAI 키/쿼터 상태 때문에 AI 생성은 제한됩니다.");
+		nextActions.push("OpenAI 키/쿼터가 정상화될 때까지 룰 기반 추천과 기존 레퍼런스 제작 규칙을 사용하세요.");
 	}
 	if (!render?.ok) {
 		blockers.push("최종 mp4 렌더와 렌더 QC에 필요한 render-queue가 꺼져 있습니다.");

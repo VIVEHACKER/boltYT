@@ -8,8 +8,12 @@ import {
 	PTag,
 	PText,
 } from "@porsche-design-system/components-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { fetchTopicSuggestions } from "../../lib/ai";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+	buildDeterministicTopicSuggestions,
+	fetchTopicSuggestions,
+} from "../../lib/ai";
+import { type ApiKeysStatus, useApiKeys } from "../../lib/api-keys-context";
 import {
 	buildContentRecommendationPlan,
 	type ContentPerformanceSample,
@@ -33,6 +37,14 @@ interface StepTopicProps {
 	performanceHistory?: ContentPerformanceSample[];
 }
 
+function hasUnrecoveredOpenAiQuota(status: ApiKeysStatus) {
+	const runtime = status.openaiRuntime;
+	if (!runtime?.lastQuotaAt) return false;
+	const quotaAt = Date.parse(runtime.lastQuotaAt);
+	const okAt = runtime.lastOkAt ? Date.parse(runtime.lastOkAt) : 0;
+	return Number.isFinite(quotaAt) && quotaAt > (Number.isFinite(okAt) ? okAt : 0);
+}
+
 export default function StepTopic({
 	channels,
 	selectedChannelId,
@@ -49,6 +61,9 @@ export default function StepTopic({
 	const [suggestions, setSuggestions] = useState<string[]>([]);
 	const [loadingSuggestions, setLoadingSuggestions] = useState(false);
 	const [suggestionsError, setSuggestionsError] = useState("");
+	const [suggestionsMode, setSuggestionsMode] = useState<"ai" | "rules">("ai");
+	const { status: apiStatus, loaded: apiStatusLoaded } = useApiKeys();
+	const suggestionRequestId = useRef(0);
 	const recommendationPlan = useMemo(
 		() =>
 			buildContentRecommendationPlan({
@@ -59,26 +74,69 @@ export default function StepTopic({
 		[title, nicheHandoff, performanceHistory],
 	);
 
-	const loadSuggestions = useCallback(async (channelId: string, seedTopic = "") => {
-		setLoadingSuggestions(true);
-		setSuggestionsError("");
-		setSuggestions([]);
-		try {
-			const result = await fetchTopicSuggestions(channelId, seedTopic);
-			setSuggestions(result);
-		} catch (err) {
-			setSuggestionsError(
-				err instanceof Error ? err.message : "추천 주제를 불러올 수 없습니다.",
-			);
-		} finally {
-			setLoadingSuggestions(false);
-		}
-	}, []);
+	const loadSuggestions = useCallback(
+		async (channelId: string, seedTopic = "") => {
+			const requestId = suggestionRequestId.current + 1;
+			suggestionRequestId.current = requestId;
+			const isCurrentRequest = () => suggestionRequestId.current === requestId;
+			const selectedChannel =
+				channels.find((channel) => channel.id === channelId) ?? null;
+			const fallback = () =>
+				buildDeterministicTopicSuggestions(
+					selectedChannel
+						? {
+								name: selectedChannel.name,
+								category: String(selectedChannel.category ?? ""),
+								description: String(selectedChannel.description ?? ""),
+							}
+						: null,
+					seedTopic,
+					);
+			const applyFallback = (message: string) => {
+				if (!isCurrentRequest()) return;
+				setSuggestionsMode("rules");
+				setSuggestions(fallback());
+				setSuggestionsError(message);
+			};
+
+			setLoadingSuggestions(true);
+			setSuggestionsError("");
+			setSuggestions([]);
+			try {
+				if (!apiStatus.openai) {
+					applyFallback("OpenAI 키가 없어 룰 기반 추천을 사용합니다.");
+					return;
+				}
+				if (
+					apiStatus.openaiRuntime?.quotaBlocked ||
+					hasUnrecoveredOpenAiQuota(apiStatus)
+				) {
+					applyFallback("OpenAI 쿼터 대기 중이라 룰 기반 추천을 사용합니다.");
+					return;
+				}
+				const result = await fetchTopicSuggestions(channelId, seedTopic);
+				if (!isCurrentRequest()) return;
+				setSuggestionsMode("ai");
+				setSuggestions(result);
+			} catch (err) {
+				const message =
+					err instanceof Error ? err.message : "추천 주제를 불러올 수 없습니다.";
+				if (/429|quota|쿼터|OpenAI API 오류/i.test(message)) {
+					applyFallback("AI 추천이 제한되어 룰 기반 추천으로 전환했습니다.");
+				} else if (isCurrentRequest()) {
+					setSuggestionsError(message);
+				}
+			} finally {
+				if (isCurrentRequest()) setLoadingSuggestions(false);
+			}
+		},
+		[apiStatus, channels],
+	);
 
 	useEffect(() => {
-		if (!selectedChannelId) return;
+		if (!selectedChannelId || !apiStatusLoaded) return;
 		loadSuggestions(selectedChannelId, initialTitle);
-	}, [selectedChannelId, initialTitle, loadSuggestions]);
+	}, [selectedChannelId, initialTitle, apiStatusLoaded, loadSuggestions]);
 
 	useEffect(() => {
 		if (!initialTitle.trim()) return;
@@ -223,7 +281,7 @@ export default function StepTopic({
 							AI 추천 주제
 						</PText>
 						<PTag color="background-frosted" icon="ai-spark">
-							AI
+							{suggestionsMode === "ai" ? "AI" : "룰 기반"}
 						</PTag>
 						{!loadingSuggestions && suggestions.length > 0 && (
 							<button
@@ -246,7 +304,14 @@ export default function StepTopic({
 					)}
 
 					{suggestionsError && (
-						<PText size="small" color="notification-error">
+						<PText
+							size="small"
+							color={
+								suggestionsMode === "rules"
+									? "contrast-medium"
+									: "notification-error"
+							}
+						>
 							{suggestionsError}
 						</PText>
 					)}

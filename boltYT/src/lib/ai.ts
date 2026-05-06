@@ -42,14 +42,33 @@ async function callOpenAI(
 	});
 
 	if (!res.ok) {
-		const err = await res.text();
-		throw new Error(`OpenAI API 오류: ${res.status} ${err}`);
+		throw new Error(`OpenAI API 오류: ${res.status} ${await readProxyError(res)}`);
 	}
 
 	const json = await res.json();
 	const content = json.choices?.[0]?.message?.content;
 	if (!content) throw new Error("OpenAI 응답에 content가 없습니다");
 	return content;
+}
+
+async function readProxyError(res: Response): Promise<string> {
+	const text = await res.text();
+	try {
+		const parsed = JSON.parse(text) as {
+			code?: string;
+			error?: unknown;
+			openaiRuntime?: { quotaBlockedUntil?: string };
+		};
+		if (parsed.code === "openai_quota_cooldown") {
+			return parsed.openaiRuntime?.quotaBlockedUntil
+				? `OpenAI 쿼터 대기 중입니다. 재시도 가능 시각: ${parsed.openaiRuntime.quotaBlockedUntil}`
+				: "OpenAI 쿼터 대기 중입니다.";
+		}
+		if (typeof parsed.error === "string") return parsed.error;
+		return JSON.stringify(parsed).slice(0, 500);
+	} catch {
+		return text.slice(0, 500);
+	}
 }
 
 function parseJSON<T>(raw: string): T {
@@ -99,6 +118,16 @@ function buildFallbackTopicSuggestions(
 				];
 
 	return Array.from(new Set(base.map(compactTopicSuggestion))).slice(0, 5);
+}
+
+export function buildDeterministicTopicSuggestions(
+	channel: Partial<Record<string, string>> | null,
+	seedTopic = "",
+): string[] {
+	return buildFallbackTopicSuggestions(
+		channel as Record<string, string> | null,
+		seedTopic,
+	);
 }
 
 function normalizeTopicSuggestions(

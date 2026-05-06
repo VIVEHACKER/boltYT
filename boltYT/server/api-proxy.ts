@@ -45,6 +45,7 @@ import {
 	snapshot as metricsSnapshot,
 } from "./lib/metrics.ts";
 import {
+	getOpenAiSkipReason,
 	getOpenAiRuntimeHealth,
 	isOpenAiQuotaError,
 	markOpenAiOk,
@@ -97,6 +98,17 @@ function reloadKeys() {
 	KEYS.fal = process.env.FAL_KEY ?? "";
 }
 
+function publicOpenAiRuntimeHealth() {
+	const health = getOpenAiRuntimeHealth();
+	return {
+		quotaBlocked: health.quotaBlocked,
+		quotaBlockedUntil: health.quotaBlockedUntil,
+		lastQuotaAt: health.lastQuotaAt,
+		lastQuotaSource: health.lastQuotaSource,
+		lastOkAt: health.lastOkAt,
+	};
+}
+
 function keyStatusPayload() {
 	const editable = Object.fromEntries(
 		EDITABLE_ENV_KEYS.map((key) => {
@@ -119,8 +131,34 @@ function keyStatusPayload() {
 		fal: Boolean(KEYS.fal),
 		google: Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
 		editable,
-		openaiRuntime: getOpenAiRuntimeHealth(),
+		openaiRuntime: publicOpenAiRuntimeHealth(),
 	};
+}
+
+function configuredProviderNames(status = keyStatusPayload()): string[] {
+	return [
+		status.openai ? "openai" : "",
+		status.elevenlabs ? "elevenlabs" : "",
+		status.pexels ? "pexels" : "",
+		status.pixabay ? "pixabay" : "",
+		status.youtube ? "youtube" : "",
+		status.naver ? "naver" : "",
+		status.fal ? "fal" : "",
+		status.google ? "google" : "",
+	].filter(Boolean);
+}
+
+function missingProviderNames(status = keyStatusPayload()): string[] {
+	return [
+		!status.openai ? "openai" : "",
+		!status.elevenlabs ? "elevenlabs" : "",
+		!status.pexels ? "pexels" : "",
+		!status.pixabay ? "pixabay" : "",
+		!status.youtube ? "youtube" : "",
+		!status.naver ? "naver" : "",
+		!status.fal ? "fal" : "",
+		!status.google ? "google" : "",
+	].filter(Boolean);
 }
 
 reloadKeys();
@@ -279,6 +317,22 @@ function recordOpenAiResult(ok: boolean, errorText: string, source: string) {
 	if (isOpenAiQuotaError(errorText)) {
 		markOpenAiQuotaBlocked(errorText, source);
 	}
+}
+
+function rejectOpenAiCooldown(
+	req: import("node:http").IncomingMessage,
+	res: import("node:http").ServerResponse,
+	source: string,
+): boolean {
+	const reason = getOpenAiSkipReason();
+	if (!reason) return false;
+	log.warn("OpenAI request skipped during quota cooldown", { source });
+	json(req, res, 429, {
+		error: reason,
+		code: "openai_quota_cooldown",
+		openaiRuntime: publicOpenAiRuntimeHealth(),
+	});
+	return true;
 }
 
 interface YouTubeSearchItem {
@@ -1292,11 +1346,15 @@ const server = createServer(async (req, res) => {
 
 	// ─── Health ───
 	if (url.pathname === "/health") {
+		const keyStatus = keyStatusPayload();
 		json(req, res, 200, {
 			ok: true,
 			service: SERVICE,
 			uptime: process.uptime(),
 			startedAt,
+			configured: configuredProviderNames(keyStatus),
+			missing: missingProviderNames(keyStatus),
+			openaiRuntime: keyStatus.openaiRuntime,
 		});
 		return;
 	}
@@ -1357,6 +1415,7 @@ const server = createServer(async (req, res) => {
 	// ─── OpenAI Chat Completions ───
 	if (url.pathname === "/api/openai/chat" && req.method === "POST") {
 		if (!requireKey(req, res, KEYS.openai, "OpenAI")) return;
+		if (rejectOpenAiCooldown(req, res, "api-proxy:chat")) return;
 		const body = await parseBody(req);
 		if (body === null) {
 			json(req, res, 413, { error: "요청 본문이 너무 큽니다 (최대 1MB)" });
@@ -1400,6 +1459,7 @@ const server = createServer(async (req, res) => {
 	// ─── OpenAI Image Generation (DALL-E) ───
 	if (url.pathname === "/api/openai/images" && req.method === "POST") {
 		if (!requireKey(req, res, KEYS.openai, "OpenAI")) return;
+		if (rejectOpenAiCooldown(req, res, "api-proxy:images")) return;
 		const body = await parseBody(req);
 		if (body === null) {
 			json(req, res, 413, { error: "요청 본문이 너무 큽니다 (최대 1MB)" });
@@ -1443,6 +1503,7 @@ const server = createServer(async (req, res) => {
 	// ─── OpenAI TTS ───
 	if (url.pathname === "/api/openai/tts" && req.method === "POST") {
 		if (!requireKey(req, res, KEYS.openai, "OpenAI")) return;
+		if (rejectOpenAiCooldown(req, res, "api-proxy:tts")) return;
 		const body = await parseBody(req);
 		if (body === null) {
 			json(req, res, 413, { error: "요청 본문이 너무 큽니다 (최대 1MB)" });
@@ -1485,6 +1546,7 @@ const server = createServer(async (req, res) => {
 	// ─── OpenAI Whisper 전사 (단어별 타이밍) ───
 	if (url.pathname === "/api/openai/transcribe" && req.method === "POST") {
 		if (!requireKey(req, res, KEYS.openai, "OpenAI")) return;
+		if (rejectOpenAiCooldown(req, res, "api-proxy:transcribe")) return;
 
 		try {
 			// 요청 body는 multipart/form-data로 받아 그대로 upstream에 전달

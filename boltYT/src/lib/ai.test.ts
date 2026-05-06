@@ -31,6 +31,7 @@ vi.mock("./supabase", () => ({
 const { mockMaybeSingle } = mocks;
 
 import {
+	buildDeterministicTopicSuggestions,
 	extractResearchBrief,
 	fetchTopicSuggestions,
 	generateBrief,
@@ -137,6 +138,19 @@ describe("extractResearchBrief", () => {
 
 // ─── fetchTopicSuggestions ────────────────────────────────────────────────────
 describe("fetchTopicSuggestions", () => {
+	it("deterministic fallback은 API 없이 채널/주제 기반 후보를 만든다", () => {
+		const result = buildDeterministicTopicSuggestions(
+			{
+				name: "미스터리 채널",
+				category: "미스터리/다큐",
+				description: "기록 기반 사건",
+			},
+			"한국의 미스터리 장소",
+		);
+		expect(result).toHaveLength(5);
+		expect(result.join(" ")).toContain("한국의 미스터리 장소");
+	});
+
 	it("성공 → 주제 배열 반환", async () => {
 		mockMaybeSingle.mockResolvedValue({
 			data: {
@@ -181,6 +195,30 @@ describe("fetchTopicSuggestions", () => {
 		aiFail(429);
 		await expect(fetchTopicSuggestions("ch")).rejects.toThrow(
 			"OpenAI API 오류",
+		);
+	});
+
+	it("quota cooldown 응답은 짧은 실행 메시지로 변환한다", async () => {
+		mockMaybeSingle.mockResolvedValue({ data: null });
+		vi.stubGlobal(
+			"fetch",
+			vi.fn().mockResolvedValue({
+				ok: false,
+				status: 429,
+				text: () =>
+					Promise.resolve(
+						JSON.stringify({
+							code: "openai_quota_cooldown",
+							error: "raw quota payload",
+							openaiRuntime: {
+								quotaBlockedUntil: "2026-05-07T00:00:00.000Z",
+							},
+						}),
+					),
+			}),
+		);
+		await expect(fetchTopicSuggestions("ch")).rejects.toThrow(
+			"OpenAI 쿼터 대기 중입니다",
 		);
 	});
 

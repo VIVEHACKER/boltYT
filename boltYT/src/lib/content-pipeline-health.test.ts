@@ -56,4 +56,57 @@ describe("content-pipeline-health", () => {
 		expect(report.overall).toBe("blocked");
 		expect(report.blockers.join(" ")).toContain("api-proxy");
 	});
+
+	it("api-proxy가 quota 대기 중이면 blocked가 아니라 degraded", async () => {
+		const fetchImpl = async (url: string | URL | Request) =>
+			new Response(
+				JSON.stringify(
+					String(url).includes("api")
+						? {
+								ok: true,
+								configured: ["openai"],
+								openaiRuntime: {
+									quotaBlocked: true,
+									quotaBlockedUntil: "2026-05-07T00:00:00.000Z",
+								},
+							}
+						: { ok: true },
+				),
+				{ status: 200 },
+			);
+		const report = await checkContentPipelineHealth({
+			services: probes,
+			fetchImpl,
+		});
+		expect(report.overall).toBe("degraded");
+		expect(report.blockers).toHaveLength(0);
+		expect(report.warnings.join(" ")).toContain("OpenAI");
+		expect(report.services[0].status).toBe("degraded");
+	});
+
+	it("최근 quota 실패 후 정상 응답이 없으면 cooldown이 끝나도 degraded", async () => {
+		const fetchImpl = async (url: string | URL | Request) =>
+			new Response(
+				JSON.stringify(
+					String(url).includes("api")
+						? {
+								ok: true,
+								configured: ["openai"],
+								openaiRuntime: {
+									quotaBlocked: false,
+									lastQuotaAt: "2026-05-07T00:10:00.000Z",
+									lastOkAt: "2026-05-07T00:00:00.000Z",
+								},
+							}
+						: { ok: true },
+				),
+				{ status: 200 },
+			);
+		const report = await checkContentPipelineHealth({
+			services: probes,
+			fetchImpl,
+		});
+		expect(report.overall).toBe("degraded");
+		expect(report.services[0].message).toContain("정상 응답");
+	});
 });
