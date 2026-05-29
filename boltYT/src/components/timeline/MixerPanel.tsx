@@ -128,16 +128,23 @@ function Channel({
 					<button
 						type="button"
 						onClick={onSolo}
+						aria-label={`${name} 솔로`}
+						aria-pressed={solo}
 						title="Solo"
 						style={{
 							fontSize: 9,
 							fontWeight: 700,
-							padding: "2px 6px",
+							width: 28,
+							height: 28,
+							padding: 0,
 							background: solo ? "rgba(234,179,8,0.25)" : "#1a1a1a",
 							color: solo ? "#fcd34d" : "rgba(255,255,255,0.55)",
 							border: "none",
 							borderRadius: 3,
 							cursor: "pointer",
+							display: "inline-flex",
+							alignItems: "center",
+							justifyContent: "center",
 						}}
 					>
 						S
@@ -147,16 +154,23 @@ function Channel({
 					<button
 						type="button"
 						onClick={onMute}
+						aria-label={`${name} ${muted ? "음소거 해제" : "음소거"}`}
+						aria-pressed={muted}
 						title={muted ? "Unmute" : "Mute"}
 						style={{
 							fontSize: 9,
 							fontWeight: 700,
-							padding: "2px 6px",
+							width: 28,
+							height: 28,
+							padding: 0,
 							background: muted ? "rgba(239,68,68,0.28)" : "#1a1a1a",
 							color: muted ? "#fca5a5" : "rgba(255,255,255,0.55)",
 							border: "none",
 							borderRadius: 3,
 							cursor: "pointer",
+							display: "inline-flex",
+							alignItems: "center",
+							justifyContent: "center",
 						}}
 					>
 						{muted ? <VolumeX size={10} /> : <Volume2 size={10} />}

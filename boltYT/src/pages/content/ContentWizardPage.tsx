@@ -88,23 +88,31 @@ function parseMode(value: string | null): ContentMode | null {
 		: null;
 }
 
+function mergeChannels(...groups: Channel[][]): Channel[] {
+	const byId = new Map<string, Channel>();
+	for (const group of groups) {
+		for (const channel of group) {
+			if (!channel.id || byId.has(channel.id)) continue;
+			byId.set(channel.id, channel);
+		}
+	}
+	return [...byId.values()];
+}
+
 export default function ContentWizardPage() {
 	const navigate = useNavigate();
 	const [searchParams] = useSearchParams();
 	const initialMode = parseMode(searchParams.get("mode"));
 	const initialTitle = searchParams.get("title") ?? "";
 	const initialSource = searchParams.get("source") ?? "manual";
+	const initialChannelId = searchParams.get("channel") ?? "";
 	const [nicheHandoff] = useState<NicheResearchHandoff | null>(() =>
 		loadNicheResearchHandoff(searchParams.get("nicheHandoff")),
 	);
 	const [mode, setMode] = useState<ContentMode | null>(initialMode);
 	const [step, setStep] = useState(0);
-	const [channels, setChannels] = useState<Channel[]>(
-		DEMO_MODE ? (DEMO_CHANNELS as Channel[]) : [],
-	);
-	const [selectedChannelId, setSelectedChannelId] = useState(
-		DEMO_MODE ? DEMO_CHANNELS[0].id : "",
-	);
+	const [channels, setChannels] = useState<Channel[]>([]);
+	const [selectedChannelId, setSelectedChannelId] = useState(initialChannelId);
 	const [topicId, setTopicId] = useState("");
 	const [topicTitle, setTopicTitle] = useState(initialTitle);
 	const [briefId, setBriefId] = useState("");
@@ -121,7 +129,7 @@ export default function ContentWizardPage() {
 	const [pipelineHealth, setPipelineHealth] =
 		useState<ContentPipelineHealthReport | null>(null);
 	const [checkingPipeline, setCheckingPipeline] = useState(false);
-	const [loading, setLoading] = useState(!DEMO_MODE);
+	const [loading, setLoading] = useState(true);
 
 	const refreshPipelineHealth = useCallback(async () => {
 		setCheckingPipeline(true);
@@ -139,28 +147,35 @@ export default function ContentWizardPage() {
 				if (t) setReferenceTemplate(t);
 			});
 		}
-		if (DEMO_MODE) return;
 		void loadContentPerformanceSamples().then(setPerformanceHistory);
 		supabase
 			.from("channels")
 			.select("*")
 			.order("name")
 			.then(({ data }) => {
-				const list = data ?? [];
+				const list = mergeChannels(
+					(data ?? []) as Channel[],
+					DEMO_MODE ? (DEMO_CHANNELS as Channel[]) : [],
+				);
 				setChannels(list);
 				// Pre-select channel from URL param, else default to first
 				const channelParam = searchParams.get("channel");
-				if (channelParam && list.some((c) => c.id === channelParam)) {
-					setSelectedChannelId(channelParam);
-				} else if (list.length > 0) {
-					setSelectedChannelId(list[0].id);
-				}
+				setSelectedChannelId((current) => {
+					if (channelParam && list.some((c) => c.id === channelParam)) {
+						return channelParam;
+					}
+					if (current && list.some((c) => c.id === current)) return current;
+					return list[0]?.id ?? "";
+				});
 				setLoading(false);
 			});
 	}, [searchParams]);
 
 	useEffect(() => {
-		if (!selectedChannelId) return;
+		if (!selectedChannelId) {
+			setReferenceCandidates([]);
+			return;
+		}
 		let cancelled = false;
 		void listReferenceTemplates(selectedChannelId)
 			.then((templates) => {
@@ -322,11 +337,14 @@ export default function ContentWizardPage() {
 				{/* Step 0: 주제 입력 (공통) */}
 				{step === 0 && (
 					<StepTopic
+						mode={mode}
 						channels={channels}
 						selectedChannelId={selectedChannelId}
 						onChannelChange={setSelectedChannelId}
 						initialTitle={initialTitle}
 						source={initialSource}
+						referenceTemplate={referenceTemplate}
+						referenceCandidates={referenceCandidates}
 						nicheHandoff={nicheHandoff}
 						performanceHistory={performanceHistory}
 						onNext={(id, title) => {

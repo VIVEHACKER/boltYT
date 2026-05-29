@@ -120,6 +120,8 @@ export function TrackV2({
 						<button
 							type="button"
 							onClick={() => updateTrack(track.id, { muted: !track.muted })}
+							aria-label={`${track.name} ${track.muted ? "음소거 해제" : "음소거"}`}
+							aria-pressed={track.muted}
 							title={track.muted ? "Unmute" : "Mute"}
 							style={{
 								background: "none",
@@ -128,7 +130,13 @@ export function TrackV2({
 									? "rgba(239,68,68,0.9)"
 									: "rgba(255,255,255,0.5)",
 								cursor: "pointer",
+								width: 24,
+								height: 24,
 								padding: 0,
+								borderRadius: 4,
+								display: "inline-flex",
+								alignItems: "center",
+								justifyContent: "center",
 							}}
 						>
 							{track.muted ? <VolumeX size={12} /> : <Volume2 size={12} />}
@@ -137,6 +145,8 @@ export function TrackV2({
 							<button
 								type="button"
 								onClick={() => updateTrack(track.id, { solo: !track.solo })}
+								aria-label={`${track.name} 솔로`}
+								aria-pressed={track.solo}
 								title="Solo"
 								style={{
 									background: track.solo
@@ -145,9 +155,11 @@ export function TrackV2({
 									border: "none",
 									color: track.solo
 										? "rgba(250,204,21,0.95)"
-										: "rgba(255,255,255,0.5)",
+									: "rgba(255,255,255,0.5)",
 									cursor: "pointer",
-									padding: "0 4px",
+									width: 24,
+									height: 24,
+									padding: 0,
 									borderRadius: 2,
 									fontSize: 9,
 									fontWeight: 700,
@@ -159,6 +171,8 @@ export function TrackV2({
 						<button
 							type="button"
 							onClick={() => updateTrack(track.id, { locked: !track.locked })}
+							aria-label={`${track.name} ${track.locked ? "잠금 해제" : "잠금"}`}
+							aria-pressed={track.locked}
 							title={track.locked ? "Unlock" : "Lock"}
 							style={{
 								background: "none",
@@ -167,7 +181,13 @@ export function TrackV2({
 									? "rgba(234,179,8,0.9)"
 									: "rgba(255,255,255,0.4)",
 								cursor: "pointer",
+								width: 24,
+								height: 24,
 								padding: 0,
+								borderRadius: 4,
+								display: "inline-flex",
+								alignItems: "center",
+								justifyContent: "center",
 							}}
 						>
 							{track.locked ? <Lock size={11} /> : <Unlock size={11} />}

@@ -2262,6 +2262,7 @@ export default function StepPreview({
 								<button
 									key={p}
 									type="button"
+									aria-pressed={active}
 									onClick={() => {
 										setRenderQuality(p);
 										setHwAccelOverride(null);
@@ -2330,6 +2331,7 @@ export default function StepPreview({
 									<button
 										key={h}
 										type="button"
+										aria-pressed={active}
 										onClick={() => setHwAccelOverride(h)}
 										disabled={approving || rendering}
 										style={{

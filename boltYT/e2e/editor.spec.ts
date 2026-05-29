@@ -139,6 +139,50 @@ test.describe("에디터 — 풀 렌더 (씬 1개 시딩)", () => {
 		expect(zoomBefore).not.toBe(zoomAfter);
 	});
 
+	test("툴바 토글: 클릭 시 pressed 상태가 바뀜", async ({ page }) => {
+		const toggles = [
+			"자석 스냅",
+			"오디오 믹서",
+			"컬러 그레이딩",
+			"스코프",
+			"트랜스폼 키프레임",
+			"모션 경로",
+			"커브 편집",
+			"오디오 FX",
+		];
+
+		for (const name of toggles) {
+			const button = page.getByRole("button", { name });
+			const before = await button.getAttribute("aria-pressed");
+			await button.click();
+			await expect(button).toHaveAttribute(
+				"aria-pressed",
+				before === "true" ? "false" : "true",
+			);
+		}
+	});
+
+	test("트랙 토글: 음소거/솔로/잠금 클릭 상태가 반영됨", async ({ page }) => {
+		const mute = page.locator("button[aria-label$='음소거']").first();
+		await expect(mute).toHaveAttribute("aria-pressed", "false");
+		await mute.click();
+		await expect(
+			page.locator("button[aria-label$='음소거 해제']").first(),
+		).toHaveAttribute("aria-pressed", "true");
+
+		const solo = page.locator("button[aria-label$='솔로']").first();
+		await expect(solo).toHaveAttribute("aria-pressed", "false");
+		await solo.click();
+		await expect(solo).toHaveAttribute("aria-pressed", "true");
+
+		const lock = page.locator("button[aria-label$='잠금']").first();
+		await expect(lock).toHaveAttribute("aria-pressed", "false");
+		await lock.click();
+		await expect(
+			page.locator("button[aria-label$='잠금 해제']").first(),
+		).toHaveAttribute("aria-pressed", "true");
+	});
+
 	test("Color Grading 버튼 클릭 → 패널 토글 (런타임 에러 없음)", async ({
 		page,
 	}) => {

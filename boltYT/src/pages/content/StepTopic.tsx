@@ -14,25 +14,27 @@ import {
 	fetchTopicSuggestions,
 } from "../../lib/ai";
 import { type ApiKeysStatus, useApiKeys } from "../../lib/api-keys-context";
-import {
-	buildContentRecommendationPlan,
-	type ContentPerformanceSample,
-} from "../../lib/content-recommendation-ranker";
+import type { ContentPerformanceSample } from "../../lib/content-recommendation-ranker";
+import { buildReferenceProductionPlan } from "../../lib/reference-production-orchestrator";
 import {
 	attachNicheHandoffToTopic,
 	formatCompactNumber,
 	type NicheResearchHandoff,
 } from "../../lib/niche-research";
 import { supabase } from "../../lib/supabase";
-import type { Channel } from "../../types/database";
+import type { Channel, ReferenceTemplate } from "../../types/database";
+import type { ContentMode } from "./ContentWizardPage";
 
 interface StepTopicProps {
+	mode?: ContentMode;
 	channels: Channel[];
 	selectedChannelId: string;
 	onChannelChange: (id: string) => void;
 	onNext: (topicId: string, topicTitle: string) => void;
 	initialTitle?: string;
 	source?: string;
+	referenceTemplate?: ReferenceTemplate | null;
+	referenceCandidates?: ReferenceTemplate[];
 	nicheHandoff?: NicheResearchHandoff | null;
 	performanceHistory?: ContentPerformanceSample[];
 }
@@ -46,12 +48,15 @@ function hasUnrecoveredOpenAiQuota(status: ApiKeysStatus) {
 }
 
 export default function StepTopic({
+	mode = "ai",
 	channels,
 	selectedChannelId,
 	onChannelChange,
 	onNext,
 	initialTitle = "",
 	source = "manual",
+	referenceTemplate,
+	referenceCandidates = [],
 	nicheHandoff,
 	performanceHistory = [],
 }: StepTopicProps) {
@@ -64,15 +69,27 @@ export default function StepTopic({
 	const [suggestionsMode, setSuggestionsMode] = useState<"ai" | "rules">("ai");
 	const { status: apiStatus, loaded: apiStatusLoaded } = useApiKeys();
 	const suggestionRequestId = useRef(0);
-	const recommendationPlan = useMemo(
+	const productionPlan = useMemo(
 		() =>
-			buildContentRecommendationPlan({
+			buildReferenceProductionPlan({
 				topicTitle: title,
+				mode,
+				selectedFormat: "both",
+				referenceTemplate,
+				referenceCandidates,
 				nicheHandoff,
 				performanceHistory,
 			}),
-		[title, nicheHandoff, performanceHistory],
+		[
+			title,
+			mode,
+			referenceTemplate,
+			referenceCandidates,
+			nicheHandoff,
+			performanceHistory,
+		],
 	);
+	const recommendationPlan = productionPlan.recommendationPlan;
 
 	const loadSuggestions = useCallback(
 		async (channelId: string, seedTopic = "") => {
@@ -186,7 +203,14 @@ export default function StepTopic({
 					name="channel"
 					label="채널 선택"
 					value={selectedChannelId}
-					onChange={(e) => onChannelChange(e.detail.value)}
+					onUpdate={(e) => onChannelChange(String(e.detail.value ?? ""))}
+					onChange={(e) => {
+						const next =
+							e.detail?.value ??
+							(e.target as HTMLSelectElement | null)?.value ??
+							"";
+						onChannelChange(String(next));
+					}}
 				>
 					{channels.map((ch) => (
 						<PSelectOption key={ch.id} value={ch.id}>
@@ -222,6 +246,28 @@ export default function StepTopic({
 							</div>
 							<PTag color="notification-info-soft">순위화</PTag>
 						</div>
+						{productionPlan.selectedTemplate && (
+							<div className="mb-static-sm flex flex-wrap items-center gap-static-xs">
+								<PTag color="notification-success-soft">
+									{productionPlan.autoSelected
+										? "자동 레퍼런스 적용"
+										: "선택 레퍼런스 적용"}
+								</PTag>
+								<PTag color="background-surface">
+									{productionPlan.selectedTemplate.name ||
+										productionPlan.selectedTemplate.source_title}
+								</PTag>
+								{productionPlan.selectedCandidate && (
+									<PTag color="background-surface">
+										R{productionPlan.selectedCandidate.score} ·{" "}
+										{productionPlan.selectedCandidate.categoryLabel}
+									</PTag>
+								)}
+								<PText size="x-small" color="contrast-medium">
+									저장된 레퍼런스의 편집 문법을 현재 주제로 변환해 추천합니다.
+								</PText>
+							</div>
+						)}
 						<div className="grid grid-cols-1 md:grid-cols-3 gap-static-sm">
 							{recommendationPlan.scripts.slice(0, 3).map((script) => (
 								<div

@@ -26,6 +26,90 @@ function trackErrors(page: Page) {
 		);
 }
 
+const TEST_CHANNELS = [
+	{
+		id: "ch-alpha",
+		user_id: "local-user",
+		name: "알파 채널",
+		description: "기술 자동화 채널",
+		language: "ko",
+		category: "기술",
+		tone: "전문적",
+		forbidden_words: [],
+		default_cta: "구독",
+		visibility_policy: "public",
+		created_at: "2026-05-01T00:00:00.000Z",
+		updated_at: "2026-05-01T00:00:00.000Z",
+	},
+	{
+		id: "ch-beta",
+		user_id: "local-user",
+		name: "베타 채널",
+		description: "드라마/영화 해설 채널",
+		language: "ko",
+		category: "드라마",
+		tone: "몰입감 있는",
+		forbidden_words: [],
+		default_cta: "다음 해설도 이어보기",
+		visibility_policy: "public",
+		created_at: "2026-05-01T00:00:00.000Z",
+		updated_at: "2026-05-01T00:00:00.000Z",
+	},
+];
+
+const DRAMA_REFERENCE = {
+	id: "ref-drama-e2e",
+	channel_id: "ch-beta",
+	name: "E2E 드라마 리캡 레퍼런스",
+	source_type: "youtube",
+	source_url: "https://www.youtube.com/watch?v=e2e",
+	source_title: "결말 해석형 드라마 리캡",
+	source_creator: "E2E",
+	thumbnail_url: "",
+	duration_seconds: 720,
+	dominant_colors: ["#101010", "#f1c75b"],
+	visual_mood: "dramatic",
+	visual_prompt_template: "",
+	lighting_style: "cinematic",
+	subtitle_position: "bottom",
+	subtitle_size_preset: "lg",
+	subtitle_bg_style: "stroke",
+	subtitle_accent_color: "#f1c75b",
+	scene_count: 16,
+	avg_scene_duration: 45,
+	hook_duration: 4,
+	transition_style: "hardcut",
+	pacing_preset: "medium",
+	tts_voice_id: "",
+	tts_provider: "openai",
+	tts_speed: 1,
+	tts_tone_keywords: ["긴장", "해설"],
+	bgm_mood: "tense",
+	bgm_keywords: ["drama", "recap"],
+	bgm_tempo: "mid",
+	bgm_reference_url: "",
+	hook_pattern: "question",
+	script_structure: [{ role: "hook", duration: 8, note: "결말 질문형 훅" }],
+	transcript: "드라마 결말과 복선을 해설하는 레퍼런스",
+	frame_urls: [],
+	raw_analysis: {},
+	analysis_status: "complete",
+	analysis_error: "",
+	created_at: "2026-05-01T00:00:00.000Z",
+	updated_at: "2026-05-01T00:00:00.000Z",
+};
+
+async function seedWizardChannels(page: Page) {
+	await page.addInitScript(
+		({ channels, reference }) => {
+			localStorage.setItem("onboarding_done_v1", "1");
+			localStorage.setItem("db:channels", JSON.stringify(channels));
+			localStorage.setItem("db:reference_templates", JSON.stringify([reference]));
+		},
+		{ channels: TEST_CHANNELS, reference: DRAMA_REFERENCE },
+	);
+}
+
 // ─── 대시보드 네비게이션 플로우 ───────────────────────────────────────────
 
 test.describe("대시보드 네비게이션 플로우", () => {
@@ -133,6 +217,82 @@ test.describe("콘텐츠 위저드 플로우", () => {
 		await researchBtn.click();
 		const body = await page.locator("body").innerText();
 		expect(body).toMatch(/주제|단계|자료/);
+	});
+
+	test("모바일 단계 표시 — 단계명이 세로로 쪼개지지 않음", async ({
+		page,
+	}) => {
+		await page.setViewportSize({ width: 390, height: 844 });
+		await page.goto("/content/new", { waitUntil: "networkidle" });
+
+		const aiBtn = page.locator("button", { hasText: "AI 자동 생성" });
+		const visible = await aiBtn
+			.isVisible({ timeout: 3_000 })
+			.catch(() => false);
+		if (!visible) {
+			test.skip();
+			return;
+		}
+
+		await aiBtn.click();
+		const labels = page.locator("[aria-label='콘텐츠 생성 단계'] p-text");
+		await expect(labels.first()).toBeVisible({ timeout: 5_000 });
+		const boxes = await labels.evaluateAll((nodes) =>
+			nodes.map((node) => {
+				const rect = node.getBoundingClientRect();
+				return { width: rect.width, height: rect.height };
+			}),
+		);
+		expect(boxes.length).toBeGreaterThanOrEqual(5);
+		for (const box of boxes) {
+			expect(box.width).toBeGreaterThan(30);
+			expect(box.height).toBeLessThanOrEqual(28);
+		}
+	});
+
+	test("채널 URL 파라미터와 채널 변경이 위저드 상태에 반영됨", async ({
+		page,
+	}) => {
+		await seedWizardChannels(page);
+		await page.goto(
+			"/content/new?mode=ai&channel=ch-beta&title=AI%20자동화%20실패담",
+			{ waitUntil: "networkidle" },
+		);
+
+		const channelSelect = page.locator('p-select[name="channel"]');
+		await expect(channelSelect).toHaveJSProperty("value", "ch-beta");
+
+		await channelSelect.evaluate((element) => {
+			(element as HTMLInputElement).value = "ch-alpha";
+			element.dispatchEvent(
+				new CustomEvent("update", {
+					bubbles: true,
+					detail: { value: "ch-alpha" },
+				}),
+			);
+		});
+
+		await expect(channelSelect).toHaveJSProperty("value", "ch-alpha");
+	});
+
+	test("저장된 레퍼런스를 원하는 주제로 변환해 추천 패널에 반영", async ({
+		page,
+	}) => {
+		await seedWizardChannels(page);
+		await page.goto(
+			"/content/new?mode=research&channel=ch-beta&template=ref-drama-e2e&title=%EA%B2%B0%EB%A7%90%EC%9D%84%20%EC%95%8C%EA%B3%A0%20%EB%8B%A4%EC%8B%9C%20%EB%B3%B4%EB%A9%B4%20%EB%8B%AC%EB%9D%BC%EC%A7%80%EB%8A%94%20%EB%93%9C%EB%9D%BC%EB%A7%88%20%EB%B3%B5%EC%84%A0",
+			{ waitUntil: "networkidle" },
+		);
+
+		await expect(page.getByText("선택 레퍼런스 적용")).toBeVisible({
+			timeout: 10_000,
+		});
+		await expect(
+			page.getByText("E2E 드라마 리캡 레퍼런스", { exact: true }).first(),
+		).toBeVisible();
+		await expect(
+			page.getByText("저장된 레퍼런스의 편집 문법을 현재 주제로 변환해 추천합니다."),
+		).toBeVisible();
 	});
 });
 

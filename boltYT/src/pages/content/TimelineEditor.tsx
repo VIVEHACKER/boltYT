@@ -30,7 +30,7 @@ import {
 	Trash2,
 	Undo2,
 } from "lucide-react";
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, type CSSProperties } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import { AudioEffectsPanel } from "../../components/timeline/AudioEffectsPanel";
@@ -60,6 +60,20 @@ import {
 } from "../../remotion/types";
 
 const FPS = VIDEO_FPS;
+
+const toolbarToggleClass =
+	"inline-flex h-9 w-9 items-center justify-center rounded-[6px] border transition-colors";
+
+function toolbarToggleStyle(
+	active: boolean,
+	activeColor: string,
+): CSSProperties {
+	return {
+		color: active ? activeColor : "rgba(255,255,255,0.52)",
+		background: active ? "rgba(255,255,255,0.08)" : "transparent",
+		borderColor: active ? activeColor : "transparent",
+	};
+}
 
 export default function TimelineEditor() {
 	const { id: scriptId = "" } = useParams<{ id: string }>();
@@ -193,13 +207,11 @@ export default function TimelineEditor() {
 					<button
 						type="button"
 						onClick={() => setSnap({ enabled: !snap.enabled })}
+						aria-label="자석 스냅"
+						aria-pressed={snap.enabled}
 						title="Toggle magnetic snap (M)"
-						className="p-1.5 rounded hover:bg-[#2a2a2a]"
-						style={{
-							color: snap.enabled
-								? "rgba(134,239,172,0.95)"
-								: "rgba(255,255,255,0.45)",
-						}}
+						className={`${toolbarToggleClass} hover:bg-[#2a2a2a]`}
+						style={toolbarToggleStyle(snap.enabled, "rgba(134,239,172,0.95)")}
 					>
 						<Magnet size={16} />
 					</button>
@@ -207,13 +219,11 @@ export default function TimelineEditor() {
 					<button
 						type="button"
 						onClick={() => setMixerOpen((v) => !v)}
+						aria-label="오디오 믹서"
+						aria-pressed={mixerOpen}
 						title="Mixer"
-						className="p-1.5 rounded hover:bg-[#2a2a2a]"
-						style={{
-							color: mixerOpen
-								? "rgba(251,191,36,0.95)"
-								: "rgba(255,255,255,0.45)",
-						}}
+						className={`${toolbarToggleClass} hover:bg-[#2a2a2a]`}
+						style={toolbarToggleStyle(mixerOpen, "rgba(251,191,36,0.95)")}
 					>
 						<Sliders size={16} />
 					</button>
@@ -221,13 +231,11 @@ export default function TimelineEditor() {
 					<button
 						type="button"
 						onClick={() => setColorOpen((v) => !v)}
+						aria-label="컬러 그레이딩"
+						aria-pressed={colorOpen}
 						title="Color Grading"
-						className="p-1.5 rounded hover:bg-[#2a2a2a]"
-						style={{
-							color: colorOpen
-								? "rgba(251,191,36,0.95)"
-								: "rgba(255,255,255,0.45)",
-						}}
+						className={`${toolbarToggleClass} hover:bg-[#2a2a2a]`}
+						style={toolbarToggleStyle(colorOpen, "rgba(251,191,36,0.95)")}
 					>
 						<Palette size={16} />
 					</button>
@@ -235,13 +243,11 @@ export default function TimelineEditor() {
 					<button
 						type="button"
 						onClick={() => setScopesOpen((v) => !v)}
+						aria-label="스코프"
+						aria-pressed={scopesOpen}
 						title="Scopes (Waveform + Vectorscope)"
-						className="p-1.5 rounded hover:bg-[#2a2a2a]"
-						style={{
-							color: scopesOpen
-								? "rgba(134,239,172,0.95)"
-								: "rgba(255,255,255,0.45)",
-						}}
+						className={`${toolbarToggleClass} hover:bg-[#2a2a2a]`}
+						style={toolbarToggleStyle(scopesOpen, "rgba(134,239,172,0.95)")}
 					>
 						<Activity size={16} />
 					</button>
@@ -249,13 +255,11 @@ export default function TimelineEditor() {
 					<button
 						type="button"
 						onClick={() => setTransformOpen((v) => !v)}
+						aria-label="트랜스폼 키프레임"
+						aria-pressed={transformOpen}
 						title="Transform keyframes (position/scale/rotation/opacity)"
-						className="p-1.5 rounded hover:bg-[#2a2a2a]"
-						style={{
-							color: transformOpen
-								? "rgba(251,191,36,0.95)"
-								: "rgba(255,255,255,0.45)",
-						}}
+						className={`${toolbarToggleClass} hover:bg-[#2a2a2a]`}
+						style={toolbarToggleStyle(transformOpen, "rgba(251,191,36,0.95)")}
 					>
 						<Move size={16} />
 					</button>
@@ -263,13 +267,11 @@ export default function TimelineEditor() {
 					<button
 						type="button"
 						onClick={() => setMotionOpen((v) => !v)}
+						aria-label="모션 경로"
+						aria-pressed={motionOpen}
 						title="Motion path (2D position keyframe 궤적)"
-						className="p-1.5 rounded hover:bg-[#2a2a2a]"
-						style={{
-							color: motionOpen
-								? "rgba(251,191,36,0.95)"
-								: "rgba(255,255,255,0.45)",
-						}}
+						className={`${toolbarToggleClass} hover:bg-[#2a2a2a]`}
+						style={toolbarToggleStyle(motionOpen, "rgba(251,191,36,0.95)")}
 					>
 						<Route size={16} />
 					</button>
@@ -277,13 +279,11 @@ export default function TimelineEditor() {
 					<button
 						type="button"
 						onClick={() => setCurvesOpen((v) => !v)}
+						aria-label="커브 편집"
+						aria-pressed={curvesOpen}
 						title="Curves — transform automation 커브 시각화"
-						className="p-1.5 rounded hover:bg-[#2a2a2a]"
-						style={{
-							color: curvesOpen
-								? "rgba(251,191,36,0.95)"
-								: "rgba(255,255,255,0.45)",
-						}}
+						className={`${toolbarToggleClass} hover:bg-[#2a2a2a]`}
+						style={toolbarToggleStyle(curvesOpen, "rgba(251,191,36,0.95)")}
 					>
 						<LineChart size={16} />
 					</button>
@@ -291,12 +291,12 @@ export default function TimelineEditor() {
 					<button
 						type="button"
 						onClick={() => setFxOpen((v) => !v)}
+						aria-label="오디오 FX"
+						aria-pressed={fxOpen}
 						title="Audio FX — 클립 오디오 이펙트 체인 (EQ / Reverb / Delay / Gain)"
-						className="p-1.5 rounded hover:bg-[#2a2a2a]"
+						className={`${toolbarToggleClass} hover:bg-[#2a2a2a]`}
 						style={{
-							color: fxOpen
-								? "rgba(251,191,36,0.95)"
-								: "rgba(255,255,255,0.45)",
+							...toolbarToggleStyle(fxOpen, "rgba(251,191,36,0.95)"),
 							fontSize: 11,
 							fontWeight: 700,
 						}}
