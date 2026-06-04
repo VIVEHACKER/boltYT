@@ -1,4 +1,11 @@
 import type { ResearchBrief } from "./ai-agents";
+import {
+	type AnimationBible,
+	type AnimationProductionFamily,
+	type AnimationProductionReadinessReport,
+	analyzeAnimationProductionReadiness,
+	formatAnimationReadinessForPrompt,
+} from "./animation-production";
 import { getApiProxyUrl } from "./proxy";
 import type { ReferencePreset } from "./reference-bridge";
 import { buildScriptConstraint } from "./reference-bridge";
@@ -13,13 +20,6 @@ import {
 	formatTopicProductionReadinessForPrompt,
 	type TopicProductionReadinessReport,
 } from "./topic-production-readiness";
-import {
-	analyzeAnimationProductionReadiness,
-	formatAnimationReadinessForPrompt,
-	type AnimationBible,
-	type AnimationProductionFamily,
-	type AnimationProductionReadinessReport,
-} from "./animation-production";
 
 interface OpenAICallOptions {
 	/** 응답 최대 토큰. 장편 JSON 은 잘림 방지 위해 크게(8000~12000) 지정. */
@@ -383,9 +383,10 @@ function buildLongformSceneRules(
 - 각 단계 전환 시 transition으로 리듬 변화를 준다.`;
 	}
 
-	const target = referencePreset!.script.targetDuration;
-	const sceneCount = referencePreset!.script.sceneCount;
-	const avg = referencePreset!.script.avgSceneDuration;
+	const fls = referencePreset?.script;
+	const target = fls?.targetDuration ?? LONGFORM_MAX_DURATION_SECONDS;
+	const sceneCount = fls?.sceneCount ?? 24;
+	const avg = fls?.avgSceneDuration ?? 30;
 	const minScenes = Math.max(18, Math.min(32, sceneCount - 4));
 	const maxScenes = Math.max(minScenes, Math.min(36, sceneCount + 4));
 	return `=== 장편 몰아보기 롱폼(16:9) 규칙 ===
@@ -583,7 +584,7 @@ ${pacing}
 			: "";
 	const topicFidelityBlock = coreMessage
 		? `\n=== 절대 준수: 주제 충실도 (최우선) ===
-이 영상은 "${coreMessage}"를 다룬다. 모든 씬 나레이션은 이 주제의 구체적 대상/사건/논점을 직접 다루고, 레퍼런스·스타일 규칙은 표현 방식일 뿐 주제를 일반론으로 대체하지 않는다. 주제와 무관한 일반 상식·다른 사건으로 새지 마라.`
+이 영상은 "${coreMessage}"를 다룬다. 첫 씬에서 핵심 대상·사건을 제시하고 모든 씬이 그것을 이어가되, 주제와 무관한 일반 상식·다른 사건으로 새지 마라. 같은 주제 문구를 매 씬 반복하지 말고 대명사·맥락으로 자연스럽게 이어가라.`
 		: "";
 
 	const result = await callOpenAI(
@@ -857,7 +858,7 @@ ${timelineConstraint}
 		`${systemRole}
 
 핵심 원칙:
-${topicTitle ? `0. 이 영상의 주제는 "${topicTitle}"이다. 주제의 핵심 키워드/고유명사가 최소 첫 2개 씬과 마지막 씬 나레이션에 명시적으로 등장해야 하며, 레퍼런스 스타일에 맞추려고 주제를 일반화하지 마세요.` : ""}
+${topicTitle ? `0. 이 영상의 주제는 "${topicTitle}"이다. 첫 씬에서 이 주제의 구체적 대상·사건을 분명히 제시하고, 이후 모든 씬이 같은 사건을 이어가게 하라. 주제 문구를 매 씬 기계적으로 반복하지 말고 대명사·맥락으로 자연스럽게 잇되, 다른 사건·일반론으로 새지 마라.` : ""}
 1. 자료에 나오는 구체적인 정보(인물 이름, 날짜, 장소, 사건 경위, 수치)를 반드시 나레이션에 포함하세요.
 2. "~라고 합니다" 같은 모호한 표현 대신, 자료에 기반한 팩트를 단정적으로 서술하세요.
 ${effectiveBrief ? "3. 아래 리서치 브리프의 팩트를 우선 사용하세요. 사실을 지어내지 마세요." : ""}
@@ -945,7 +946,7 @@ ${
 - mood: "horror"(차가운 파랑), "mystery"(따뜻한 앰버), "news"(중립), "neutral", "warm"
 - text_effect: 사용하지 않는 값입니다. 항상 "none"으로 두세요. 강조는 씬 타입이 아니라 자막/컷/SFX/카메라 무브로 처리합니다.
 - visual_prompt는 영어로 작성. 어둡고 분위기 있는 시네마틱 톤으로.
-${topicTitle ? `\n=== 절대 준수: 주제 충실도 (최우선) ===\n이 영상의 주제는 "${topicTitle}"이다. 모든 씬의 나레이션은 이 주제의 구체적 대상/사건/인물/숫자를 직접 다뤄야 하며, 레퍼런스 스타일 규칙은 표현 방식일 뿐 주제를 대체하지 않는다. 주제와 무관한 일반론·다른 사건으로 새지 마라. 마지막 씬에서 이 주제의 핵심 질문에 분명히 답하라.` : ""}`,
+${topicTitle ? `\n=== 절대 준수: 주제 충실도 (최우선) ===\n이 영상의 주제는 "${topicTitle}"이다. 모든 씬이 이 주제의 구체적 사건/대상/인물/숫자를 다루고 다른 사건·일반론으로 새지 않게 하라. 단, 같은 주제 문구를 매 씬 반복하지 말고 대명사·맥락으로 자연스러운 구어체로 이어가라. 마지막 씬에서 이 주제의 핵심 질문에 분명히 답하라.` : ""}`,
 		// 대본 창작 — 사실 안정성 0.7, 장편 드라마는 36씬까지라 max_tokens 최대, 타임아웃 연장.
 		{
 			jsonMode: true,
