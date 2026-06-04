@@ -12,31 +12,31 @@ import {
 import { Player } from "@remotion/player";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { generateContinuousNarration } from "../../lib/ai";
 import {
 	clampShortsDuration,
 	estimatedBpmFromTempo,
 	retimeScenesToBeatGrid,
 } from "../../lib/beat-sync";
-import { generateContinuousNarration } from "../../lib/ai";
-import { planBgmCuePlan, type BgmCuePlan } from "../../lib/bgm-cue-plan";
+import { autoPickBgm, inferAutoBgmPreset } from "../../lib/bgm";
+import { type BgmAnalysis, isBpmReliable } from "../../lib/bgm-analyze";
+import { type BgmCuePlan, planBgmCuePlan } from "../../lib/bgm-cue-plan";
+import {
+	type ChannelBranding,
+	loadChannelBranding,
+} from "../../lib/channel-branding";
 import {
 	buildFinalOutputCritique,
 	type FinalOutputCritiqueReport,
 } from "../../lib/final-output-critique";
-import {
-	loadChannelBranding,
-	type ChannelBranding,
-} from "../../lib/channel-branding";
-import { autoPickBgm, inferAutoBgmPreset } from "../../lib/bgm";
-import { type BgmAnalysis, isBpmReliable } from "../../lib/bgm-analyze";
 import { buildHookFlags } from "../../lib/hook-detector";
 import { buildRenderKnowledgeEvent } from "../../lib/knowledge-system";
 import { ensureBlobUrls } from "../../lib/local-db";
-import { referenceToPreset } from "../../lib/reference-bridge";
 import {
 	assessReferenceApplicationScore,
 	type ReferenceApplicationScoreReport,
 } from "../../lib/reference-application-score";
+import { referenceToPreset } from "../../lib/reference-bridge";
 import { prepareRenderPayload } from "../../lib/render-assets";
 import {
 	DEFAULT_PRESET,
@@ -50,20 +50,20 @@ import {
 import {
 	isRenderJobError,
 	pollRenderProgress,
-	submitRender,
 	type RenderJob,
+	submitRender,
 } from "../../lib/render-queue";
 import type { SceneShot } from "../../lib/scene-shot-types";
-import type { SourceSafetyReport } from "../../lib/source-safety-gate";
-import {
-	applyCooldownToSfx,
-	createCooldownTracker,
-} from "../../lib/sfx-cooldown";
 import {
 	assignSfxToScenes,
 	type SfxCategory,
 	withMoodVolume,
 } from "../../lib/sfx";
+import {
+	applyCooldownToSfx,
+	createCooldownTracker,
+} from "../../lib/sfx-cooldown";
+import type { SourceSafetyReport } from "../../lib/source-safety-gate";
 import { supabase } from "../../lib/supabase";
 import { generateAndSaveThumbnail } from "../../lib/thumbnail";
 import {
@@ -81,8 +81,8 @@ import {
 	type ProductionQualityScene,
 } from "../../lib/youtube-production-quality";
 import {
-	buildReferenceRepairGuidance,
 	buildMotionRepairPatch,
+	buildReferenceRepairGuidance,
 	renderOutputIssueCodesToProductionIssueCodes,
 	shouldRepairMotionDesign,
 	shouldRepairNarrationEnding,
@@ -453,6 +453,7 @@ function ProductionQualityPanel({
 						<div className="mt-static-sm grid grid-cols-1 lg:grid-cols-2 gap-static-xs">
 							{nicheTargets.map((target, index) => (
 								<div
+									// biome-ignore lint/suspicious/noArrayIndexKey: key/label 접두사 + index 복합키(안정적)
 									key={`${target.key ?? target.label ?? "target"}-${index}`}
 									className="rounded-[6px] bg-canvas p-static-sm"
 								>
@@ -1240,7 +1241,9 @@ export default function StepPreview({
 					transitionSfxVolume: sfxList[idx]?.transitionSfx?.volume,
 					transitionSfxFromFrame: sfxList[idx]?.transitionOffsetFrames,
 					transitionSfxDurationFrames: sfxList[idx]?.transitionSfx
-						? Math.ceil(sfxList[idx]!.transitionSfx!.duration * VIDEO_FPS)
+						? Math.ceil(
+								(sfxList[idx]?.transitionSfx?.duration ?? 0) * VIDEO_FPS,
+							)
 						: undefined,
 				};
 			});

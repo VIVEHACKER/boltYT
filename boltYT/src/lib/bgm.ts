@@ -4,13 +4,13 @@
  * Pixabay Music: 무료, CC0 라이선스, 속성 표시 불필요
  */
 
-import { storeLocalFile } from "./local-db";
-import { getApiProxyUrl } from "./proxy";
 import {
 	pickProfessionalBgmTrack,
 	rankBgmTracks,
 	type ScoredBgmTrack,
 } from "./bgm-quality";
+import { storeLocalFile } from "./local-db";
+import { getApiProxyUrl } from "./proxy";
 
 // ─── 타입 ───
 
