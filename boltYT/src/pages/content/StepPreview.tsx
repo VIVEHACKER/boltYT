@@ -18,10 +18,7 @@ import {
 	retimeScenesToBeatGrid,
 } from "../../lib/beat-sync";
 import { generateContinuousNarration } from "../../lib/ai";
-import {
-	planBgmCuePlan,
-	type BgmCuePlan,
-} from "../../lib/bgm-cue-plan";
+import { planBgmCuePlan, type BgmCuePlan } from "../../lib/bgm-cue-plan";
 import {
 	buildFinalOutputCritique,
 	type FinalOutputCritiqueReport,
@@ -58,7 +55,15 @@ import {
 } from "../../lib/render-queue";
 import type { SceneShot } from "../../lib/scene-shot-types";
 import type { SourceSafetyReport } from "../../lib/source-safety-gate";
-import { assignSfxToScenes, type SfxCategory } from "../../lib/sfx";
+import {
+	applyCooldownToSfx,
+	createCooldownTracker,
+} from "../../lib/sfx-cooldown";
+import {
+	assignSfxToScenes,
+	type SfxCategory,
+	withMoodVolume,
+} from "../../lib/sfx";
 import { supabase } from "../../lib/supabase";
 import { generateAndSaveThumbnail } from "../../lib/thumbnail";
 import {
@@ -322,7 +327,9 @@ function productionStatusLabel(report: ProductionQualityReport): string {
 	return "보강 필요";
 }
 
-function nicheDecisionLabel(decision?: PreviewNicheResearch["decision"]): string {
+function nicheDecisionLabel(
+	decision?: PreviewNicheResearch["decision"],
+): string {
 	if (decision === "scale") return "증폭 후보";
 	if (decision === "test") return "파일럿 후보";
 	if (decision === "hold") return "보류";
@@ -338,7 +345,9 @@ function ProductionQualityPanel({
 }) {
 	const metrics = report.metrics;
 	const visibleIssues = report.issues
-		.filter((issue) => issue.severity === "critical" || issue.severity === "warning")
+		.filter(
+			(issue) => issue.severity === "critical" || issue.severity === "warning",
+		)
 		.slice(0, 4);
 	const visibleActions = report.requiredActions.slice(0, 4);
 	const nicheTargets =
@@ -372,7 +381,10 @@ function ProductionQualityPanel({
 			</div>
 
 			<div className="grid grid-cols-2 lg:grid-cols-4 gap-static-sm">
-				<ProductionMetric label="제작 QC" value={formatMetricScore(report.score)} />
+				<ProductionMetric
+					label="제작 QC"
+					value={formatMetricScore(report.score)}
+				/>
 				<ProductionMetric
 					label="프리미엄 바닥선"
 					value={formatMetricScore(metrics.premiumFloorScore)}
@@ -408,9 +420,14 @@ function ProductionQualityPanel({
 					<div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-static-sm">
 						<div className="min-w-0">
 							<PText size="small" weight="semi-bold">
-								니치 목표: {nicheResearch.query ?? nicheResearch.topic ?? "선택 주제"}
+								니치 목표:{" "}
+								{nicheResearch.query ?? nicheResearch.topic ?? "선택 주제"}
 							</PText>
-							<PText size="x-small" color="contrast-medium" className="mt-static-xs">
+							<PText
+								size="x-small"
+								color="contrast-medium"
+								className="mt-static-xs"
+							>
 								{nicheResearch.playbook?.headline ??
 									"니치 리서치에서 넘어온 제작 기준을 프리뷰 QC와 대조합니다."}
 							</PText>
@@ -442,7 +459,11 @@ function ProductionQualityPanel({
 									<PText size="x-small" weight="semi-bold">
 										{target.label ?? "영상 목표"}
 									</PText>
-									<PText size="x-small" color="contrast-medium" className="mt-static-xs">
+									<PText
+										size="x-small"
+										color="contrast-medium"
+										className="mt-static-xs"
+									>
 										{target.target ?? target.rationale ?? "목표 기준 없음"}
 									</PText>
 								</div>
@@ -521,7 +542,9 @@ function ProductionMetric({ label, value }: { label: string; value: string }) {
 	);
 }
 
-function critiqueColor(report: FinalOutputCritiqueReport):
+function critiqueColor(
+	report: FinalOutputCritiqueReport,
+):
 	| "notification-success-soft"
 	| "notification-warning-soft"
 	| "notification-error-soft" {
@@ -550,7 +573,8 @@ function FinalOutputCritiquePanel({
 						최종 산출물 자동 비평
 					</PHeading>
 					<PText size="small" color="contrast-medium" className="mt-static-xs">
-						레퍼런스 반영, 자료 안전, 썸네일, 정책, 제작 QC를 업로드 직전 한 번 더 합산합니다.
+						레퍼런스 반영, 자료 안전, 썸네일, 정책, 제작 QC를 업로드 직전 한 번
+						더 합산합니다.
 					</PText>
 				</div>
 				<div className="flex flex-wrap gap-static-xs">
@@ -702,7 +726,10 @@ function ThumbnailPlanPanel({
 							<div className="max-w-[520px] text-[clamp(28px,4vw,48px)] font-black leading-[.98] tracking-[-.05em] text-white drop-shadow-[0_3px_0_rgba(0,0,0,.85)]">
 								{plan.title}
 							</div>
-							<div className="mt-static-sm text-[18px] font-black" style={{ color: plan.accentColor }}>
+							<div
+								className="mt-static-sm text-[18px] font-black"
+								style={{ color: plan.accentColor }}
+							>
 								{plan.subtitle}
 							</div>
 						</div>
@@ -714,17 +741,28 @@ function ThumbnailPlanPanel({
 						<PText size="small" weight="semi-bold">
 							클릭 역할
 						</PText>
-						<PText size="x-small" color="contrast-medium" className="mt-static-xs">
+						<PText
+							size="x-small"
+							color="contrast-medium"
+							className="mt-static-xs"
+						>
 							{plan.referenceDna.clickPackaging.titleThumbnailRelationship}
 						</PText>
 					</div>
 					<div className="grid gap-static-xs md:grid-cols-3">
 						{plan.variants.slice(0, 3).map((variant) => (
-							<div key={variant.id} className="rounded-[8px] bg-surface p-static-sm">
+							<div
+								key={variant.id}
+								className="rounded-[8px] bg-surface p-static-sm"
+							>
 								<PText size="x-small" weight="semi-bold">
 									{variant.titlePattern}
 								</PText>
-								<PText size="x-small" color="contrast-medium" className="mt-static-xs">
+								<PText
+									size="x-small"
+									color="contrast-medium"
+									className="mt-static-xs"
+								>
 									{variant.testGoal}
 								</PText>
 							</div>
@@ -762,7 +800,10 @@ function thumbnailPathForScript(scriptId: string): string {
 
 function compactThumbnailTitle(title: string, fallback: string): string {
 	const primary = (title.split("|")[0] ?? title)
-		.replace(/\s*(타임라인 분석|확인된 사실과 남은 의문|핵심만 60초 요약)$/g, "")
+		.replace(
+			/\s*(타임라인 분석|확인된 사실과 남은 의문|핵심만 60초 요약)$/g,
+			"",
+		)
 		.trim();
 	if (primary.length > 0 && primary.length <= 18) return primary;
 	return (primary || fallback).slice(0, 18).trim() || "사건 타임라인";
@@ -772,7 +813,9 @@ function chooseThumbnailBackground(scenes: SceneWithAssets[]): string {
 	const ranked = scenes
 		.map((scene, index) => {
 			const url = scene.imageUrl ?? "";
-			const hasPunchShot = sceneShots(scene).some((shot) => shot.kind === "punch");
+			const hasPunchShot = sceneShots(scene).some(
+				(shot) => shot.kind === "punch",
+			);
 			return {
 				url,
 				score:
@@ -1068,7 +1111,7 @@ export default function StepPreview({
 			const hookFlags = hookResults.map((r) => r.hookBoost);
 
 			// SFX 자동 배정
-			const sfxList = assignSfxToScenes(
+			const rawSfxList = assignSfxToScenes(
 				beatRetimedScenes.map((s, idx) => ({
 					type: s.scene_type,
 					mood: s.mood,
@@ -1083,7 +1126,34 @@ export default function StepPreview({
 					...animationSfxHints(s),
 				})),
 			);
+			// SFX 마감: ① 무드별 볼륨 보정(horror↑/news↓) ② 같은 카테고리 효과음이
+			// 연속 씬에 반복돼 청각 피로를 주는 것을 쿨다운으로 억제.
+			const sfxTracker = createCooldownTracker();
+			let sfxFrameCursor = 0;
+			const sfxList = rawSfxList.map((sceneSfx, idx) => {
+				const startFrame = sfxFrameCursor;
+				sfxFrameCursor += Math.ceil(
+					Number(beatRetimedScenes[idx].duration_seconds) * VIDEO_FPS,
+				);
+				const mood = beatRetimedScenes[idx].mood;
+				return applyCooldownToSfx(
+					{
+						...sceneSfx,
+						enterSfx: withMoodVolume(sceneSfx.enterSfx, mood),
+						transitionSfx: withMoodVolume(sceneSfx.transitionSfx, mood),
+					},
+					startFrame,
+					sfxTracker,
+				);
+			});
 
+			// beat-pulse용 절대 BGM 비트(초). export 경로(submitRender)는 bgmCuePlan을 beats 없이
+			// 재계산해 startFrom=0(seek 안 함)으로 내보내므로, 트랙 비트시간=컴포지션 시간 → shift 없이
+			// 그대로 전달해야 export(=최종 산출물) 영상에서 정렬된다(로컬 remotion render 로 검증함).
+			// 알려진 한계(P3): 인앱 프리뷰는 state cuePlan(beats 포함)으로 BGM 을 startFrom seek 하므로,
+			// firstBeat∈[0.35,2.2]일 때 프리뷰 펄스가 startFrom/fps 만큼 늦게 보일 수 있다. export 는 정상.
+			// 근본 해결은 preview/export 의 bgmCuePlan startFrom 통일(선행 불일치 버그)과 함께 처리할 것.
+			const allBeatTimes = bgmAnalysis?.beats ?? [];
 			const rScenes: RemotionScene[] = beatRetimedScenes.map((s, idx) => {
 				// 이미지 출처 판단: generation_params에 origin/width가 있으면 활용
 				const genParams = (s as Record<string, unknown>).generation_params as
@@ -1139,6 +1209,8 @@ export default function StepPreview({
 					wordTimings: (s as Record<string, unknown>).word_timings as
 						| Array<{ word: string; startFrame: number; endFrame: number }>
 						| undefined,
+					// beat-pulse용 절대 BGM 비트(초). export startFrom=0 기준이라 shift 없이 전달.
+					beatTimes: allBeatTimes.length > 0 ? allBeatTimes : undefined,
 					// v3: 모션 그래픽
 					motionGraphics: (s as Record<string, unknown>).motion_graphics as
 						| Array<{
@@ -1392,14 +1464,19 @@ export default function StepPreview({
 			setBgmUrl(pickedUrl);
 			return pickedUrl;
 		}
-		throw new Error("BGM 자동 선택에 실패했습니다. 기본 BGM 또는 로컬 BGM을 먼저 설정하세요.");
+		throw new Error(
+			"BGM 자동 선택에 실패했습니다. 기본 BGM 또는 로컬 BGM을 먼저 설정하세요.",
+		);
 	}
 
 	async function updateSceneRecord(
 		sceneId: string,
 		patch: Record<string, unknown>,
 	) {
-		const { error } = await supabase.from("scenes").update(patch).eq("id", sceneId);
+		const { error } = await supabase
+			.from("scenes")
+			.update(patch)
+			.eq("id", sceneId);
 		if (error) throw new Error(`씬 품질 보강 저장 실패: ${error.message}`);
 	}
 
@@ -1544,7 +1621,8 @@ export default function StepPreview({
 						workingRemotionScenes[index].transition,
 					shots: patch.shots ?? workingRemotionScenes[index].shots,
 					motionGraphics:
-						patch.motion_graphics ?? workingRemotionScenes[index].motionGraphics,
+						patch.motion_graphics ??
+						workingRemotionScenes[index].motionGraphics,
 				};
 				repaired = true;
 			}
@@ -1627,7 +1705,9 @@ export default function StepPreview({
 			const repaired = await repairProductionQuality(ensuredBgmUrl);
 			if (!repaired.report.passed) {
 				const blockingIssue =
-					repaired.report.issues.find((issue) => issue.severity === "critical") ??
+					repaired.report.issues.find(
+						(issue) => issue.severity === "critical",
+					) ??
 					repaired.report.issues.find((issue) => issue.severity === "warning");
 				setApprovalError(
 					`품질 기준 미달: ${
@@ -1649,8 +1729,7 @@ export default function StepPreview({
 					thumbnailPlan?.title ?? "사건 타임라인",
 				),
 				subtitle:
-					thumbnailPlan?.subtitle ??
-					(isShorts ? "핵심 60초" : "확인된 흐름"),
+					thumbnailPlan?.subtitle ?? (isShorts ? "핵심 60초" : "확인된 흐름"),
 				channelName,
 				accentColor: thumbnailPlan?.accentColor,
 				preset: thumbnailPlan?.preset ?? "mystery",
@@ -1672,7 +1751,8 @@ export default function StepPreview({
 					finalReport.issues.find((issue) => issue.severity === "warning");
 				setApprovalError(
 					`품질 기준 미달: ${
-						blockingIssue?.message ?? "썸네일 생성 후 품질 기준을 통과하지 못했습니다."
+						blockingIssue?.message ??
+						"썸네일 생성 후 품질 기준을 통과하지 못했습니다."
 					}`,
 				);
 				setRenderProgress("품질 기준 미달로 렌더를 시작하지 않았습니다.");
@@ -1709,16 +1789,16 @@ export default function StepPreview({
 				0,
 			);
 
-				const renderFormat = isShorts ? "shorts" : "longform";
-				const initialKnowledgeEvent = buildRenderKnowledgeEvent({
-					referenceTemplate,
-					productionReport: finalReport,
-					format: renderFormat,
-					repaired: repaired.repaired,
-				});
-				const { data: render } = await supabase
-					.from("renders")
-					.insert({
+			const renderFormat = isShorts ? "shorts" : "longform";
+			const initialKnowledgeEvent = buildRenderKnowledgeEvent({
+				referenceTemplate,
+				productionReport: finalReport,
+				format: renderFormat,
+				repaired: repaired.repaired,
+			});
+			const { data: render } = await supabase
+				.from("renders")
+				.insert({
 					script_id: scriptId,
 					format: renderFormat,
 					aspect_ratio: isShorts ? "9:16" : "16:9",
@@ -1738,12 +1818,12 @@ export default function StepPreview({
 						auto_repair_applied: repaired.repaired,
 						production_quality_score: finalReport.score,
 						production_quality_passed: finalReport.passed,
-							production_quality_metrics: finalReport.metrics,
-							production_quality_issues: finalReport.issues,
-							production_quality_actions: finalReport.requiredActions,
-							knowledge_event: initialKnowledgeEvent,
-						},
-					})
+						production_quality_metrics: finalReport.metrics,
+						production_quality_issues: finalReport.issues,
+						production_quality_actions: finalReport.requiredActions,
+						knowledge_event: initialKnowledgeEvent,
+					},
+				})
 				.select()
 				.maybeSingle();
 
@@ -1886,29 +1966,29 @@ export default function StepPreview({
 					.from("renders")
 					.update({
 						status: "complete",
-							storage_path:
-								completed.outputPath || `renders/${scriptId}/final.mp4`,
-							qc_result_json: mergeRenderOutputQc(
-								renderQcBase,
-								completed.qcResult as RenderOutputQcLike | undefined,
-								{
-									render_output_repair_attempted: renderOutputRepairAttempted,
-									render_output_repair_succeeded:
-										renderOutputRepairAttempted || undefined,
-									knowledge_event: buildRenderKnowledgeEvent({
-										referenceTemplate,
-										productionReport: finalRenderResult.report,
-										format: renderFormat,
-										renderOutputQc:
-											completed.qcResult as RenderOutputQcLike | undefined,
-										repaired:
-											finalRenderResult.repaired ||
-											renderOutputRepairAttempted,
-									}),
-								},
-							),
-						})
-						.eq("id", render.id);
+						storage_path:
+							completed.outputPath || `renders/${scriptId}/final.mp4`,
+						qc_result_json: mergeRenderOutputQc(
+							renderQcBase,
+							completed.qcResult as RenderOutputQcLike | undefined,
+							{
+								render_output_repair_attempted: renderOutputRepairAttempted,
+								render_output_repair_succeeded:
+									renderOutputRepairAttempted || undefined,
+								knowledge_event: buildRenderKnowledgeEvent({
+									referenceTemplate,
+									productionReport: finalRenderResult.report,
+									format: renderFormat,
+									renderOutputQc: completed.qcResult as
+										| RenderOutputQcLike
+										| undefined,
+									repaired:
+										finalRenderResult.repaired || renderOutputRepairAttempted,
+								}),
+							},
+						),
+					})
+					.eq("id", render.id);
 			} catch (e) {
 				const msg = renderFailureMessage(e);
 				const failedJob = isRenderJobError(e) ? e.job : null;
@@ -1919,25 +1999,25 @@ export default function StepPreview({
 						...(failedJob?.outputPath
 							? { storage_path: failedJob.outputPath }
 							: {}),
-							qc_result_json: mergeRenderOutputQc(
-								renderQcBase,
-								failedJob?.qcResult as RenderOutputQcLike | undefined,
-								{
-									render_output_repair_attempted: renderOutputRepairAttempted,
-									render_output_repair_succeeded: false,
-									knowledge_event: buildRenderKnowledgeEvent({
-										referenceTemplate,
-										productionReport: finalRenderResult.report,
-										format: renderFormat,
-										renderOutputQc:
-											failedJob?.qcResult as RenderOutputQcLike | undefined,
-										repaired:
-											finalRenderResult.repaired ||
-											renderOutputRepairAttempted,
-									}),
-								},
-							),
-						})
+						qc_result_json: mergeRenderOutputQc(
+							renderQcBase,
+							failedJob?.qcResult as RenderOutputQcLike | undefined,
+							{
+								render_output_repair_attempted: renderOutputRepairAttempted,
+								render_output_repair_succeeded: false,
+								knowledge_event: buildRenderKnowledgeEvent({
+									referenceTemplate,
+									productionReport: finalRenderResult.report,
+									format: renderFormat,
+									renderOutputQc: failedJob?.qcResult as
+										| RenderOutputQcLike
+										| undefined,
+									repaired:
+										finalRenderResult.repaired || renderOutputRepairAttempted,
+								}),
+							},
+						),
+					})
 					.eq("id", render.id);
 				throw new Error(msg);
 			}
@@ -2137,7 +2217,9 @@ export default function StepPreview({
 
 			{visiblePolicyIssue && !approvalError && (
 				<PInlineNotification
-					state={visiblePolicyIssue.severity === "critical" ? "error" : "warning"}
+					state={
+						visiblePolicyIssue.severity === "critical" ? "error" : "warning"
+					}
 					dismissButton={false}
 					className="mb-static-md"
 				>
@@ -2151,9 +2233,7 @@ export default function StepPreview({
 			{visibleRetentionIssue && !approvalError && (
 				<PInlineNotification
 					state={
-						visibleRetentionIssue.severity === "critical"
-							? "error"
-							: "warning"
+						visibleRetentionIssue.severity === "critical" ? "error" : "warning"
 					}
 					dismissButton={false}
 					className="mb-static-md"
@@ -2168,9 +2248,7 @@ export default function StepPreview({
 			{visibleProductionIssue && !approvalError && (
 				<PInlineNotification
 					state={
-						visibleProductionIssue.severity === "critical"
-							? "error"
-							: "warning"
+						visibleProductionIssue.severity === "critical" ? "error" : "warning"
 					}
 					dismissButton={false}
 					className="mb-static-md"

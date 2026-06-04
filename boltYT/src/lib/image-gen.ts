@@ -14,12 +14,35 @@ import { supabase } from "./supabase";
 
 export type ImageGenProvider = "comfyui" | "a1111" | "dalle" | "none";
 
+export type ImageAspectRatio = "16:9" | "9:16" | "1:1";
+
 export interface ImageGenerationOptions {
 	seed?: number;
 	styleMode?: "auto" | "animation" | "photo";
 	negativePrompt?: string;
 	referenceImagePath?: string;
 	referenceStrength?: number;
+	/** 출력 종횡비. Shorts=9:16, 롱폼=16:9. 미지정 시 16:9. 영상 프레이밍과 일치시켜 크롭 방지. */
+	aspectRatio?: ImageAspectRatio;
+	/** 씬 mood — moodVisualIntensity 시네마틱 디스크립터 주입(영상 경로와 톤 일치). */
+	mood?: string;
+}
+
+/** 종횡비 → SDXL/A1111 권장 해상도(픽셀). */
+function imageDims(ratio?: ImageAspectRatio): {
+	width: number;
+	height: number;
+} {
+	if (ratio === "9:16") return { width: 768, height: 1344 };
+	if (ratio === "1:1") return { width: 1024, height: 1024 };
+	return { width: 1344, height: 768 }; // 16:9 기본
+}
+
+/** 종횡비 → DALL-E 3 허용 사이즈 문자열. */
+function dalleSize(ratio?: ImageAspectRatio): string {
+	if (ratio === "9:16") return "1024x1792";
+	if (ratio === "1:1") return "1024x1024";
+	return "1792x1024"; // 16:9 기본
 }
 
 interface ImageGenStatus {
@@ -168,8 +191,19 @@ async function generateWithComfyUI(
 	workflow["6"].inputs.text = prompt;
 	workflow["7"].inputs.text =
 		options?.negativePrompt ??
-		(isAnimationPrompt(prompt) ? ANIMATION_NEGATIVE_PROMPT : DEFAULT_NEGATIVE_PROMPT);
+		(isAnimationPrompt(prompt)
+			? ANIMATION_NEGATIVE_PROMPT
+			: DEFAULT_NEGATIVE_PROMPT);
 	workflow["3"].inputs.seed = normalizeSeed(options?.seed);
+	// 종횡비 반영 — Shorts(9:16) 컷 크롭 방지.
+	const dims = imageDims(options?.aspectRatio);
+	workflow["5"].inputs.width = dims.width;
+	workflow["5"].inputs.height = dims.height;
+	// 디테일↑·과대비 인공물↓: steps 40, cfg 6.5. 체크포인트는 설정으로 교체 가능.
+	workflow["3"].inputs.steps = 40;
+	workflow["3"].inputs.cfg = 6.5;
+	const ckpt = localStorage.getItem("comfyui_ckpt");
+	if (ckpt) workflow["4"].inputs.ckpt_name = ckpt;
 
 	// 프롬프트 제출
 	const queueRes = await fetch("http://localhost:8188/prompt", {
@@ -224,11 +258,10 @@ async function generateWithA1111(
 				(isAnimationPrompt(prompt)
 					? ANIMATION_NEGATIVE_PROMPT
 					: DEFAULT_NEGATIVE_PROMPT),
-			steps: 35,
-			cfg_scale: 7,
+			steps: 40,
+			cfg_scale: 6.5,
 			seed: normalizeSeed(options?.seed),
-			width: 1344,
-			height: 768,
+			...imageDims(options?.aspectRatio),
 			sampler_index: "DPM++ 2M Karras",
 		}),
 	});
@@ -256,9 +289,7 @@ async function generateWithA1111Img2Img(
 	}
 	const referenceData = await loadLocalFileData(options.referenceImagePath);
 	if (!referenceData) {
-		throw new Error(
-			`Reference image not found: ${options.referenceImagePath}`,
-		);
+		throw new Error(`Reference image not found: ${options.referenceImagePath}`);
 	}
 	const res = await fetch("http://localhost:7860/sdapi/v1/img2img", {
 		method: "POST",
@@ -271,12 +302,11 @@ async function generateWithA1111Img2Img(
 				(isAnimationPrompt(prompt)
 					? ANIMATION_NEGATIVE_PROMPT
 					: DEFAULT_NEGATIVE_PROMPT),
-			steps: 35,
-			cfg_scale: 7,
+			steps: 40,
+			cfg_scale: 6.5,
 			denoising_strength: clamp(options.referenceStrength ?? 0.42, 0.2, 0.75),
 			seed: normalizeSeed(options.seed),
-			width: 1344,
-			height: 768,
+			...imageDims(options.aspectRatio),
 			sampler_index: "DPM++ 2M Karras",
 		}),
 	});
@@ -297,18 +327,42 @@ async function generateWithA1111Img2Img(
 
 // ─── DALL-E API 이미지 생성 ───
 
-async function generateWithDalle(prompt: string): Promise<ArrayBuffer> {
+async function generateWithDalle(
+	prompt: string,
+	options?: ImageGenerationOptions,
+): Promise<ArrayBuffer> {
 	const proxy = getApiProxyUrl();
+	// 뉴스/정보/다큐 톤은 'natural'(과채도·합성사진 방지), 미스터리/호러/드라마는 'vivid'.
+	const naturalMood = /news|neutral|proof|evidence|document/i.test(
+		options?.mood ?? "",
+	);
+	const style =
+		options?.styleMode === "photo" || naturalMood ? "natural" : "vivid";
+	// DALL-E는 negative_prompt 미지원 → 스타일은 긍정 지시로, 결함은 avoid 절로 분리.
+	const isAnimation =
+		options?.styleMode === "animation" || isAnimationPrompt(prompt);
+	// 애니메이션은 "flat 2D illustration"을 *원하는 스타일*로 지시(긍정), photorealism/live action만 회피.
+	const styleDirective = isAnimation
+		? " Render as a flat 2D animated illustration."
+		: "";
+	const animationAvoid = isAnimation
+		? " photorealism, live action, realistic photo,"
+		: "";
+	const dallePrompt =
+		`${prompt}${styleDirective}\n\nAvoid:${animationAvoid} on-screen text, watermark, logo, distorted faces, extra fingers, oversaturation.`.slice(
+			0,
+			3900,
+		);
 	const res = await fetch(`${proxy}/api/openai/images`, {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
 		body: JSON.stringify({
 			model: "dall-e-3",
-			prompt,
+			prompt: dallePrompt,
 			n: 1,
-			size: "1792x1024",
+			size: dalleSize(options?.aspectRatio),
 			quality: "hd",
-			style: "vivid",
+			style,
 			response_format: "b64_json",
 		}),
 	});
@@ -375,9 +429,9 @@ async function generateImageInternal(
 	sceneIdForAsset?: string,
 	options?: ImageGenerationOptions,
 ): Promise<{ url: string; provider: ImageGenProvider }> {
-	// 레퍼런스 프리셋이 있으면 visualPrompt에 스타일 DNA(프롬프트 템플릿 + 컬러 + 조명) 주입
+	// 레퍼런스 프리셋이 있으면 visualPrompt에 스타일 DNA(프롬프트 템플릿 + 컬러 + 조명 + mood) 주입
 	const styledPrompt = referencePreset
-		? enrichVisualPrompt(visualPrompt, referencePreset)
+		? enrichVisualPrompt(visualPrompt, referencePreset, options?.mood)
 		: visualPrompt;
 	const promptStyle = animationPromptStyle(styledPrompt, options?.styleMode);
 	const provider = preferredProvider ?? getActiveProvider();
@@ -410,7 +464,7 @@ async function generateImageInternal(
 					}
 					break;
 				case "dalle":
-					buffer = await generateWithDalle(promptStyle);
+					buffer = await generateWithDalle(promptStyle, options);
 					break;
 				default:
 					continue;

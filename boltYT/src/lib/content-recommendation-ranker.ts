@@ -152,7 +152,8 @@ const CATEGORY_BLUEPRINTS: CategoryBlueprint[] = [
 	{
 		id: "mystery_doc",
 		label: "미스터리/다큐",
-		keywords: /미스터리|사건|기록|왕릉|유적|실종|범죄|다큐|비밀|의문|mystery|case|crime|documentary/i,
+		keywords:
+			/미스터리|사건|기록|왕릉|유적|실종|범죄|다큐|비밀|의문|mystery|case|crime|documentary/i,
 		defaultMode: "research",
 		scriptDirections: [
 			{
@@ -170,7 +171,11 @@ const CATEGORY_BLUEPRINTS: CategoryBlueprint[] = [
 					"후반: 반론을 먼저 인정한 뒤 남는 의문 회수",
 				],
 				thumbnail: "현장 이미지 + 노란 원형 표시 + '왜 여기만?'",
-				risks: ["출처 없는 단정 표현", "괴담처럼 과장된 제목", "자료 없는 AI 이미지 의존"],
+				risks: [
+					"출처 없는 단정 표현",
+					"괴담처럼 과장된 제목",
+					"자료 없는 AI 이미지 의존",
+				],
 			},
 			{
 				id: "three-questions",
@@ -211,7 +216,8 @@ const CATEGORY_BLUEPRINTS: CategoryBlueprint[] = [
 	{
 		id: "drama_recap",
 		label: "드라마/영화 해설",
-		keywords: /드라마|영화|결말|복선|리캡|몰아보기|캐릭터|movie|film|recap|ending/i,
+		keywords:
+			/드라마|영화|결말|복선|리캡|몰아보기|캐릭터|movie|film|recap|ending/i,
 		defaultMode: "research",
 		scriptDirections: [
 			{
@@ -252,7 +258,8 @@ const CATEGORY_BLUEPRINTS: CategoryBlueprint[] = [
 	{
 		id: "social_clip",
 		label: "사회/이슈 클립",
-		keywords: /뉴스|이슈|논란|반응|댓글|사회|사건|해외|정리|news|issue|reaction|social/i,
+		keywords:
+			/뉴스|이슈|논란|반응|댓글|사회|사건|해외|정리|news|issue|reaction|social/i,
 		defaultMode: "research",
 		scriptDirections: [
 			{
@@ -294,7 +301,8 @@ const CATEGORY_BLUEPRINTS: CategoryBlueprint[] = [
 	{
 		id: "business",
 		label: "비즈니스/자동화",
-		keywords: /자동화|수익|비즈니스|창업|ai|워크플로우|툴|개발자|automation|business|startup|workflow/i,
+		keywords:
+			/자동화|수익|비즈니스|창업|\bai\b|워크플로우|툴|개발자|automation|business|startup|workflow/i,
 		defaultMode: "ai",
 		scriptDirections: [
 			{
@@ -336,7 +344,8 @@ const CATEGORY_BLUEPRINTS: CategoryBlueprint[] = [
 	{
 		id: "animation",
 		label: "애니메이션/스토리",
-		keywords: /애니|캐릭터|스토리|상황극|공포|개그|cartoon|animation|character|story/i,
+		keywords:
+			/애니|캐릭터|스토리|상황극|공포|개그|cartoon|animation|character|story/i,
 		defaultMode: "animation",
 		scriptDirections: [
 			{
@@ -361,7 +370,8 @@ const CATEGORY_BLUEPRINTS: CategoryBlueprint[] = [
 				title: "짧은 공포 빌드업형",
 				format: "shorts",
 				goal: "watch_time",
-				structure: "평범한 상황에서 시각적 불일치를 하나씩 늘려 마지막 컷에서 정체를 암시",
+				structure:
+					"평범한 상황에서 시각적 불일치를 하나씩 늘려 마지막 컷에서 정체를 암시",
 				angle: "설명보다 화면 변화로 긴장감 생성",
 				beats: [
 					"0-4초: 평범하지만 이상한 첫 프레임",
@@ -536,7 +546,9 @@ function rankHooks(
 	performanceFeedback: ContentPerformanceFeedback,
 ): RankedHookRecommendation[] {
 	const preferredPattern = input.referenceTemplate?.hook_pattern || "question";
-	const hooks: Array<Omit<RankedHookRecommendation, "rank" | "score"> & { base: number }> = [
+	const hooks: Array<
+		Omit<RankedHookRecommendation, "rank" | "score"> & { base: number }
+	> = [
 		{
 			pattern: "question",
 			text: `${topicTitle}, 왜 사람들은 이 지점을 놓쳤을까요?`,
@@ -625,9 +637,27 @@ function rankFormats(params: {
 }): RankedFormatChoice[] {
 	const { input, blueprint, sourceMetrics, performanceFeedback } = params;
 	const choices: Array<Omit<RankedFormatChoice, "rank">> = [
-		buildFormatChoice("shorts", input, blueprint, sourceMetrics, performanceFeedback),
-		buildFormatChoice("longform", input, blueprint, sourceMetrics, performanceFeedback),
-		buildFormatChoice("both", input, blueprint, sourceMetrics, performanceFeedback),
+		buildFormatChoice(
+			"shorts",
+			input,
+			blueprint,
+			sourceMetrics,
+			performanceFeedback,
+		),
+		buildFormatChoice(
+			"longform",
+			input,
+			blueprint,
+			sourceMetrics,
+			performanceFeedback,
+		),
+		buildFormatChoice(
+			"both",
+			input,
+			blueprint,
+			sourceMetrics,
+			performanceFeedback,
+		),
 	];
 	return choices
 		.sort((a, b) => b.score - a.score)
@@ -641,7 +671,8 @@ function buildFormatChoice(
 	sourceMetrics: ReturnType<typeof measureSources>,
 	performanceFeedback: ContentPerformanceFeedback,
 ): Omit<RankedFormatChoice, "rank"> {
-	const domainFormat: DomainFormat = format === "longform" ? "longform" : "shorts";
+	const domainFormat: DomainFormat =
+		format === "longform" ? "longform" : "shorts";
 	const durationBand = recommendDurationBand({
 		categoryId: blueprint.id,
 		format: domainFormat,
@@ -653,11 +684,17 @@ function buildFormatChoice(
 		const templatePrefersLongform =
 			input.referenceTemplate.duration_seconds >= 180 ||
 			input.referenceTemplate.scene_count >= 12;
-		if ((format === "longform" || format === "both") && templatePrefersLongform) score += 8;
+		if ((format === "longform" || format === "both") && templatePrefersLongform)
+			score += 8;
 		if (format === "shorts" && !templatePrefersLongform) score += 8;
 	}
 	if (format === "longform" && sourceMetrics.total >= 5) score += 6;
-	if (format === "longform" && input.mode === "research" && sourceMetrics.total < 3) score -= 12;
+	if (
+		format === "longform" &&
+		input.mode === "research" &&
+		sourceMetrics.total < 3
+	)
+		score -= 12;
 	if (format === "shorts" && sourceMetrics.total < 3) score += 4;
 	if (format === "both" && sourceMetrics.hasMixedMedia) score += 5;
 	if (performanceFeedback.winningFormat) {
@@ -669,13 +706,23 @@ function buildFormatChoice(
 		format,
 		score: clampScore(score),
 		label:
-			format === "both" ? "쇼츠+롱폼 동시 제작" : format === "shorts" ? "쇼츠 우선" : "롱폼 우선",
+			format === "both"
+				? "쇼츠+롱폼 동시 제작"
+				: format === "shorts"
+					? "쇼츠 우선"
+					: "롱폼 우선",
 		durationRange:
 			format === "both"
 				? `쇼츠 ${formatDurationRange(
-						recommendDurationBand({ categoryId: blueprint.id, format: "shorts" }),
+						recommendDurationBand({
+							categoryId: blueprint.id,
+							format: "shorts",
+						}),
 					)} / 롱폼 ${formatDurationRange(
-						recommendDurationBand({ categoryId: blueprint.id, format: "longform" }),
+						recommendDurationBand({
+							categoryId: blueprint.id,
+							format: "longform",
+						}),
 					)}`
 				: formatDurationRange(durationBand),
 		reason:
@@ -708,15 +755,27 @@ function scoreScriptDirection(params: {
 		performanceFeedback,
 	} = params;
 	let score = 72 - index * 2;
-	if (direction.format === input.selectedFormat || direction.format === "both") score += 5;
+	if (direction.format === input.selectedFormat || direction.format === "both")
+		score += 5;
 	if (input.mode === blueprint.defaultMode) score += 4;
 	if (input.referenceTemplate) {
 		score += 5;
-		if (input.referenceTemplate.hook_duration > 0 && input.referenceTemplate.hook_duration <= 5) {
+		if (
+			input.referenceTemplate.hook_duration > 0 &&
+			input.referenceTemplate.hook_duration <= 5
+		) {
 			score += 4;
 		}
-		if (input.referenceTemplate.pacing_preset === "fast" && candidateFormat === "shorts") score += 4;
-		if (input.referenceTemplate.duration_seconds >= 180 && candidateFormat === "longform") score += 5;
+		if (
+			input.referenceTemplate.pacing_preset === "fast" &&
+			candidateFormat === "shorts"
+		)
+			score += 4;
+		if (
+			input.referenceTemplate.duration_seconds >= 180 &&
+			candidateFormat === "longform"
+		)
+			score += 5;
 		if (input.referenceTemplate.script_structure?.length) score += 3;
 	}
 	if (input.nicheHandoff) {
@@ -728,14 +787,20 @@ function scoreScriptDirection(params: {
 	if (input.mode === "research" && sourceMetrics.total === 0) score -= 10;
 	if (blueprint.id === "animation" && input.mode === "animation") score += 8;
 	if (performanceFeedback.winningFormat === candidateFormat) score += 7;
-	if (performanceFeedback.openingRetentionRisk && direction.goal === "watch_time") {
+	if (
+		performanceFeedback.openingRetentionRisk &&
+		direction.goal === "watch_time"
+	) {
 		score += 5;
 	}
 	if (performanceFeedback.ctrRisk && direction.goal === "new_viewers") {
 		score += 4;
 	}
 	if (performanceFeedback.topKeywords.length > 0) {
-		score += Math.min(5, Math.round(performanceFeedback.topKeywords[0].score / 80));
+		score += Math.min(
+			5,
+			Math.round(performanceFeedback.topKeywords[0].score / 80),
+		);
 	}
 	return clampScore(score);
 }
@@ -843,17 +908,47 @@ function confidenceLevel(
 	return "low";
 }
 
-function resolveCategory(input: ContentRecommendationInput): CategoryBlueprint {
-	if (input.referenceTemplate) {
-		const profile = inferCategoryProfile(input.referenceTemplate);
-		const fromTemplate =
-			CATEGORY_BLUEPRINTS.find((blueprint) => blueprint.id === profile.id) ?? null;
-		if (fromTemplate) return fromTemplate;
+/** 텍스트에서 blueprint 키워드 정규식의 매치 개수(전역) — first-match 오분류 방지용 스코어. */
+function countCategoryKeywordMatches(keywords: RegExp, text: string): number {
+	const matches = text.match(new RegExp(keywords.source, "gi"));
+	return matches ? matches.length : 0;
+}
+
+/** 가장 많이 매치된 카테고리 선택. 단순 first-match가 아니라 매치 수로 가려, 여러 카테고리
+ *  키워드가 섞인 주제(예: '해외 뉴스 댓글이 갈린 사건')를 올바른 카테고리로 라우팅한다. */
+function bestTopicCategoryMatch(text: string): CategoryBlueprint | null {
+	let best: CategoryBlueprint | null = null;
+	let bestScore = 0;
+	for (const blueprint of CATEGORY_BLUEPRINTS) {
+		const score = countCategoryKeywordMatches(blueprint.keywords, text);
+		if (score > bestScore) {
+			bestScore = score;
+			best = blueprint;
+		}
 	}
-	const text = [
+	return best;
+}
+
+function resolveCategory(input: ContentRecommendationInput): CategoryBlueprint {
+	const topicText = [
 		input.topicTitle,
 		input.nicheHandoff?.topic,
 		input.nicheHandoff?.summary.query,
+	]
+		.filter(Boolean)
+		.join(" ");
+	const fromTopic =
+		topicText.trim().length > 0 ? bestTopicCategoryMatch(topicText) : null;
+	if (fromTopic) return fromTopic;
+
+	if (input.referenceTemplate) {
+		const profile = inferCategoryProfile(input.referenceTemplate);
+		const fromTemplate =
+			CATEGORY_BLUEPRINTS.find((blueprint) => blueprint.id === profile.id) ??
+			null;
+		if (fromTemplate) return fromTemplate;
+	}
+	const text = [
 		input.referenceTemplate?.name,
 		input.referenceTemplate?.source_title,
 	]
@@ -872,7 +967,10 @@ function recommendedDomainFormat(
 ): DomainFormat {
 	if (input.selectedFormat === "shorts") return "shorts";
 	if (input.selectedFormat === "longform") return "longform";
-	if (input.referenceTemplate?.duration_seconds && input.referenceTemplate.duration_seconds >= 180) {
+	if (
+		input.referenceTemplate?.duration_seconds &&
+		input.referenceTemplate.duration_seconds >= 180
+	) {
 		return "longform";
 	}
 	if (sourceMetrics.total >= 5 && input.mode === "research") return "longform";
@@ -899,14 +997,22 @@ function summarizePerformanceFeedback(
 			openingRetentionRisk: false,
 			ctrRisk: false,
 			topKeywords: [],
-			topSignals: ["아직 업로드 성과 데이터가 없어 기본 도메인 규칙으로만 추천합니다."],
+			topSignals: [
+				"아직 업로드 성과 데이터가 없어 기본 도메인 규칙으로만 추천합니다.",
+			],
 			warnings: [],
 			scoreNotes: [],
 		};
 	}
 
-	const formatScores = new Map<DomainFormat, { score: number; count: number }>();
-	const keywordScores = new Map<string, { score: number; sampleIds: Set<string> }>();
+	const formatScores = new Map<
+		DomainFormat,
+		{ score: number; count: number }
+	>();
+	const keywordScores = new Map<
+		string,
+		{ score: number; sampleIds: Set<string> }
+	>();
 	const topicTokens = new Set(tokenizeRecommendationText(topicTitle));
 	const ctrValues: number[] = [];
 	const viewPercentageValues: number[] = [];
@@ -938,11 +1044,7 @@ function summarizePerformanceFeedback(
 		}
 		const sampleTokens = new Set(
 			tokenizeRecommendationText(
-				[
-					sample.title,
-					sample.description,
-					...(sample.tags ?? []),
-				]
+				[sample.title, sample.description, ...(sample.tags ?? [])]
 					.filter(Boolean)
 					.join(" "),
 			),
@@ -1039,7 +1141,9 @@ function summarizePerformanceFeedback(
 function measureSources(sources: RecommendationSourceInput[]) {
 	const videoCount = sources.filter((source) => source.type === "video").length;
 	const imageCount = sources.filter((source) => source.type === "image").length;
-	const articleCount = sources.filter((source) => source.type === "article").length;
+	const articleCount = sources.filter(
+		(source) => source.type === "article",
+	).length;
 	const textChars = sources.reduce(
 		(sum, source) =>
 			sum +
@@ -1055,7 +1159,8 @@ function measureSources(sources: RecommendationSourceInput[]) {
 		articleCount,
 		textChars,
 		hasMixedMedia:
-			[videoCount > 0, imageCount > 0, articleCount > 0].filter(Boolean).length >= 2,
+			[videoCount > 0, imageCount > 0, articleCount > 0].filter(Boolean)
+				.length >= 2,
 	};
 }
 
@@ -1079,11 +1184,18 @@ function buildHookText(
 	return `${topicTitle}, 왜 ${angle.replace(/\.$/, "")}일까요?`;
 }
 
-function buildViewerQuestion(topicTitle: string, blueprint: CategoryBlueprint): string {
-	if (blueprint.id === "business") return `${topicTitle}에서 실제 병목은 무엇이었나?`;
-	if (blueprint.id === "social_clip") return `${topicTitle}에서 사람들이 갈리는 진짜 쟁점은 무엇인가?`;
-	if (blueprint.id === "drama_recap") return `${topicTitle}의 결말은 이미 어디서 예고됐나?`;
-	if (blueprint.id === "animation") return `${topicTitle}의 마지막 행동은 왜 예상과 달랐나?`;
+function buildViewerQuestion(
+	topicTitle: string,
+	blueprint: CategoryBlueprint,
+): string {
+	if (blueprint.id === "business")
+		return `${topicTitle}에서 실제 병목은 무엇이었나?`;
+	if (blueprint.id === "social_clip")
+		return `${topicTitle}에서 사람들이 갈리는 진짜 쟁점은 무엇인가?`;
+	if (blueprint.id === "drama_recap")
+		return `${topicTitle}의 결말은 이미 어디서 예고됐나?`;
+	if (blueprint.id === "animation")
+		return `${topicTitle}의 마지막 행동은 왜 예상과 달랐나?`;
 	return `${topicTitle}에서 아직 설명되지 않은 단서는 무엇인가?`;
 }
 
@@ -1160,7 +1272,8 @@ function normalizePerformanceFormat(
 		return sample.format;
 	}
 	const duration = finiteMetric(sample.durationSeconds);
-	if (duration != null && duration > 0) return duration > 180 ? "longform" : "shorts";
+	if (duration != null && duration > 0)
+		return duration > 180 ? "longform" : "shorts";
 	return null;
 }
 
@@ -1174,7 +1287,8 @@ function hasOpeningRetentionRisk(
 	const sorted = [...curve].sort(
 		(a, b) => a.elapsedVideoTimeRatio - b.elapsedVideoTimeRatio,
 	);
-	const early = sorted.find((point) => point.elapsedVideoTimeRatio >= 0.05) ?? sorted[0];
+	const early =
+		sorted.find((point) => point.elapsedVideoTimeRatio >= 0.05) ?? sorted[0];
 	const later =
 		sorted.find((point) => point.elapsedVideoTimeRatio >= 0.25) ??
 		sorted[Math.min(2, sorted.length - 1)];
@@ -1191,7 +1305,9 @@ function tokenizeRecommendationText(text: string): string[] {
 		.replace(/[^\p{L}\p{N}\s#]/gu, " ")
 		.split(/\s+/)
 		.map((token) => token.replace(/^#+/, "").trim())
-		.filter((token) => token.length >= 2 && !RECOMMENDATION_STOPWORDS.has(token))
+		.filter(
+			(token) => token.length >= 2 && !RECOMMENDATION_STOPWORDS.has(token),
+		)
 		.slice(0, 80);
 }
 

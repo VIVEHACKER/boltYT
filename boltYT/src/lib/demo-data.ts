@@ -211,6 +211,8 @@ export function getDemoRemotionScenes(): RemotionScene[] {
 	];
 	const enterSfx = ["reveal-1.mp3", "tension-rise.mp3", "impact-1.mp3"];
 	const transitionSfx = ["whoosh-1.mp3", "whoosh-1.mp3", "whoosh-2.mp3"];
+	// 데모 BGM(dark-ambient) 절대 비트 그리드 — 0.5s 간격(120bpm). beat-pulse 시연/검증용.
+	const demoBeatTimes = Array.from({ length: 40 }, (_, k) => 0.5 + k * 0.5);
 
 	return DEMO_SCENES.map((s, i) => ({
 		imageUrl: "",
@@ -227,5 +229,6 @@ export function getDemoRemotionScenes(): RemotionScene[] {
 		shots: DEMO_SHOTS[i],
 		enterSfxFile: enterSfx[i],
 		transitionSfxFile: transitionSfx[i],
+		beatTimes: demoBeatTimes,
 	}));
 }

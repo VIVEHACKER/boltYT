@@ -187,6 +187,42 @@ describe("generateImage", () => {
 		await expect(generateImage("scene-1", "prompt")).rejects.toThrow();
 	});
 
+	it("aspectRatio 9:16 → DALL-E size 1024x1792 (Shorts 세로)", async () => {
+		mockStorage.setItem("image_gen_active", "dalle");
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			json: () => Promise.resolve({ data: [{ b64_json: fakeB64 }] }),
+		});
+		vi.stubGlobal("fetch", fetchMock);
+		await generateImage("scene-1", "prompt", "dalle", undefined, {
+			aspectRatio: "9:16",
+		});
+		const body = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
+		expect(body.size).toBe("1024x1792");
+	});
+
+	it("mood=news → DALL-E style 'natural' (과채도 방지), 기본은 'vivid'", async () => {
+		mockStorage.setItem("image_gen_active", "dalle");
+		const mk = () =>
+			vi.fn().mockResolvedValue({
+				ok: true,
+				json: () => Promise.resolve({ data: [{ b64_json: fakeB64 }] }),
+			});
+		const newsFetch = mk();
+		vi.stubGlobal("fetch", newsFetch);
+		await generateImage("s", "prompt", "dalle", undefined, { mood: "news" });
+		expect(JSON.parse(String(newsFetch.mock.calls[0][1]?.body)).style).toBe(
+			"natural",
+		);
+
+		const horrorFetch = mk();
+		vi.stubGlobal("fetch", horrorFetch);
+		await generateImage("s", "prompt", "dalle", undefined, { mood: "horror" });
+		expect(JSON.parse(String(horrorFetch.mock.calls[0][1]?.body)).style).toBe(
+			"vivid",
+		);
+	});
+
 	it("provider='comfyui' 실패 → DALL-E fallback 성공", async () => {
 		mockStorage.setItem("image_gen_active", "comfyui");
 		let callCount = 0;

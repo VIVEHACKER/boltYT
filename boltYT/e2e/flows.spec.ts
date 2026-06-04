@@ -294,6 +294,22 @@ test.describe("콘텐츠 위저드 플로우", () => {
 			page.getByText("저장된 레퍼런스의 편집 문법을 현재 주제로 변환해 추천합니다."),
 		).toBeVisible();
 	});
+
+	test("레퍼런스가 달라도 추천 방향은 사용자가 입력한 주제를 따른다", async ({
+		page,
+	}) => {
+		await seedWizardChannels(page);
+		await page.goto(
+			"/content/new?mode=research&channel=ch-beta&template=ref-drama-e2e&title=AI%20%EC%9E%90%EB%8F%99%ED%99%94%EB%A1%9C%20%EB%91%90%20%EB%B2%88%20%EC%8B%A4%ED%8C%A8%ED%95%98%EA%B3%A0%20%EC%84%B1%EA%B3%B5%ED%95%9C%20%EA%B0%9C%EB%B0%9C%EC%9E%90%EC%9D%98%20%EC%9B%8C%ED%81%AC%ED%94%8C%EB%A1%9C%EC%9A%B0",
+			{ waitUntil: "networkidle" },
+		);
+
+		await expect(page.getByText("선택 레퍼런스 적용")).toBeVisible({
+			timeout: 10_000,
+		});
+		await expect(page.getByText(/카테고리 비즈니스\/자동화/)).toBeVisible();
+		await expect(page.getByText("실패 원인 해부형")).toBeVisible();
+	});
 });
 
 // ─── 채널 생성 폼 ─────────────────────────────────────────────────────────

@@ -94,7 +94,16 @@ export function buildSceneSearchQueries(scene: SceneMediaLike): {
 
 export function buildSceneImagePrompt(scene: SceneMediaLike): string {
 	const visualPrompt = normalizeText(scene.visual_prompt);
-	if (visualPrompt) return visualPrompt;
+	// 정상 경로: 영어 visual_prompt 를 충분한 길이로 사용 (디테일 유실 방지).
+	if (visualPrompt && looksEnglish(visualPrompt))
+		return truncate(visualPrompt, 380);
+
+	// fal/Flux/SDXL 은 영어 편향 — 한국어 프롬프트는 무시되므로 영어 대체(searchQueryEn) 우선.
+	const englishFallback = normalizeText(scene.searchQueryEn);
+	if (englishFallback) return truncate(englishFallback, 380);
+
+	// 영어 대체가 없으면 한국어 visual_prompt 라도 사용 (현행 동작).
+	if (visualPrompt) return truncate(visualPrompt, 380);
 
 	const parts = [
 		normalizeText(scene.news_title),
@@ -102,7 +111,7 @@ export function buildSceneImagePrompt(scene: SceneMediaLike): string {
 		normalizeText(scene.narration_text),
 	].filter(Boolean);
 
-	return truncate(parts.join(" - "), 180);
+	return truncate(parts.join(" - "), 380);
 }
 
 export function buildShotSearchQueries(
@@ -117,7 +126,8 @@ export function buildShotSearchQueries(
 	const shotPrompt = normalizeText(shot?.visual_prompt);
 	const shotCaption = normalizeText(shot?.caption);
 	const shotTitle = normalizeText(shot?.source_title);
-	const shotTerms = shot?.search_terms?.map(normalizeText).filter(Boolean) ?? [];
+	const shotTerms =
+		shot?.search_terms?.map(normalizeText).filter(Boolean) ?? [];
 	const roleSuffix =
 		shot?.visual_role === "document"
 			? "document record evidence"
@@ -162,7 +172,16 @@ export function buildShotImagePrompt(
 	shot?: ShotMediaLike,
 ): string {
 	const shotPrompt = normalizeText(shot?.visual_prompt);
-	if (shotPrompt) return shotPrompt;
+	if (shotPrompt && looksEnglish(shotPrompt)) return truncate(shotPrompt, 380);
+
+	// 영어 shot search_terms 가 있으면 영어 모델용으로 우선 사용.
+	const englishShotTerms = (shot?.search_terms ?? [])
+		.map(normalizeText)
+		.filter((term) => term && looksEnglish(term));
+	if (englishShotTerms.length)
+		return truncate(englishShotTerms.join(", "), 380);
+
+	if (shotPrompt) return truncate(shotPrompt, 380);
 
 	const parts = [
 		normalizeText(shot?.source_title),
@@ -170,5 +189,5 @@ export function buildShotImagePrompt(
 		buildSceneImagePrompt(scene),
 	].filter(Boolean);
 
-	return truncate(parts.join(" - "), 220);
+	return truncate(parts.join(" - "), 380);
 }

@@ -35,6 +35,7 @@ import {
 	detectVideoGen,
 	generateSceneVideo,
 	getActiveVideoProvider,
+	resolveVideoProvider,
 	setActiveVideoProvider,
 	VIDEO_COST_PER_SCENE,
 	type VideoGenProvider,
@@ -65,18 +66,18 @@ afterEach(() => {
 
 // ─── getActiveVideoProvider ───────────────────────────────────────────────────
 describe("getActiveVideoProvider", () => {
-	it("localStorage 없으면 기본값 'wan26' (선택 보강용)", () => {
-		expect(getActiveVideoProvider()).toBe("wan26");
-	});
-
-	it("localStorage 값 반환", () => {
-		mockStorage.setItem("video_gen_active", "kling3");
+	it("localStorage 없으면 기본값 'kling3' (최종 렌더 품질 우선)", () => {
 		expect(getActiveVideoProvider()).toBe("kling3");
 	});
 
-	it("불명 값은 fallback wan26", () => {
-		mockStorage.setItem("video_gen_active", "invalid");
+	it("localStorage 값 반환", () => {
+		mockStorage.setItem("video_gen_active", "wan26");
 		expect(getActiveVideoProvider()).toBe("wan26");
+	});
+
+	it("불명 값은 fallback kling3", () => {
+		mockStorage.setItem("video_gen_active", "invalid");
+		expect(getActiveVideoProvider()).toBe("kling3");
 	});
 });
 
@@ -84,6 +85,22 @@ describe("setActiveVideoProvider", () => {
 	it("저장 후 즉시 조회 가능", () => {
 		setActiveVideoProvider("hailuo");
 		expect(getActiveVideoProvider()).toBe("hailuo");
+	});
+});
+
+describe("resolveVideoProvider (품질 티어)", () => {
+	it("preview 티어는 가성비 wan26", () => {
+		expect(resolveVideoProvider("preview")).toBe("wan26");
+	});
+
+	it("final 티어는 사용자 선택(기본 kling3)", () => {
+		mockStorage.clear();
+		expect(resolveVideoProvider("final")).toBe("kling3");
+	});
+
+	it("명시 provider는 티어보다 우선한다", () => {
+		expect(resolveVideoProvider("preview", "hailuo")).toBe("hailuo");
+		expect(resolveVideoProvider("final", "ltx2")).toBe("ltx2");
 	});
 });
 
@@ -120,31 +137,48 @@ describe("buildFalInput", () => {
 		);
 	});
 
-	it("wan26: image_url + duration 문자열", () => {
+	it("wan26: image_url + duration은 5/10으로 스냅(7→10)", () => {
 		const input = buildFalInput("wan26", {
 			prompt: "ocean waves",
 			imageUrl: baseImg,
 			duration: 7,
 		});
 		expect(input.image_url).toBe(baseImg);
-		expect(input.duration).toBe("7");
+		// 7초 나레이션은 5초보다 길어야 하므로 10으로 스냅 (영상이 나레이션보다 짧아지는 것 방지)
+		expect(input.duration).toBe("10");
 		expect(input.prompt).toMatch(/cinematic/i);
 	});
 
-	it("duration clamp 3~10", () => {
-		const tooShort = buildFalInput("wan26", {
+	it("duration은 provider 허용값(5/10)으로 스냅", () => {
+		const short = buildFalInput("wan26", {
 			prompt: "x",
 			imageUrl: baseImg,
 			duration: 1,
 		});
-		expect(tooShort.duration).toBe("3");
+		expect(short.duration).toBe("5"); // clamp 3 → snap 5
 
-		const tooLong = buildFalInput("wan26", {
+		const mid = buildFalInput("wan26", {
+			prompt: "x",
+			imageUrl: baseImg,
+			duration: 5,
+		});
+		expect(mid.duration).toBe("5");
+
+		const long = buildFalInput("wan26", {
 			prompt: "x",
 			imageUrl: baseImg,
 			duration: 30,
 		});
-		expect(tooLong.duration).toBe("10");
+		expect(long.duration).toBe("10"); // clamp 10 → snap 10
+	});
+
+	it("네거티브 기본값에 I2V 결함 차단 키워드가 포함된다", () => {
+		const input = buildFalInput("kling3", {
+			prompt: "scene",
+			imageUrl: baseImg,
+		});
+		expect(String(input.negative_prompt)).toMatch(/morphing/);
+		expect(String(input.negative_prompt)).toMatch(/flickering/);
 	});
 
 	it("klingO1: end_image_url 누락 시 throw", () => {

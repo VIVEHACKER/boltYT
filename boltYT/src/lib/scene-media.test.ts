@@ -49,6 +49,17 @@ describe("scene-media helpers", () => {
 		expect(prompt).toBe("cinematic apartment alley at dusk, detective tape");
 	});
 
+	it("한국어 visual_prompt면 영어 searchQueryEn을 우선 사용한다 (영어 모델 호환)", () => {
+		const prompt = buildSceneImagePrompt({
+			narration_text: "피해자는 집 앞에서 마지막으로 목격됐습니다.",
+			scene_type: "image",
+			visual_prompt: "어두운 골목의 범죄 현장",
+			searchQueryEn: "dark crime scene alley at night, cinematic",
+		});
+		// 한국어 프롬프트가 fal 영어 모델에 그대로 가지 않고 영어 대체로 치환
+		expect(prompt).toBe("dark crime scene alley at night, cinematic");
+	});
+
 	it("샷 검색어는 shot.visual_prompt와 caption을 우선 사용한다", () => {
 		const queries = buildShotSearchQueries(
 			{
