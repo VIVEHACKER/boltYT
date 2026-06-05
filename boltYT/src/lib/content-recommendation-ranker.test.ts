@@ -6,7 +6,9 @@ import {
 	pickTopContentRecommendation,
 } from "./content-recommendation-ranker";
 
-function template(overrides: Partial<ReferenceTemplate> = {}): ReferenceTemplate {
+function template(
+	overrides: Partial<ReferenceTemplate> = {},
+): ReferenceTemplate {
 	return {
 		id: "builtin-auto-mystery-doc-test",
 		channel_id: "__builtin_reference__",
@@ -159,6 +161,58 @@ describe("content-recommendation-ranker", () => {
 		expect(pickTopContentRecommendation(plan)?.title).toContain("실패");
 		expect(plan.confidence).toBe("medium");
 		expect(plan.scripts[0].promptDirectives.join(" ")).toContain("훅");
+	});
+
+	it("명시한 레퍼런스가 있어도 사용자가 입력한 주제 카테고리를 우선한다", () => {
+		const plan = buildContentRecommendationPlan({
+			topicTitle: "AI 자동화로 두 번 실패하고 성공한 개발자의 워크플로우",
+			mode: "research",
+			selectedFormat: "longform",
+			referenceTemplate: template({
+				id: "builtin-drama-recap-longform",
+				name: "드라마/영화 몰아보기",
+				source_title: "드라마 결말 해설 레퍼런스",
+				duration_seconds: 1200,
+				scene_count: 30,
+				visual_mood: "mystery",
+			}),
+		});
+
+		expect(plan.categoryId).toBe("business");
+		expect(plan.categoryLabel).toBe("비즈니스/자동화");
+		expect(plan.scripts[0].title).toBe("실패 원인 해부형");
+		expect(plan.evidence.join(" ")).toContain("레퍼런스");
+	});
+
+	it("우연히 'ai' 부분문자열이 든 영어 주제(Rain)는 business로 오분류되지 않는다", () => {
+		const plan = buildContentRecommendationPlan({
+			// 'Rain'에 'ai'가 들어있지만 다른 카테고리 키워드는 없음 → 레퍼런스로 떨어져야 함
+			topicTitle: "Rain forest survival journey",
+			mode: "research",
+			selectedFormat: "longform",
+			referenceTemplate: template({
+				id: "builtin-drama-recap-longform",
+				name: "드라마/영화 몰아보기",
+				source_title: "드라마 결말 해설 레퍼런스",
+				duration_seconds: 1200,
+				scene_count: 30,
+				visual_mood: "mystery",
+			}),
+		});
+
+		// 'Rain'의 'ai'가 토큰 경계(\bai\b)로 더 이상 매칭되지 않아 레퍼런스 카테고리를 따른다
+		expect(plan.categoryId).not.toBe("business");
+		expect(plan.categoryId).toBe("drama_recap");
+	});
+
+	it("여러 카테고리 키워드가 섞인 주제는 매치 수가 많은 카테고리로 라우팅한다", () => {
+		// '사건'(mystery 1개) vs '해외/뉴스/댓글'(social 3개) → first-match가 아니라 social_clip
+		const plan = buildContentRecommendationPlan({
+			topicTitle: "해외 뉴스 댓글이 갈린 사건",
+			mode: "research",
+			selectedFormat: "shorts",
+		});
+		expect(plan.categoryId).toBe("social_clip");
 	});
 
 	it("업로드 성과 데이터가 강한 포맷과 유지율 리스크를 추천 점수에 반영한다", () => {

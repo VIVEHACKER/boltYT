@@ -189,6 +189,20 @@ describe("deriveLockedSeed", () => {
 		expect(deriveLockedSeed("script-A")).not.toBe(deriveLockedSeed("script-B"));
 	});
 
+	it("sceneIndex 생략(0)은 기존 시드와 동일 → 이미지 톤 일관성 유지", () => {
+		expect(deriveLockedSeed("script-x", 0)).toBe(deriveLockedSeed("script-x"));
+	});
+
+	it("sceneIndex 지정 시 씬마다 다른 시드 → I2V 모션 정체 방지", () => {
+		const s0 = deriveLockedSeed("script-x", 0);
+		const s1 = deriveLockedSeed("script-x", 1);
+		const s2 = deriveLockedSeed("script-x", 2);
+		expect(s1).not.toBe(s0);
+		expect(s2).not.toBe(s1);
+		// 결정론 유지
+		expect(deriveLockedSeed("script-x", 1)).toBe(s1);
+	});
+
 	it("양의 정수 (32-bit 양수 범위)", () => {
 		const seed = deriveLockedSeed("any-id");
 		expect(seed).toBeGreaterThanOrEqual(0);

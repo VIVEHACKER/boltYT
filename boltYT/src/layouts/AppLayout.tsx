@@ -22,11 +22,11 @@ export default function AppLayout() {
 	}
 
 	return (
-		<div className="flex min-h-screen bg-canvas">
+		<div className="flex h-screen min-h-0 overflow-hidden bg-canvas">
 			<Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-			<div className="flex-1 flex flex-col min-w-0">
+			<div className="flex-1 flex h-full min-h-0 flex-col min-w-0">
 				{/* Mobile top bar with hamburger */}
-				<div className="md:hidden flex items-center gap-static-sm p-static-sm border-b border-contrast-low bg-surface sticky top-0 z-40">
+				<div className="md:hidden shrink-0 flex items-center gap-static-sm p-static-sm border-b border-contrast-low bg-surface sticky top-0 z-40">
 					<button
 						type="button"
 						aria-label="메뉴 열기"
@@ -36,7 +36,7 @@ export default function AppLayout() {
 						<Menu size={20} />
 					</button>
 				</div>
-				<main className="flex-1 p-fluid-md overflow-y-auto">
+				<main className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-fluid-md">
 					<Outlet />
 				</main>
 			</div>

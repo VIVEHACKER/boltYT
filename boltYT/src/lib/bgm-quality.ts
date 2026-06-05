@@ -106,11 +106,53 @@ const MOOD_POSITIVE_TERMS: Record<BgmMood, string[]> = {
 };
 
 const MOOD_NEGATIVE_TERMS: Record<BgmMood, string[]> = {
-	dark: ["happy", "funny", "comedy", "cute", "ukulele", "kids", "corporate", "christmas"],
-	tense: ["happy", "funny", "comedy", "cute", "relaxing", "ukulele", "corporate", "christmas"],
-	mysterious: ["happy", "funny", "comedy", "cute", "motivation", "corporate", "dance"],
-	dramatic: ["funny", "comedy", "cute", "kids", "ukulele", "corporate", "jingle"],
-	calm: ["horror", "scary", "aggressive", "battle", "dubstep", "metal", "trailer hit"],
+	dark: [
+		"happy",
+		"funny",
+		"comedy",
+		"cute",
+		"ukulele",
+		"kids",
+		"corporate",
+		"christmas",
+	],
+	tense: [
+		"happy",
+		"funny",
+		"comedy",
+		"cute",
+		"relaxing",
+		"ukulele",
+		"corporate",
+		"christmas",
+	],
+	mysterious: [
+		"happy",
+		"funny",
+		"comedy",
+		"cute",
+		"motivation",
+		"corporate",
+		"dance",
+	],
+	dramatic: [
+		"funny",
+		"comedy",
+		"cute",
+		"kids",
+		"ukulele",
+		"corporate",
+		"jingle",
+	],
+	calm: [
+		"horror",
+		"scary",
+		"aggressive",
+		"battle",
+		"dubstep",
+		"metal",
+		"trailer hit",
+	],
 	upbeat: ["horror", "creepy", "sad", "melancholy", "dark drone", "funeral"],
 	epic: ["funny", "comedy", "cute", "kids", "ukulele", "lo-fi", "jingle"],
 	sad: ["happy", "upbeat", "funky", "dance", "corporate", "comedy", "kids"],
@@ -185,11 +227,13 @@ export function assessBgmTrackQuality(
 	let score = 50;
 
 	const mood = context.mood || "";
+	let moodPositive = 0;
 	if (mood) {
-		const positive = countTerms(text, MOOD_POSITIVE_TERMS[mood]);
-		const negative = countTerms(text, MOOD_NEGATIVE_TERMS[mood]);
-		if (positive > 0) {
-			score += Math.min(34, positive * 8);
+		// 방어: 매핑에 없는 mood(예: 씬 mood가 그대로 전달)면 빈 배열로 처리해 크래시 방지.
+		moodPositive = countTerms(text, MOOD_POSITIVE_TERMS[mood] ?? []);
+		const negative = countTerms(text, MOOD_NEGATIVE_TERMS[mood] ?? []);
+		if (moodPositive > 0) {
+			score += Math.min(34, moodPositive * 8);
 			pushUnique(reasons, `${mood} mood match`);
 		} else {
 			score -= 12;
@@ -239,7 +283,13 @@ export function assessBgmTrackQuality(
 		pushUnique(warnings, "short track for slow pacing");
 	}
 
-	const finalScore = Math.max(0, Math.min(100, Math.round(score)));
+	let finalScore = Math.max(0, Math.min(100, Math.round(score)));
+	// mood 가 지정됐는데 긍정 키워드가 0개면 분위기 미스매치 → 통과 임계 미만으로 캡
+	// (다른 보너스로 상쇄돼 분위기 안 맞는 BGM 이 선택되는 것 방지).
+	if (mood && moodPositive === 0) {
+		finalScore = Math.min(finalScore, MIN_PROFESSIONAL_BGM_SCORE - 1);
+		pushUnique(warnings, "mood gate: no positive mood match");
+	}
 	return {
 		score: finalScore,
 		passed: finalScore >= MIN_PROFESSIONAL_BGM_SCORE,

@@ -181,14 +181,29 @@ function resolveTextLayout(zone: ThumbnailTextZone | undefined): TextLayout {
 		case "left_third":
 			return { x: 76, centerY: 375, maxWidth: 560, align: "left" };
 		case "right_third":
-			return { x: THUMB_WIDTH - 76, centerY: 375, maxWidth: 560, align: "right" };
+			return {
+				x: THUMB_WIDTH - 76,
+				centerY: 375,
+				maxWidth: 560,
+				align: "right",
+			};
 		case "top_left":
 			return { x: 76, centerY: 215, maxWidth: 650, align: "left" };
 		case "bottom_band":
-			return { x: THUMB_WIDTH / 2, centerY: 505, maxWidth: 960, align: "center" };
+			return {
+				x: THUMB_WIDTH / 2,
+				centerY: 505,
+				maxWidth: 960,
+				align: "center",
+			};
 		case "center_band":
 		default:
-			return { x: THUMB_WIDTH / 2, centerY: 360, maxWidth: THUMB_WIDTH - 160, align: "center" };
+			return {
+				x: THUMB_WIDTH / 2,
+				centerY: 360,
+				maxWidth: THUMB_WIDTH - 160,
+				align: "center",
+			};
 	}
 }
 
@@ -218,9 +233,10 @@ function drawBadge(
 export async function generateThumbnail(
 	options: ThumbnailOptions,
 ): Promise<string> {
-	const preset = PRESETS[
-		options.preset ?? options.referenceDna?.generation.preset ?? "mystery"
-	];
+	const preset =
+		PRESETS[
+			options.preset ?? options.referenceDna?.generation.preset ?? "mystery"
+		];
 	const accentColor =
 		options.accentColor ??
 		options.referenceDna?.color.accentColor ??
@@ -233,6 +249,15 @@ export async function generateThumbnail(
 	const ctx = canvas.getContext("2d");
 	if (!ctx) throw new Error("Canvas 2D context not available");
 
+	// 레퍼런스 썸네일 DNA 가 고대비면 배경에 대비·채도 부스트 (CTR 1차 변수인 시각 임팩트↑).
+	const dnaContrast = options.referenceDna?.color.contrast;
+	const contrastBoost =
+		dnaContrast === "extreme"
+			? "contrast(1.3) saturate(1.25)"
+			: dnaContrast === "high"
+				? "contrast(1.18) saturate(1.15)"
+				: "";
+
 	// ─── 1. 배경 이미지 ───
 	try {
 		const bg = await loadImage(options.backgroundUrl);
@@ -240,7 +265,9 @@ export async function generateThumbnail(
 		const scale = Math.max(THUMB_WIDTH / bg.width, THUMB_HEIGHT / bg.height);
 		const w = bg.width * scale;
 		const h = bg.height * scale;
+		if (contrastBoost) ctx.filter = contrastBoost;
 		ctx.drawImage(bg, (THUMB_WIDTH - w) / 2, (THUMB_HEIGHT - h) / 2, w, h);
+		if (contrastBoost) ctx.filter = "none";
 	} catch {
 		// 이미지 로드 실패 시 그라데이션 배경
 		const grad = ctx.createLinearGradient(0, 0, THUMB_WIDTH, THUMB_HEIGHT);
@@ -287,7 +314,12 @@ export async function generateThumbnail(
 	}
 
 	// ─── 5.5. 클릭 패키징 배지 ───
-	drawBadge(ctx, options.badgeText ?? options.referenceDna?.generation.badgeText, accentColor, options.channelName);
+	drawBadge(
+		ctx,
+		options.badgeText ?? options.referenceDna?.generation.badgeText,
+		accentColor,
+		options.channelName,
+	);
 
 	// ─── 6. 메인 타이틀 ───
 	const layout = resolveTextLayout(textZone);

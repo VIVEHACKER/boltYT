@@ -14,6 +14,12 @@ import { expect, test } from "@playwright/test";
 const SCRIPT_ID = "e2e-visual-script-001";
 const EDITOR_URL = `/content/${SCRIPT_ID}/editor`;
 
+async function stabilizeVisualState(page: Page) {
+	await page.addInitScript(() => {
+		localStorage.setItem("onboarding_done_v1", "1");
+	});
+}
+
 async function seedScene(page: Page) {
 	await page.evaluate((scriptId: string) => {
 		const scene = {
@@ -42,6 +48,7 @@ async function clearSeed(page: Page) {
 
 test.describe("visual regression", () => {
 	test("dashboard 스냅샷", async ({ page }) => {
+		await stabilizeVisualState(page);
 		await page.goto("/dashboard", { waitUntil: "networkidle" });
 		await expect(page).toHaveScreenshot("dashboard.png", {
 			threshold: 0.1,
@@ -50,6 +57,7 @@ test.describe("visual regression", () => {
 	});
 
 	test("에디터 — 타임라인 풀 렌더 스냅샷", async ({ page }) => {
+		await stabilizeVisualState(page);
 		await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
 		await seedScene(page);
 		await page.goto(EDITOR_URL, { waitUntil: "networkidle" });
@@ -71,6 +79,7 @@ test.describe("visual regression", () => {
 	});
 
 	test("에디터 — 단축키 모달 스냅샷", async ({ page }) => {
+		await stabilizeVisualState(page);
 		await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
 		await seedScene(page);
 		await page.goto(EDITOR_URL, { waitUntil: "networkidle" });

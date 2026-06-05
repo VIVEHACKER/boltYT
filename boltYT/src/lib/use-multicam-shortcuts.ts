@@ -5,7 +5,7 @@
  * onCut(angleIndex) 콜백 — HUD 트리거용 옵션 파라미터.
  */
 
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { findGroup } from "./multicam-timeline";
 import { useTimelineStore } from "./timeline-store";
 
@@ -19,8 +19,11 @@ export function useMulticamShortcuts(
 ): void {
 	const project = useTimelineStore((s) => s.project);
 	const playhead = useTimelineStore((s) => s.playhead);
-	const selected = useTimelineStore((s) => s.selected());
 	const setMulticamCut = useTimelineStore((s) => s.setMulticamCut);
+	const selected = useMemo(
+		() => project?.clips.filter((clip) => clip.selected) ?? [],
+		[project],
+	);
 
 	const onCut = options?.onCut;
 

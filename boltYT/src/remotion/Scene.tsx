@@ -28,6 +28,7 @@ import {
 import type { SceneShot } from "../lib/scene-shot-types";
 import { SFX_CATALOG, type SfxCategory, type SfxEntry } from "../lib/sfx";
 import { getShotOverlayTheme } from "../lib/shot-overlay-theme";
+import { computeBeatPulseScale } from "../lib/beat-pulse";
 import { computeTextEmphasisCueTheme } from "../lib/text-emphasis-cue-theme";
 import { computeTextEmphasisWordStyle } from "../lib/text-emphasis-highlight";
 import { computeTextEmphasisLayout } from "../lib/text-emphasis-layout";
@@ -212,8 +213,7 @@ function animationRigMicroTransform(
 		rig.mouthCue === "open" || rig.mouthCue === "wide"
 			? 1 + 0.012 * eased * intensity
 			: 1;
-	const squash =
-		rig.pose === "action" ? 1 + 0.012 * eased * intensity : 1;
+	const squash = rig.pose === "action" ? 1 + 0.012 * eased * intensity : 1;
 	return `translateY(${y.toFixed(2)}px) rotate(${rotation.toFixed(2)}deg) scale(${(mouthPulse * squash).toFixed(3)})`;
 }
 
@@ -244,7 +244,8 @@ function animationAccentColor(scene: RemotionScene, shot?: SceneShot): string {
 	if (cue === "impact" || cue === "suspense_hit") return "255, 232, 138";
 	if (cue === "glitch") return "112, 231, 255";
 	if (cue === "notification" || cue === "bell") return "132, 204, 255";
-	if (scene.mood === "horror" || scene.mood === "mystery") return "167, 139, 250";
+	if (scene.mood === "horror" || scene.mood === "mystery")
+		return "167, 139, 250";
 	return "255, 255, 255";
 }
 
@@ -385,7 +386,8 @@ function shotBoundaryFadeFrames(
 	) {
 		return 2;
 	}
-	if (scene.pacing === "fast" || scene.hookBoost || shot.animation_rig) return 3;
+	if (scene.pacing === "fast" || scene.hookBoost || shot.animation_rig)
+		return 3;
 	if (shot.media_type === "video") return 4;
 	return 6;
 }
@@ -395,7 +397,8 @@ function editorialAccentColor(scene: RemotionScene, shot?: SceneShot): string {
 	if (cue === "glitch") return "84, 220, 255";
 	if (cue === "impact" || cue === "suspense_hit") return "255, 223, 118";
 	if (scene.mood === "warm") return "255, 198, 128";
-	if (scene.mood === "horror" || scene.mood === "mystery") return "166, 130, 255";
+	if (scene.mood === "horror" || scene.mood === "mystery")
+		return "166, 130, 255";
 	return "255, 255, 255";
 }
 
@@ -782,6 +785,8 @@ type SubtitleBgStyle = "none" | "pill" | "block" | "stroke" | "glow";
 
 interface SceneProps {
 	scene: RemotionScene;
+	/** 이 씬 Sequence의 컴포지션 절대 시작 프레임(전환 오버랩 반영). beat-pulse 절대 동기화용. */
+	sceneStartFrame?: number;
 	brand?: {
 		channelName?: string;
 		channelHandle?: string;
@@ -1479,6 +1484,7 @@ function NewsOverlayView({
 
 function DefaultSceneView({
 	scene,
+	sceneStartFrame = 0,
 	subtitleStyle: sub = DEFAULT_SUBTITLE,
 	fadeOutFrames,
 	hasGlobalNarration = false,
@@ -1521,7 +1527,7 @@ function DefaultSceneView({
 		activeShot.durationInFrames,
 	);
 
-	const kb = computeShotMotion(
+	const kbBase = computeShotMotion(
 		activeShot.shot,
 		activeShot.localFrame,
 		activeShot.durationInFrames,
@@ -1530,6 +1536,24 @@ function DefaultSceneView({
 		scene.narration,
 		scene.mood,
 	);
+	// beat-pulse: BGM 비트에 맞춰 배경 비주얼만 미세 줌펀치(자막 제외). 컴포지션 절대 프레임
+	// (sceneStartFrame=전환 오버랩 반영) 기준으로 절대 비트(초)와 매칭 → 다중 씬 누적 드리프트 없음.
+	// export 경로는 BGM startFrom=0(seek 안 함)이라 트랙 비트시간=컴포지션 시간이므로 그대로 매칭.
+	const beatPulse = computeBeatPulseScale({
+		sceneStartFrame,
+		frame: sceneStartFrame + frame,
+		beatTimes: scene.beatTimes ?? [],
+		fps,
+		intensity: 1.05,
+		pulseWidthFrames: 5,
+	});
+	const kb =
+		beatPulse > 1
+			? {
+					...kbBase,
+					transform: `${kbBase.transform ?? ""} scale(${beatPulse.toFixed(4)})`,
+				}
+			: kbBase;
 	const emphasisTone = inferNewsSurfaceTone({
 		narration: scene.narration,
 		newsTitle: scene.newsTitle,
@@ -1850,13 +1874,13 @@ function SocialClipCardSceneView({
 		scene.wordTimings,
 	);
 	const progress = clamp(frame / Math.max(1, durationInFrames - 1), 0, 1);
-		const handle = brand?.channelHandle?.trim() ?? "";
-		const title = scene.newsTitle || scene.sourceAttribution || scene.narration;
-		const titleLines = splitReadableLines(title, 13, 2);
-		const captionSource =
-			activeShot.shot?.caption || scene.newsExcerpt || scene.narration;
-		const captionLines = splitReadableLines(captionSource, 17, 2);
-		const hookPill = scene.newsExcerpt ? compactText(scene.newsExcerpt, 38) : "";
+	const handle = brand?.channelHandle?.trim() ?? "";
+	const title = scene.newsTitle || scene.sourceAttribution || scene.narration;
+	const titleLines = splitReadableLines(title, 13, 2);
+	const captionSource =
+		activeShot.shot?.caption || scene.newsExcerpt || scene.narration;
+	const captionLines = splitReadableLines(captionSource, 17, 2);
+	const hookPill = scene.newsExcerpt ? compactText(scene.newsExcerpt, 38) : "";
 	const mediaUrl =
 		activeShot.shot?.source_url || scene.videoUrl || scene.imageUrl || "";
 	const isVideoShot =
@@ -1892,9 +1916,9 @@ function SocialClipCardSceneView({
 		{
 			width: "100%",
 			height: "100%",
-				objectFit: getShotObjectFit(activeShot.shot?.crop),
-				background: "#050505",
-				...mediaMotion,
+			objectFit: getShotObjectFit(activeShot.shot?.crop),
+			background: "#050505",
+			...mediaMotion,
 		},
 		micro,
 	);
@@ -1964,28 +1988,28 @@ function SocialClipCardSceneView({
 				))}
 			</div>
 
-				{hookPill && (
-					<div
-						style={{
-							position: "absolute",
-							top: 292,
-							left: "50%",
-							maxWidth: 650,
-							padding: "9px 18px",
-							borderRadius: 999,
-							transform: "translateX(-50%)",
-							background: "rgba(0,0,0,0.62)",
-							color: "#fff",
-							fontSize: 25,
-							fontWeight: 760,
-							lineHeight: 1.25,
-							textAlign: "center",
-							boxShadow: "0 6px 20px rgba(0,0,0,0.18)",
-						}}
-					>
-						{hookPill}
-					</div>
-				)}
+			{hookPill && (
+				<div
+					style={{
+						position: "absolute",
+						top: 292,
+						left: "50%",
+						maxWidth: 650,
+						padding: "9px 18px",
+						borderRadius: 999,
+						transform: "translateX(-50%)",
+						background: "rgba(0,0,0,0.62)",
+						color: "#fff",
+						fontSize: 25,
+						fontWeight: 760,
+						lineHeight: 1.25,
+						textAlign: "center",
+						boxShadow: "0 6px 20px rgba(0,0,0,0.18)",
+					}}
+				>
+					{hookPill}
+				</div>
+			)}
 
 			<div
 				style={{
@@ -2062,8 +2086,7 @@ function SocialClipCardSceneView({
 						fontWeight: 930,
 						lineHeight: 1.18,
 						letterSpacing: "-0.045em",
-						textShadow:
-							"0 4px 0 rgba(0,0,0,0.86), 0 0 18px rgba(0,0,0,0.72)",
+						textShadow: "0 4px 0 rgba(0,0,0,0.86), 0 0 18px rgba(0,0,0,0.72)",
 					}}
 				>
 					{captionLines.map((line, index) => (
@@ -2084,52 +2107,52 @@ function SocialClipCardSceneView({
 				}}
 			/>
 
-				{handle && (
+			{handle && (
+				<div
+					style={{
+						position: "absolute",
+						top: footerTop + 236,
+						left: 92,
+						display: "flex",
+						alignItems: "center",
+						gap: 16,
+					}}
+				>
 					<div
 						style={{
-							position: "absolute",
-							top: footerTop + 236,
-							left: 92,
+							width: 62,
+							height: 62,
+							borderRadius: 999,
+							background: "#ffd21f",
 							display: "flex",
 							alignItems: "center",
-							gap: 16,
+							justifyContent: "center",
+							color: "#fff",
+							fontSize: 34,
+							fontWeight: 950,
 						}}
 					>
-						<div
-							style={{
-								width: 62,
-								height: 62,
-								borderRadius: 999,
-								background: "#ffd21f",
-								display: "flex",
-								alignItems: "center",
-								justifyContent: "center",
-								color: "#fff",
-								fontSize: 34,
-								fontWeight: 950,
-							}}
-						>
-							♪
-						</div>
-						<div style={{ color: "#111", fontSize: 30, fontWeight: 900 }}>
-							{handle}
-						</div>
-						<div
-							style={{
-								marginLeft: 6,
-								padding: "12px 30px",
-								borderRadius: 999,
-								background: "#fff",
-								color: "#111",
-								fontSize: 29,
-								fontWeight: 900,
-								boxShadow: "0 4px 18px rgba(0,0,0,0.16)",
-							}}
-						>
-							구독
-						</div>
+						♪
 					</div>
-				)}
+					<div style={{ color: "#111", fontSize: 30, fontWeight: 900 }}>
+						{handle}
+					</div>
+					<div
+						style={{
+							marginLeft: 6,
+							padding: "12px 30px",
+							borderRadius: 999,
+							background: "#fff",
+							color: "#111",
+							fontSize: 29,
+							fontWeight: 900,
+							boxShadow: "0 4px 18px rgba(0,0,0,0.16)",
+						}}
+					>
+						구독
+					</div>
+				</div>
+			)}
 
 			<div
 				style={{
@@ -2159,6 +2182,7 @@ function SocialClipCardSceneView({
 
 function VideoSceneView({
 	scene,
+	sceneStartFrame = 0,
 	subtitleStyle: sub = DEFAULT_SUBTITLE,
 	fadeOutFrames,
 	hasGlobalNarration = false,
@@ -2232,10 +2256,7 @@ function VideoSceneView({
 					const sequenceFrom = Math.max(0, entry.from - fadeFrames);
 					const sequenceLeadFrames = entry.from - sequenceFrom;
 					const videoStartFrame = secondsToFrames(entry.shot.trim_start, fps);
-					const startFrom = Math.max(
-						0,
-						videoStartFrame - sequenceLeadFrames,
-					);
+					const startFrom = Math.max(0, videoStartFrame - sequenceLeadFrames);
 					const endAt = shotEndAtFrame(
 						entry.shot,
 						fps,
@@ -2249,7 +2270,7 @@ function VideoSceneView({
 						usage,
 						proxyAvailable: proxyReady,
 					});
-					const motion = computeShotMotion(
+					const motionBase = computeShotMotion(
 						entry.shot,
 						Math.max(0, localF),
 						entry.durationInFrames,
@@ -2258,6 +2279,22 @@ function VideoSceneView({
 						scene.narration,
 						scene.mood,
 					);
+					// beat-pulse: 컴포지션 절대 프레임 기준 BGM 비트 줌펀치(영상 씬에도 적용).
+					const beatPulse = computeBeatPulseScale({
+						sceneStartFrame,
+						frame: sceneStartFrame + frame,
+						beatTimes: scene.beatTimes ?? [],
+						fps,
+						intensity: 1.05,
+						pulseWidthFrames: 5,
+					});
+					const motion =
+						beatPulse > 1
+							? {
+									...motionBase,
+									transform: `${motionBase.transform ?? ""} scale(${beatPulse.toFixed(4)})`,
+								}
+							: motionBase;
 					const micro = computeMicroEditStyle({
 						frame,
 						durationInFrames,
@@ -2282,66 +2319,66 @@ function VideoSceneView({
 							from={sequenceFrom}
 							durationInFrames={entry.durationInFrames + sequenceLeadFrames}
 						>
-						<AbsoluteFill
-							style={{
-								opacity,
-								overflow: "hidden",
-								filter: shotFilter || undefined,
-							}}
-						>
-							{isVideoShot && shotSrc ? (
-								<Video
-									src={shotSrc}
-									startFrom={startFrom}
-									style={mergeMotionStyles(
-										mergeMotionStyles(
-											{
-												width: "100%",
-												height: "100%",
-												objectFit: getShotObjectFit(entry.shot.crop),
-												background: "#050505",
-												...motion,
-											},
-											micro,
-										),
-										speechMicro,
-									)}
-									volume={opacity * videoVolume}
-									endAt={endAt}
+							<AbsoluteFill
+								style={{
+									opacity,
+									overflow: "hidden",
+									filter: shotFilter || undefined,
+								}}
+							>
+								{isVideoShot && shotSrc ? (
+									<Video
+										src={shotSrc}
+										startFrom={startFrom}
+										style={mergeMotionStyles(
+											mergeMotionStyles(
+												{
+													width: "100%",
+													height: "100%",
+													objectFit: getShotObjectFit(entry.shot.crop),
+													background: "#050505",
+													...motion,
+												},
+												micro,
+											),
+											speechMicro,
+										)}
+										volume={opacity * videoVolume}
+										endAt={endAt}
+									/>
+								) : shotSrc ? (
+									<Img
+										src={shotSrc}
+										style={mergeMotionStyles(
+											mergeMotionStyles(
+												{
+													width: "100%",
+													height: "100%",
+													objectFit: "cover",
+													...motion,
+												},
+												micro,
+											),
+											speechMicro,
+										)}
+									/>
+								) : null}
+								<AnimationPerformanceOverlay
+									scene={scene}
+									shot={entry.shot}
+									sceneFrame={frame}
+									localFrame={Math.max(0, localF)}
+									durationInFrames={entry.durationInFrames}
 								/>
-							) : shotSrc ? (
-								<Img
-									src={shotSrc}
-									style={mergeMotionStyles(
-										mergeMotionStyles(
-											{
-												width: "100%",
-												height: "100%",
-												objectFit: "cover",
-												...motion,
-											},
-											micro,
-										),
-										speechMicro,
-									)}
+								<EditorialRhythmOverlay
+									scene={scene}
+									shot={entry.shot}
+									sceneFrame={frame}
+									localFrame={Math.max(0, localF)}
+									durationInFrames={entry.durationInFrames}
+									isVideoShot={isVideoShot}
 								/>
-							) : null}
-							<AnimationPerformanceOverlay
-								scene={scene}
-								shot={entry.shot}
-								sceneFrame={frame}
-								localFrame={Math.max(0, localF)}
-								durationInFrames={entry.durationInFrames}
-							/>
-							<EditorialRhythmOverlay
-								scene={scene}
-								shot={entry.shot}
-								sceneFrame={frame}
-								localFrame={Math.max(0, localF)}
-								durationInFrames={entry.durationInFrames}
-								isVideoShot={isVideoShot}
-							/>
-						</AbsoluteFill>
+							</AbsoluteFill>
 						</Sequence>
 					);
 				})
@@ -2436,6 +2473,7 @@ function VideoSceneView({
 
 export function SceneView({
 	scene,
+	sceneStartFrame = 0,
 	brand,
 	subtitleStyle,
 	fadeOutFrames,
@@ -2450,6 +2488,7 @@ export function SceneView({
 }: SceneProps) {
 	const props: SceneProps = {
 		scene,
+		sceneStartFrame,
 		brand,
 		subtitleStyle,
 		fadeOutFrames,
@@ -2683,7 +2722,9 @@ function CinematicTextEmphasis({
 	titleOpacity: number;
 	cardTransform: string;
 }) {
-	const leadFontSize = Math.round(sub.emphasisFontSize * (vertical ? 0.46 : 0.42));
+	const leadFontSize = Math.round(
+		sub.emphasisFontSize * (vertical ? 0.46 : 0.42),
+	);
 	const focusFontSize = isStacked
 		? Math.round(sub.emphasisFontSize * (vertical ? 0.78 : 0.7))
 		: Math.round(sub.emphasisFontSize * (vertical ? 0.92 : 0.86));
@@ -2696,8 +2737,7 @@ function CinematicTextEmphasis({
 				alignItems: "center",
 				gap: isStacked ? (vertical ? 18 : 16) : 0,
 				textAlign: "center",
-				textShadow:
-					"0 9px 34px rgba(0,0,0,0.78), 0 1px 2px rgba(0,0,0,0.9)",
+				textShadow: "0 9px 34px rgba(0,0,0,0.78), 0 1px 2px rgba(0,0,0,0.9)",
 				letterSpacing: scene.hookBoost ? "-0.035em" : "-0.02em",
 			}}
 		>

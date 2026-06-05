@@ -3,9 +3,10 @@ import {
 	PHeading,
 	PInlineNotification,
 	PSpinner,
+	PTag,
 	PText,
 } from "@porsche-design-system/components-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { DEMO_CHANNELS } from "../../lib/demo-data";
 import type { ContentPerformanceSample } from "../../lib/content-recommendation-ranker";
@@ -13,8 +14,16 @@ import {
 	loadNicheResearchHandoff,
 	type NicheResearchHandoff,
 } from "../../lib/niche-research";
-import { getReferenceTemplate } from "../../lib/reference-import";
+import {
+	getReferenceTemplate,
+	listReferenceTemplates,
+} from "../../lib/reference-import";
 import { buildReferenceKnowledgeProfile } from "../../lib/knowledge-system";
+import {
+	checkContentPipelineHealth,
+	type ContentPipelineHealthReport,
+	type PipelineServiceHealth,
+} from "../../lib/content-pipeline-health";
 import {
 	getReferenceTemplateQuality,
 	getReferenceTemplateReadiness,
@@ -79,23 +88,31 @@ function parseMode(value: string | null): ContentMode | null {
 		: null;
 }
 
+function mergeChannels(...groups: Channel[][]): Channel[] {
+	const byId = new Map<string, Channel>();
+	for (const group of groups) {
+		for (const channel of group) {
+			if (!channel.id || byId.has(channel.id)) continue;
+			byId.set(channel.id, channel);
+		}
+	}
+	return [...byId.values()];
+}
+
 export default function ContentWizardPage() {
 	const navigate = useNavigate();
 	const [searchParams] = useSearchParams();
 	const initialMode = parseMode(searchParams.get("mode"));
 	const initialTitle = searchParams.get("title") ?? "";
 	const initialSource = searchParams.get("source") ?? "manual";
+	const initialChannelId = searchParams.get("channel") ?? "";
 	const [nicheHandoff] = useState<NicheResearchHandoff | null>(() =>
 		loadNicheResearchHandoff(searchParams.get("nicheHandoff")),
 	);
 	const [mode, setMode] = useState<ContentMode | null>(initialMode);
 	const [step, setStep] = useState(0);
-	const [channels, setChannels] = useState<Channel[]>(
-		DEMO_MODE ? (DEMO_CHANNELS as Channel[]) : [],
-	);
-	const [selectedChannelId, setSelectedChannelId] = useState(
-		DEMO_MODE ? DEMO_CHANNELS[0].id : "",
-	);
+	const [channels, setChannels] = useState<Channel[]>([]);
+	const [selectedChannelId, setSelectedChannelId] = useState(initialChannelId);
 	const [topicId, setTopicId] = useState("");
 	const [topicTitle, setTopicTitle] = useState(initialTitle);
 	const [briefId, setBriefId] = useState("");
@@ -106,7 +123,22 @@ export default function ContentWizardPage() {
 	>([]);
 	const [referenceTemplate, setReferenceTemplate] =
 		useState<ReferenceTemplate | null>(null);
-	const [loading, setLoading] = useState(!DEMO_MODE);
+	const [referenceCandidates, setReferenceCandidates] = useState<
+		ReferenceTemplate[]
+	>([]);
+	const [pipelineHealth, setPipelineHealth] =
+		useState<ContentPipelineHealthReport | null>(null);
+	const [checkingPipeline, setCheckingPipeline] = useState(false);
+	const [loading, setLoading] = useState(true);
+
+	const refreshPipelineHealth = useCallback(async () => {
+		setCheckingPipeline(true);
+		try {
+			setPipelineHealth(await checkContentPipelineHealth());
+		} finally {
+			setCheckingPipeline(false);
+		}
+	}, []);
 
 	useEffect(() => {
 		const templateId = searchParams.get("template");
@@ -115,25 +147,56 @@ export default function ContentWizardPage() {
 				if (t) setReferenceTemplate(t);
 			});
 		}
-		if (DEMO_MODE) return;
 		void loadContentPerformanceSamples().then(setPerformanceHistory);
 		supabase
 			.from("channels")
 			.select("*")
 			.order("name")
 			.then(({ data }) => {
-				const list = data ?? [];
+				const list = mergeChannels(
+					(data ?? []) as Channel[],
+					DEMO_MODE ? (DEMO_CHANNELS as Channel[]) : [],
+				);
 				setChannels(list);
 				// Pre-select channel from URL param, else default to first
 				const channelParam = searchParams.get("channel");
-				if (channelParam && list.some((c) => c.id === channelParam)) {
-					setSelectedChannelId(channelParam);
-				} else if (list.length > 0) {
-					setSelectedChannelId(list[0].id);
-				}
+				setSelectedChannelId((current) => {
+					if (channelParam && list.some((c) => c.id === channelParam)) {
+						return channelParam;
+					}
+					if (current && list.some((c) => c.id === current)) return current;
+					return list[0]?.id ?? "";
+				});
 				setLoading(false);
 			});
 	}, [searchParams]);
+
+	useEffect(() => {
+		if (!selectedChannelId) {
+			setReferenceCandidates([]);
+			return;
+		}
+		let cancelled = false;
+		void listReferenceTemplates(selectedChannelId)
+			.then((templates) => {
+				if (!cancelled) setReferenceCandidates(templates);
+			})
+			.catch(() => {
+				if (!cancelled) setReferenceCandidates([]);
+			});
+		return () => {
+			cancelled = true;
+		};
+	}, [selectedChannelId]);
+
+	useEffect(() => {
+		if (!mode) return;
+		void refreshPipelineHealth();
+		const interval = window.setInterval(() => {
+			void refreshPipelineHealth();
+		}, 30_000);
+		return () => window.clearInterval(interval);
+	}, [mode, refreshPipelineHealth]);
 
 	if (loading) {
 		return (
@@ -255,6 +318,12 @@ export default function ContentWizardPage() {
 						: "자료를 수집하고 영상으로 구성합니다."}
 			</PText>
 
+			<PipelineHealthPanel
+				report={pipelineHealth}
+				checking={checkingPipeline}
+				onRefresh={refreshPipelineHealth}
+			/>
+
 			{referenceTemplate && (
 				<ReferenceTemplateStatusNotice
 					template={referenceTemplate}
@@ -268,11 +337,14 @@ export default function ContentWizardPage() {
 				{/* Step 0: 주제 입력 (공통) */}
 				{step === 0 && (
 					<StepTopic
+						mode={mode}
 						channels={channels}
 						selectedChannelId={selectedChannelId}
 						onChannelChange={setSelectedChannelId}
 						initialTitle={initialTitle}
 						source={initialSource}
+						referenceTemplate={referenceTemplate}
+						referenceCandidates={referenceCandidates}
 						nicheHandoff={nicheHandoff}
 						performanceHistory={performanceHistory}
 						onNext={(id, title) => {
@@ -312,6 +384,7 @@ export default function ContentWizardPage() {
 						mode={mode}
 						sources={sources}
 						referenceTemplate={referenceTemplate}
+						referenceCandidates={referenceCandidates}
 						nicheHandoff={nicheHandoff}
 						topicTitle={topicTitle}
 						performanceHistory={performanceHistory}
@@ -342,6 +415,96 @@ export default function ContentWizardPage() {
 						referenceTemplate={referenceTemplate}
 						onBack={() => setStep(3)}
 					/>
+				)}
+			</div>
+		</div>
+	);
+}
+
+function serviceColor(
+	service: PipelineServiceHealth,
+):
+	| "notification-success-soft"
+	| "notification-warning-soft"
+	| "notification-error-soft" {
+	if (service.ok) return "notification-success-soft";
+	if (service.status === "degraded") return "notification-warning-soft";
+	return "notification-error-soft";
+}
+
+function PipelineHealthPanel({
+	report,
+	checking,
+	onRefresh,
+}: {
+	report: ContentPipelineHealthReport | null;
+	checking: boolean;
+	onRefresh: () => void;
+}) {
+	if (!report) {
+		return (
+			<div className="mb-fluid-sm rounded-[8px] border border-contrast-low bg-canvas p-static-md">
+				<div className="flex items-center justify-between gap-static-sm">
+					<PText size="small" weight="semi-bold">
+						제작 파이프라인 상태
+					</PText>
+					<PButton compact variant="secondary" loading={checking} onClick={onRefresh}>
+						상태 확인
+					</PButton>
+				</div>
+			</div>
+		);
+	}
+
+	const notificationState =
+		report.overall === "blocked"
+			? "error"
+			: report.overall === "degraded"
+				? "warning"
+				: "info";
+	const primaryMessage =
+		report.blockers[0] ??
+		report.warnings[0] ??
+		"AI 생성, 레퍼런스, 렌더, 업로드 서버가 모두 응답 중입니다.";
+
+	return (
+		<div className="mb-fluid-sm">
+			<PInlineNotification
+				state={notificationState}
+				heading={`제작 파이프라인 ${
+					report.overall === "ready"
+						? "준비 완료"
+						: report.overall === "degraded"
+							? "일부 제한"
+							: "차단"
+				}`}
+				description={primaryMessage}
+				dismissButton={false}
+			/>
+			<div className="mt-static-sm rounded-[8px] border border-contrast-low bg-canvas p-static-md">
+				<div className="flex flex-wrap items-center justify-between gap-static-sm">
+					<div className="flex flex-wrap gap-static-xs">
+						{report.services.map((service) => (
+							<PTag key={service.id} color={serviceColor(service)}>
+								{service.label}:{" "}
+								{service.ok
+									? "ON"
+									: service.status === "degraded"
+										? "LIMITED"
+										: "OFF"}
+							</PTag>
+						))}
+					</div>
+					<PButton compact variant="secondary" loading={checking} onClick={onRefresh}>
+						다시 확인
+					</PButton>
+				</div>
+				{report.nextActions.length > 0 && (
+					<ul className="mt-static-sm list-disc pl-4 text-[12px] text-contrast-medium">
+						{report.nextActions.slice(0, 3).map((action) => (
+							<li key={action}>{action}</li>
+						))}
+					</ul>
 				)}
 			</div>
 		</div>

@@ -8,6 +8,7 @@ import { getNarrationCaptionMotionTheme } from "../lib/narration-caption-motion"
 import {
 	getNarrationCaptionContainerToneStyle,
 	getNarrationCaptionWordToneStyle,
+	isEmphasisWord,
 } from "../lib/narration-caption-theme";
 import type { NewsSurfaceTone } from "../lib/news-surface-theme";
 import type { RemotionScene, SubtitleStyle, WordTiming } from "./types";
@@ -149,6 +150,8 @@ export function KaraokeCaption({
 					state,
 					accentColor,
 				});
+				// 자동 emphasis(숫자/강조부사/감탄/고유명사): accent 색 + 굵게 — ChunkedCaption과 동일 강조 일관성
+				const emphasized = isEmphasisWord(w.word);
 
 				return (
 					<span
@@ -162,6 +165,12 @@ export function KaraokeCaption({
 							transition: "color 0.1s",
 							fontWeight: isActive ? 700 : sub.fontWeight,
 							...toneWordStyle,
+							...(emphasized
+								? {
+										color: isActive ? accentColor : color,
+										fontWeight: isActive ? 760 : 700,
+									}
+								: {}),
 						}}
 					>
 						{w.word}

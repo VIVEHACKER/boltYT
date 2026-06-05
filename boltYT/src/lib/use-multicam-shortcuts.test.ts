@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("react", () => ({
 	useEffect: vi.fn(),
+	useMemo: vi.fn((factory: () => unknown) => factory()),
 }));
 
 vi.mock("./timeline-store", () => ({
@@ -19,7 +20,7 @@ vi.mock("./multicam-timeline", () => ({
 	findGroup: vi.fn(),
 }));
 
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { findGroup } from "./multicam-timeline";
 import { useTimelineStore } from "./timeline-store";
 import { useMulticamShortcuts } from "./use-multicam-shortcuts";
@@ -33,7 +34,7 @@ const mockGroup = {
 	activeAngle: 0,
 	audioAngle: 0,
 };
-const mockProject = { tracks: [], multicamGroups: [mockGroup] };
+const mockProject = { tracks: [], clips: [], multicamGroups: [mockGroup] };
 const mockClip = {
 	id: "c1",
 	multicam: { groupId: "g1" },
@@ -53,8 +54,12 @@ describe("useMulticamShortcuts", () => {
 		vi.mocked(useTimelineStore).mockImplementation(
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			(selector: (s: any) => unknown) => {
+				const project = {
+					...mockProject,
+					clips: selected.map((clip) => ({ ...clip, selected: true })),
+				};
 				const state = {
-					project: mockProject,
+					project,
 					playhead: 10,
 					selected: () => selected,
 					setMulticamCut: setMulticamCutMock,
@@ -77,6 +82,7 @@ describe("useMulticamShortcuts", () => {
 		capturedCleanup = undefined;
 		setMulticamCutMock = vi.fn();
 		onCutMock = vi.fn();
+		vi.mocked(useMemo).mockImplementation((factory) => factory());
 
 		vi.stubGlobal("window", {
 			addEventListener: vi.fn((ev: string, fn: KeyHandler) => {

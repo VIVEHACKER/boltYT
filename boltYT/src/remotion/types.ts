@@ -41,11 +41,7 @@ export type TextEffect = "typewriter" | "glitch" | "scale_in" | "none";
 export type CaptionStyle = "karaoke" | "chunked" | "none";
 
 // ─── Layout ───
-export type LayoutVariant =
-	| "full"
-	| "split"
-	| "letterbox"
-	| "social_clip_card";
+export type LayoutVariant = "full" | "split" | "letterbox" | "social_clip_card";
 
 // ─── Subtitle ───
 export interface SubtitleStyle {
@@ -109,6 +105,8 @@ export interface RemotionScene {
 
 	/** 카라오케 자막용 단어별 타이밍 */
 	wordTimings?: WordTiming[];
+	/** 절대 BGM 비트 시간(초). beat-pulse(비트 줌펀치) 시각 동기화용. */
+	beatTimes?: number[];
 
 	// 뉴스 오버레이 전용
 	newsTitle?: string;

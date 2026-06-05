@@ -52,11 +52,17 @@ export function ApiKeysProvider({ children }: { children: ReactNode }) {
 		// 최초 마운트 시 서버에서 키 상태 fetch — setState 는 async 경계 이후에 발생
 		// eslint-disable-next-line react-hooks/set-state-in-effect
 		void refresh();
+		const interval = window.setInterval(() => {
+			void refresh();
+		}, 30_000);
 		function onFocus() {
 			void refresh();
 		}
 		window.addEventListener("focus", onFocus);
-		return () => window.removeEventListener("focus", onFocus);
+		return () => {
+			window.clearInterval(interval);
+			window.removeEventListener("focus", onFocus);
+		};
 	}, [refresh]);
 
 	return (

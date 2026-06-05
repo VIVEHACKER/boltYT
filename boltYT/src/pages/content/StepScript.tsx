@@ -36,7 +36,6 @@ import { planSceneSourceAssignments, researchTopic } from "../../lib/ai-agents";
 import { snapDurationToBeat } from "../../lib/beat-sync";
 import { suggestColorGrade } from "../../lib/color-grades";
 import {
-	buildContentRecommendationPlan,
 	type ContentPerformanceSample,
 	type RankedScriptRecommendation,
 } from "../../lib/content-recommendation-ranker";
@@ -44,6 +43,11 @@ import {
 	buildReferenceKnowledgeProfile,
 	compactKnowledgeProfile,
 } from "../../lib/knowledge-system";
+import {
+	assessReferenceApplicationScore,
+	type ReferenceApplicationScoreReport,
+} from "../../lib/reference-application-score";
+import { buildReferenceProductionPlan } from "../../lib/reference-production-orchestrator";
 import { assignMotionGraphicsForScene } from "../../lib/motion-graphics";
 import { referenceToPreset } from "../../lib/reference-bridge";
 import {
@@ -59,6 +63,10 @@ import {
 	buildFallbackSceneSourcePlan,
 } from "../../lib/scene-sequence";
 import type { SceneShot } from "../../lib/scene-shot-types";
+import {
+	analyzeSourceSafety,
+	type SourceSafetyReport,
+} from "../../lib/source-safety-gate";
 import {
 	applyLongformVideoRules,
 	applyShortsVideoRules,
@@ -94,6 +102,7 @@ interface StepScriptProps {
 	mode?: ContentMode;
 	sources?: CollectedSource[];
 	referenceTemplate?: ReferenceTemplate | null;
+	referenceCandidates?: ReferenceTemplate[];
 	nicheHandoff?: NicheResearchHandoff | null;
 	topicTitle?: string;
 	performanceHistory?: ContentPerformanceSample[];
@@ -123,6 +132,7 @@ export default function StepScript({
 	mode = "ai",
 	sources = [],
 	referenceTemplate,
+	referenceCandidates = [],
 	nicheHandoff,
 	topicTitle: initialTopicTitle = "",
 	performanceHistory = [],
@@ -154,14 +164,15 @@ export default function StepScript({
 	const [animationBible, setAnimationBible] = useState<
 		AnimationBible | undefined
 	>(undefined);
-	const recommendationPlan = useMemo(
+	const productionPlan = useMemo(
 		() =>
-			buildContentRecommendationPlan({
+			buildReferenceProductionPlan({
 				topicTitle: resolvedTopicTitle || initialTopicTitle,
 				mode,
 				selectedFormat: format,
 				sources,
 				referenceTemplate,
+				referenceCandidates,
 				nicheHandoff,
 				performanceHistory,
 			}),
@@ -172,17 +183,48 @@ export default function StepScript({
 			format,
 			sources,
 			referenceTemplate,
+			referenceCandidates,
 			nicheHandoff,
 			performanceHistory,
 		],
 	);
+	const effectiveReferenceTemplate =
+		referenceTemplate ?? productionPlan.selectedTemplate;
+	const recommendationPlan = productionPlan.recommendationPlan;
+	const referenceApplicationReport = useMemo(
+		() =>
+			assessReferenceApplicationScore({
+				referenceTemplate: effectiveReferenceTemplate,
+				format,
+				topicTitle: resolvedTopicTitle || initialTopicTitle,
+				shortsScript,
+				scenes: longformScenes,
+				sourceCount: sources.length,
+			}),
+		[
+			effectiveReferenceTemplate,
+			format,
+			resolvedTopicTitle,
+			initialTopicTitle,
+			shortsScript,
+			longformScenes,
+			sources.length,
+		],
+	);
+	const sourceSafetyReport = useMemo<SourceSafetyReport | null>(
+		() =>
+			mode === "research"
+				? analyzeSourceSafety(sources, longformScenes)
+				: null,
+		[mode, sources, longformScenes],
+	);
 
 	useEffect(() => {
-		if (!referenceTemplate) return;
-		const supported = getReferenceTemplateSupportedFormats(referenceTemplate);
+		if (!effectiveReferenceTemplate) return;
+		const supported = getReferenceTemplateSupportedFormats(effectiveReferenceTemplate);
 		if (supported.length !== 1) return;
 		setFormat((current) => (current === supported[0] ? current : supported[0]));
-	}, [referenceTemplate]);
+	}, [effectiveReferenceTemplate]);
 
 	useEffect(() => {
 		if (!initialTopicTitle.trim()) return;
@@ -274,8 +316,8 @@ export default function StepScript({
 				const family =
 					currentAnimationFamily ?? animationReadiness?.productionFamily;
 				const referenceLongformTarget =
-					referenceTemplate && format !== "shorts"
-						? referenceToPreset(referenceTemplate, "longform").script
+					effectiveReferenceTemplate && format !== "shorts"
+						? referenceToPreset(effectiveReferenceTemplate, "longform").script
 								.targetDuration
 						: undefined;
 				const adjusted =
@@ -367,7 +409,7 @@ export default function StepScript({
 			applySceneShots,
 			format,
 			mode,
-			referenceTemplate,
+			effectiveReferenceTemplate,
 			sources,
 			toShotSources,
 		],
@@ -471,9 +513,9 @@ export default function StepScript({
 				return;
 			}
 
-			const preset = referenceTemplate
+			const preset = effectiveReferenceTemplate
 				? referenceToPreset(
-						referenceTemplate,
+						effectiveReferenceTemplate,
 						format === "shorts" ? "shorts" : "longform",
 					)
 				: undefined;
@@ -490,6 +532,7 @@ export default function StepScript({
 							nicheHandoff
 								? formatNicheHandoffForPrompt(nicheHandoff)
 								: undefined,
+							productionPlan.promptContext,
 						)
 					: await generateScript(
 							briefId,
@@ -497,6 +540,7 @@ export default function StepScript({
 							preset,
 							mode === "animation" ? "animation" : "standard",
 							animationGate ?? undefined,
+							productionPlan.promptContext,
 						);
 			setAnimationBible(script.animation_bible);
 			setShortsScript(script.shorts_script || "");
@@ -517,8 +561,8 @@ export default function StepScript({
 				}>) || []
 			).map((s) => {
 				// BGM 템포 기반 비트 스냅 — 레퍼런스 템플릿 있으면 활성화
-				const snappedDuration = referenceTemplate?.bgm_tempo
-					? snapDurationToBeat(s.duration, referenceTemplate.bgm_tempo)
+				const snappedDuration = effectiveReferenceTemplate?.bgm_tempo
+					? snapDurationToBeat(s.duration, effectiveReferenceTemplate.bgm_tempo)
 					: s.duration;
 				return {
 					narration: s.narration,
@@ -547,7 +591,7 @@ export default function StepScript({
 				buildStoryEditDraft({
 					shortsScript: script.shorts_script || "",
 					scenes: alignedScenes,
-					referenceName: referenceTemplate?.name,
+					referenceName: effectiveReferenceTemplate?.name,
 					format,
 				}),
 			);
@@ -566,7 +610,9 @@ export default function StepScript({
 		mode,
 		sources,
 		referenceTemplate,
+		effectiveReferenceTemplate,
 		nicheHandoff,
+		productionPlan.promptContext,
 	]);
 
 	const lastAutoBriefId = useRef<string | null>(null);
@@ -781,9 +827,11 @@ export default function StepScript({
 					story_edit: storyDraft,
 					story_edit_summary: summarizeStoryEditDraft(storyDraft),
 					content_recommendation_plan: recommendationPlan,
-					reference_knowledge: referenceTemplate
+					reference_application_report: referenceApplicationReport,
+					source_safety_report: sourceSafetyReport,
+					reference_knowledge: effectiveReferenceTemplate
 						? compactKnowledgeProfile(
-								buildReferenceKnowledgeProfile(referenceTemplate),
+								buildReferenceKnowledgeProfile(effectiveReferenceTemplate),
 							)
 						: null,
 					niche_research: nicheHandoff
@@ -798,7 +846,7 @@ export default function StepScript({
 						: null,
 				},
 				status: "approved",
-				reference_template_id: referenceTemplate?.id ?? null,
+				reference_template_id: effectiveReferenceTemplate?.id ?? null,
 			})
 			.select()
 			.maybeSingle();
@@ -840,8 +888,8 @@ export default function StepScript({
 
 				// LUT 색보정 프리셋 — 씬 mood + 템플릿 lighting
 				const colorGrade = suggestColorGrade(
-					s.mood ?? referenceTemplate?.visual_mood ?? "neutral",
-					referenceTemplate?.lighting_style,
+					s.mood ?? effectiveReferenceTemplate?.visual_mood ?? "neutral",
+					effectiveReferenceTemplate?.lighting_style,
 				);
 
 				return {
@@ -1041,6 +1089,15 @@ export default function StepScript({
 		);
 	}
 
+	function renderReferenceApplicationPanel() {
+		return (
+			<ReferenceApplicationPanel
+				report={referenceApplicationReport}
+				sourceSafetyReport={sourceSafetyReport}
+			/>
+		);
+	}
+
 	function renderNicheHandoffPanel(handoff: NicheResearchHandoff) {
 		return (
 			<div className="mb-static-md bg-canvas rounded-[4px] p-static-sm border border-contrast-low">
@@ -1079,13 +1136,29 @@ export default function StepScript({
 									성과 {recommendationPlan.performanceFeedback.sampleCount}개 반영
 								</PTag>
 							)}
+							{productionPlan.selectedCandidate && (
+								<PTag color="notification-success-soft">
+									{productionPlan.autoSelected ? "자동 레퍼런스" : "선택 레퍼런스"} R
+									{productionPlan.selectedCandidate.score}
+								</PTag>
+							)}
 						</div>
 						<PHeading size="small" tag="h3">
-							주제 기반 대본/훅/썸네일 추천
+							주제 맞춤 레퍼런스 제작 지시서
 						</PHeading>
 						<PText size="small" color="contrast-medium" className="mt-1">
 							{recommendationPlan.topSummary}
 						</PText>
+						{productionPlan.selectedCandidate && (
+							<PText size="x-small" color="contrast-medium" className="mt-1">
+								적용 레퍼런스:{" "}
+								{productionPlan.selectedCandidate.template.name ||
+									productionPlan.selectedCandidate.template.source_title}{" "}
+								· Q{productionPlan.selectedCandidate.qualityScore} · K
+								{productionPlan.selectedCandidate.knowledgeScore} ·{" "}
+								{productionPlan.selectedCandidate.categoryLabel}
+							</PText>
+						)}
 						{recommendationPlan.performanceFeedback.sampleCount > 0 && (
 							<div className="mt-2 flex flex-wrap gap-1">
 								{recommendationPlan.performanceFeedback.topSignals
@@ -1151,6 +1224,25 @@ export default function StepScript({
 							>
 								이 방향 적용
 							</PButton>
+						</div>
+					))}
+				</div>
+
+				<div className="mb-static-md grid grid-cols-1 md:grid-cols-3 gap-static-sm">
+					{productionPlan.directives.slice(0, 6).map((directive) => (
+						<div
+							key={directive.id}
+							className="rounded-[12px] border border-[#d9c5a5] bg-[#fffaf1] p-static-sm"
+						>
+							<div className="mb-1 flex items-center justify-between gap-2">
+								<PText size="x-small" weight="semi-bold">
+									{directive.label}
+								</PText>
+								<PTag color="background-frosted">{directive.priority}</PTag>
+							</div>
+							<PText size="x-small" color="contrast-medium">
+								{directive.directive}
+							</PText>
 						</div>
 					))}
 				</div>
@@ -1225,19 +1317,36 @@ export default function StepScript({
 				</div>
 
 				<details className="mt-static-sm text-[12px] text-contrast-medium">
-					<summary className="cursor-pointer">추천 근거와 품질 게이트</summary>
+					<summary className="cursor-pointer">
+						추천 근거, 레퍼런스 후보, 품질 게이트
+					</summary>
 					<div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-static-sm">
 						<ul className="list-disc pl-4">
-							{recommendationPlan.evidence.map((item) => (
+							{productionPlan.evidence.map((item) => (
 								<li key={item}>{item}</li>
 							))}
 						</ul>
 						<ul className="list-disc pl-4">
-							{recommendationPlan.qualityGates.map((item) => (
+							{productionPlan.qualityGates.map((item) => (
 								<li key={item}>{item}</li>
 							))}
 						</ul>
 					</div>
+					{productionPlan.candidates.length > 1 && (
+						<div className="mt-2 rounded-[10px] border border-[#e4d2b2] bg-[#fffdf8] p-2">
+							<PText size="x-small" weight="semi-bold">
+								레퍼런스 후보 순위
+							</PText>
+							<ol className="mt-1 list-decimal pl-4">
+								{productionPlan.candidates.slice(0, 5).map((candidate) => (
+									<li key={candidate.template.id}>
+										{candidate.template.name || candidate.template.source_title} · R
+										{candidate.score} · {candidate.categoryLabel}
+									</li>
+								))}
+							</ol>
+						</div>
+					)}
 				</details>
 			</div>
 		);
@@ -1280,8 +1389,8 @@ export default function StepScript({
 	}
 
 	const formatChoices: Array<"both" | "shorts" | "longform"> = (() => {
-		if (!referenceTemplate) return ["both", "shorts", "longform"];
-		const supported = getReferenceTemplateSupportedFormats(referenceTemplate);
+		if (!effectiveReferenceTemplate) return ["both", "shorts", "longform"];
+		const supported = getReferenceTemplateSupportedFormats(effectiveReferenceTemplate);
 		if (supported.length === 1) return [supported[0]];
 		return ["both", ...supported];
 	})();
@@ -1304,9 +1413,10 @@ export default function StepScript({
 			{renderAnimationReadinessPanel()}
 			{nicheHandoff && renderNicheHandoffPanel(nicheHandoff)}
 			{renderRecommendationPanel()}
+			{renderReferenceApplicationPanel()}
 			<StoryEditPanel
 				draft={storyDraft}
-				referenceTemplate={referenceTemplate}
+				referenceTemplate={effectiveReferenceTemplate}
 				sceneCount={longformScenes.length}
 				totalDuration={longformScenes.reduce((sum, s) => sum + s.duration, 0)}
 				onChange={updateStoryDraft}
@@ -1764,7 +1874,8 @@ export default function StepScript({
 						loading={saving}
 						disabled={
 							topicReadiness?.status === "blocked" ||
-							animationReadiness?.status === "blocked"
+							animationReadiness?.status === "blocked" ||
+							sourceSafetyReport?.passed === false
 						}
 						onClick={handleSubmit}
 					>
@@ -1866,6 +1977,114 @@ function StoryEditPanel({
 					/>
 				</div>
 			</div>
+		</section>
+	);
+}
+
+function scoreColor(score: number):
+	| "notification-success-soft"
+	| "notification-warning-soft"
+	| "notification-error-soft" {
+	if (score >= 78) return "notification-success-soft";
+	if (score >= 58) return "notification-warning-soft";
+	return "notification-error-soft";
+}
+
+function ReferenceApplicationPanel({
+	report,
+	sourceSafetyReport,
+}: {
+	report: ReferenceApplicationScoreReport;
+	sourceSafetyReport: SourceSafetyReport | null;
+}) {
+	const visibleReferenceIssues = report.issues
+		.filter((issue) => issue.severity !== "info")
+		.slice(0, 3);
+	const visibleSourceIssues =
+		sourceSafetyReport?.issues
+			.filter((issue) => issue.severity !== "info")
+			.slice(0, 3) ?? [];
+	return (
+		<section className="mb-static-lg rounded-[14px] border border-[#d8c9b5] bg-[#fffdf8] p-static-md">
+			<div className="flex flex-wrap items-start justify-between gap-static-sm">
+				<div>
+					<PText size="small" weight="semi-bold">
+						레퍼런스 적용 점수 · 자료 안전 게이트
+					</PText>
+					<PText size="x-small" color="contrast-medium" className="mt-1">
+						훅 시간, 컷 밀도, 씬 수, 출처 앵커, 원본 복제 경계를 저장 전에 점검합니다.
+					</PText>
+				</div>
+				<div className="flex flex-wrap gap-static-xs">
+					<PTag color={scoreColor(report.score)}>
+						{report.label} · {report.score}점
+					</PTag>
+					{sourceSafetyReport && (
+						<PTag color={scoreColor(sourceSafetyReport.score)}>
+							자료 안전 {sourceSafetyReport.score}점
+						</PTag>
+					)}
+				</div>
+			</div>
+
+			<div className="mt-static-sm grid grid-cols-2 lg:grid-cols-4 gap-static-xs">
+				<PTag color="background-surface">
+					훅 {report.metrics.hookFit}점
+				</PTag>
+				<PTag color="background-surface">
+					컷밀도 {report.metrics.cutDensityFit}점
+				</PTag>
+				<PTag color="background-surface">
+					출처 {report.metrics.sourceFit}점
+				</PTag>
+				<PTag color="background-surface">
+					샷 {report.metrics.shotCount}개
+				</PTag>
+				{sourceSafetyReport && (
+					<PTag color="background-surface">
+						자료 {sourceSafetyReport.metrics.sourceCount}개
+					</PTag>
+				)}
+				{sourceSafetyReport && (
+					<PTag color="background-surface">
+						출처씬 {Math.round(sourceSafetyReport.metrics.scenesWithSourceRatio * 100)}%
+					</PTag>
+				)}
+				{sourceSafetyReport?.disclosureRequired && (
+					<PTag color="notification-warning-soft">AI 재구성 고지 필요</PTag>
+				)}
+			</div>
+
+			{(visibleReferenceIssues.length > 0 || visibleSourceIssues.length > 0) && (
+				<div className="mt-static-sm grid grid-cols-1 lg:grid-cols-2 gap-static-sm">
+					{visibleReferenceIssues.length > 0 && (
+						<div className="rounded-[10px] bg-[#fff8ea] border border-[#ead9bd] p-static-sm">
+							<PText size="x-small" weight="semi-bold">
+								레퍼런스 보강
+							</PText>
+							<ul className="mt-1 list-disc pl-4 text-[12px] text-contrast-medium">
+								{visibleReferenceIssues.map((issue) => (
+									<li key={issue.code}>{issue.message}</li>
+								))}
+							</ul>
+						</div>
+					)}
+					{visibleSourceIssues.length > 0 && (
+						<div className="rounded-[10px] bg-[#fff8ea] border border-[#ead9bd] p-static-sm">
+							<PText size="x-small" weight="semi-bold">
+								자료/저작권 안전
+							</PText>
+							<ul className="mt-1 list-disc pl-4 text-[12px] text-contrast-medium">
+								{visibleSourceIssues.map((issue) => (
+									<li key={`${issue.code}-${issue.sceneIndex ?? "global"}`}>
+										{issue.message}
+									</li>
+								))}
+							</ul>
+						</div>
+					)}
+				</div>
+			)}
 		</section>
 	);
 }

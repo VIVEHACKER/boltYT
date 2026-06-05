@@ -45,6 +45,7 @@ import {
 	snapshot as metricsSnapshot,
 } from "./lib/metrics.ts";
 import {
+	getOpenAiSkipReason,
 	getOpenAiRuntimeHealth,
 	isOpenAiQuotaError,
 	markOpenAiOk,
@@ -70,7 +71,8 @@ validateEnv(["OPENAI_API_KEY"], SERVICE);
 
 const DIAG_TOKEN = process.env.DIAG_TOKEN ?? "";
 const FORMAT_WORK_DIR = join(import.meta.dirname ?? ".", ".tmp/format");
-if (!existsSync(FORMAT_WORK_DIR)) mkdirSync(FORMAT_WORK_DIR, { recursive: true });
+if (!existsSync(FORMAT_WORK_DIR))
+	mkdirSync(FORMAT_WORK_DIR, { recursive: true });
 
 // ─── 환경변수에서 키 로드 (in-place mutation으로 .env 변경 시 재적용) ───
 
@@ -97,6 +99,17 @@ function reloadKeys() {
 	KEYS.fal = process.env.FAL_KEY ?? "";
 }
 
+function publicOpenAiRuntimeHealth() {
+	const health = getOpenAiRuntimeHealth();
+	return {
+		quotaBlocked: health.quotaBlocked,
+		quotaBlockedUntil: health.quotaBlockedUntil,
+		lastQuotaAt: health.lastQuotaAt,
+		lastQuotaSource: health.lastQuotaSource,
+		lastOkAt: health.lastOkAt,
+	};
+}
+
 function keyStatusPayload() {
 	const editable = Object.fromEntries(
 		EDITABLE_ENV_KEYS.map((key) => {
@@ -117,10 +130,38 @@ function keyStatusPayload() {
 		youtube: Boolean(KEYS.youtube),
 		naver: Boolean(KEYS.naverClientId && KEYS.naverClientSecret),
 		fal: Boolean(KEYS.fal),
-		google: Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
+		google: Boolean(
+			process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET,
+		),
 		editable,
-		openaiRuntime: getOpenAiRuntimeHealth(),
+		openaiRuntime: publicOpenAiRuntimeHealth(),
 	};
+}
+
+function configuredProviderNames(status = keyStatusPayload()): string[] {
+	return [
+		status.openai ? "openai" : "",
+		status.elevenlabs ? "elevenlabs" : "",
+		status.pexels ? "pexels" : "",
+		status.pixabay ? "pixabay" : "",
+		status.youtube ? "youtube" : "",
+		status.naver ? "naver" : "",
+		status.fal ? "fal" : "",
+		status.google ? "google" : "",
+	].filter(Boolean);
+}
+
+function missingProviderNames(status = keyStatusPayload()): string[] {
+	return [
+		!status.openai ? "openai" : "",
+		!status.elevenlabs ? "elevenlabs" : "",
+		!status.pexels ? "pexels" : "",
+		!status.pixabay ? "pixabay" : "",
+		!status.youtube ? "youtube" : "",
+		!status.naver ? "naver" : "",
+		!status.fal ? "fal" : "",
+		!status.google ? "google" : "",
+	].filter(Boolean);
 }
 
 reloadKeys();
@@ -198,6 +239,7 @@ function cors(
 	return {
 		...baseHeaders,
 		"Access-Control-Allow-Origin": origin,
+		"Access-Control-Allow-Credentials": "true",
 	};
 }
 
@@ -278,6 +320,22 @@ function recordOpenAiResult(ok: boolean, errorText: string, source: string) {
 	if (isOpenAiQuotaError(errorText)) {
 		markOpenAiQuotaBlocked(errorText, source);
 	}
+}
+
+function rejectOpenAiCooldown(
+	req: import("node:http").IncomingMessage,
+	res: import("node:http").ServerResponse,
+	source: string,
+): boolean {
+	const reason = getOpenAiSkipReason();
+	if (!reason) return false;
+	log.warn("OpenAI request skipped during quota cooldown", { source });
+	json(req, res, 429, {
+		error: reason,
+		code: "openai_quota_cooldown",
+		openaiRuntime: publicOpenAiRuntimeHealth(),
+	});
+	return true;
 }
 
 interface YouTubeSearchItem {
@@ -476,7 +534,9 @@ async function analyzeYouTubeFormatVideo(
 	try {
 		const metadata = await fetchFormatMetadata(url);
 		const title = metadata.title || video.title || "";
-		const durationSeconds = Number(metadata.duration ?? video.durationSeconds ?? 0);
+		const durationSeconds = Number(
+			metadata.duration ?? video.durationSeconds ?? 0,
+		);
 		const captions = await fetchCaptionSegments(metadata, sampleSeconds);
 		const clipPath = await downloadOpeningClip(url, workDir, sampleSeconds);
 		const cutTimes = clipPath
@@ -538,7 +598,9 @@ async function analyzeYouTubeFormatVideo(
 	}
 }
 
-async function fetchFormatMetadata(url: string): Promise<YouTubeFormatMetadata> {
+async function fetchFormatMetadata(
+	url: string,
+): Promise<YouTubeFormatMetadata> {
 	const { stdout } = await execFileP(
 		"yt-dlp",
 		[
@@ -557,7 +619,9 @@ async function fetchCaptionSegments(
 	metadata: YouTubeFormatMetadata,
 	sampleSeconds: number,
 ): Promise<CaptionSegment[]> {
-	const track = selectCaptionTrack(metadata.subtitles) ?? selectCaptionTrack(metadata.automatic_captions);
+	const track =
+		selectCaptionTrack(metadata.subtitles) ??
+		selectCaptionTrack(metadata.automatic_captions);
 	if (!track?.url) return [];
 	try {
 		const res = await fetchWithRetry(track.url);
@@ -575,13 +639,7 @@ function selectCaptionTrack(
 	groups?: Record<string, YouTubeCaptionTrack[]>,
 ): YouTubeCaptionTrack | null {
 	if (!groups) return null;
-	const languages = [
-		"ko-orig",
-		"ko",
-		"en-orig",
-		"en",
-		...Object.keys(groups),
-	];
+	const languages = ["ko-orig", "ko", "en-orig", "en", ...Object.keys(groups)];
 	for (const lang of languages) {
 		const tracks = groups[lang] ?? [];
 		const json3 = tracks.find((track) => track.ext === "json3" && track.url);
@@ -592,7 +650,10 @@ function selectCaptionTrack(
 	return null;
 }
 
-function parseJson3Captions(raw: unknown, sampleSeconds: number): CaptionSegment[] {
+function parseJson3Captions(
+	raw: unknown,
+	sampleSeconds: number,
+): CaptionSegment[] {
 	const events = (raw as { events?: unknown[] }).events ?? [];
 	return events
 		.map((event) => {
@@ -614,7 +675,10 @@ function parseJson3Captions(raw: unknown, sampleSeconds: number): CaptionSegment
 		.slice(0, 80);
 }
 
-function parseVttCaptions(raw: string, sampleSeconds: number): CaptionSegment[] {
+function parseVttCaptions(
+	raw: string,
+	sampleSeconds: number,
+): CaptionSegment[] {
 	const segments: CaptionSegment[] = [];
 	const blocks = raw.split(/\n\s*\n/);
 	for (const block of blocks) {
@@ -626,7 +690,12 @@ function parseVttCaptions(raw: string, sampleSeconds: number): CaptionSegment[] 
 		const end = parseVttTimestamp((endRaw ?? "").split(/\s+/)[0] ?? "");
 		if (start > sampleSeconds) continue;
 		const text = lines
-			.filter((line) => line && !line.includes("-->") && !/^WEBVTT|Kind:|Language:/i.test(line))
+			.filter(
+				(line) =>
+					line &&
+					!line.includes("-->") &&
+					!/^WEBVTT|Kind:|Language:/i.test(line),
+			)
 			.join(" ")
 			.replace(/<[^>]+>/g, "")
 			.replace(/\s+/g, " ")
@@ -697,7 +766,9 @@ async function detectSceneCutTimes(
 		);
 		return [...stderr.matchAll(/pts_time:([0-9.]+)/g)]
 			.map((match) => Number(match[1]))
-			.filter((time) => Number.isFinite(time) && time > 0 && time <= sampleSeconds)
+			.filter(
+				(time) => Number.isFinite(time) && time > 0 && time <= sampleSeconds,
+			)
 			.filter((time, index, arr) => index === 0 || time - arr[index - 1] > 0.45)
 			.slice(0, 80);
 	} catch {
@@ -726,9 +797,10 @@ function estimateHookDuration(
 		text = `${text} ${segment.text}`.trim();
 		const enough = segment.end >= 2.5;
 		const sentenceEnded = /[.?!。？！]|(다|요|죠|까|습니다)$/.test(text.trim());
-		const transition = /(그런데|하지만|문제는|이유는|왜냐하면|그리고|이제|먼저|바로)/.test(
-			segment.text,
-		);
+		const transition =
+			/(그런데|하지만|문제는|이유는|왜냐하면|그리고|이제|먼저|바로)/.test(
+				segment.text,
+			);
 		if (enough && (sentenceEnded || transition)) {
 			return round1(Math.min(segment.end, maxHook));
 		}
@@ -753,9 +825,7 @@ function detectFormatHookPattern(
 		return "shock";
 	}
 	if (
-		/(사실|진실|이유|핵심|절대|반드시|단 하나|전부|모든|방법|법칙)/.test(
-			value,
-		)
+		/(사실|진실|이유|핵심|절대|반드시|단 하나|전부|모든|방법|법칙)/.test(value)
 	) {
 		return "claim";
 	}
@@ -815,7 +885,9 @@ function buildFormatVideoRules(input: {
 		rules.push(`오프닝 훅은 ${hookPatternLabel(input.hookPattern)} 패턴`);
 	}
 	if (input.hookDurationSeconds !== null) {
-		rules.push(`첫 훅은 약 ${input.hookDurationSeconds.toFixed(1)}초 안에 닫힘`);
+		rules.push(
+			`첫 훅은 약 ${input.hookDurationSeconds.toFixed(1)}초 안에 닫힘`,
+		);
 	}
 	if (input.firstCutSeconds !== null) {
 		rules.push(`첫 화면 전환은 ${input.firstCutSeconds.toFixed(1)}초 부근`);
@@ -844,8 +916,10 @@ function buildFormatVideoWarnings(input: {
 	cutDetectionAvailable: boolean;
 }): string[] {
 	const warnings: string[] = [];
-	if (!input.transcriptAvailable) warnings.push("자막을 찾지 못해 훅 문장 추정 제한");
-	if (!input.cutDetectionAvailable) warnings.push("장면 전환 감지가 약하거나 다운로드 실패");
+	if (!input.transcriptAvailable)
+		warnings.push("자막을 찾지 못해 훅 문장 추정 제한");
+	if (!input.cutDetectionAvailable)
+		warnings.push("장면 전환 감지가 약하거나 다운로드 실패");
 	if (input.hookDurationSeconds !== null && input.hookDurationSeconds > 10) {
 		warnings.push("훅이 10초를 넘어 느린 편");
 	}
@@ -873,8 +947,12 @@ function summarizeFormatAnalysis(
 	);
 	const medianHookSeconds = nullableMedian(hookValues);
 	const medianFirstCutSeconds = nullableMedian(firstCuts);
-	const medianCutsFirst10 = medianNumber(videos.map((video) => video.cutsFirst10));
-	const medianCutsFirst30 = medianNumber(videos.map((video) => video.cutsFirst30));
+	const medianCutsFirst10 = medianNumber(
+		videos.map((video) => video.cutsFirst10),
+	);
+	const medianCutsFirst30 = medianNumber(
+		videos.map((video) => video.cutsFirst30),
+	);
 	const medianTitleOpeningOverlap = round2(
 		medianNumber(videos.map((video) => video.titleOpeningOverlap)),
 	);
@@ -1191,14 +1269,19 @@ function extractArticleMedia(
 	while ((match = imgRegex.exec(html)) !== null) {
 		const abs = absolutize(match[1]);
 		if (!abs) continue;
-		if (!/\.(png|jpe?g|webp)(\?|#|$)/i.test(abs) && !/\/image|\/img/i.test(abs)) {
+		if (
+			!/\.(png|jpe?g|webp)(\?|#|$)/i.test(abs) &&
+			!/\/image|\/img/i.test(abs)
+		) {
 			continue;
 		}
 		imageUrls.push(abs);
 		if (imageUrls.length >= 8) break;
 	}
 
-	const deduped = [...new Set([absolutize(ogImage), ...imageUrls].filter(Boolean))];
+	const deduped = [
+		...new Set([absolutize(ogImage), ...imageUrls].filter(Boolean)),
+	];
 	return {
 		thumbnail: deduped[0],
 		images: deduped.slice(0, 6),
@@ -1291,11 +1374,15 @@ const server = createServer(async (req, res) => {
 
 	// ─── Health ───
 	if (url.pathname === "/health") {
+		const keyStatus = keyStatusPayload();
 		json(req, res, 200, {
 			ok: true,
 			service: SERVICE,
 			uptime: process.uptime(),
 			startedAt,
+			configured: configuredProviderNames(keyStatus),
+			missing: missingProviderNames(keyStatus),
+			openaiRuntime: keyStatus.openaiRuntime,
 		});
 		return;
 	}
@@ -1356,6 +1443,7 @@ const server = createServer(async (req, res) => {
 	// ─── OpenAI Chat Completions ───
 	if (url.pathname === "/api/openai/chat" && req.method === "POST") {
 		if (!requireKey(req, res, KEYS.openai, "OpenAI")) return;
+		if (rejectOpenAiCooldown(req, res, "api-proxy:chat")) return;
 		const body = await parseBody(req);
 		if (body === null) {
 			json(req, res, 413, { error: "요청 본문이 너무 큽니다 (최대 1MB)" });
@@ -1373,19 +1461,20 @@ const server = createServer(async (req, res) => {
 					},
 					body: JSON.stringify(body),
 				},
-				{ timeout: 60_000 },
+				// 장편 대본은 max_tokens 8000~12000 으로 생성 시간이 길어 120s 로 상향.
+				{ timeout: 120_000 },
 			);
 
-				if (!upstream.ok) {
-					const err = await upstream.text();
-					recordOpenAiResult(false, err, "api-proxy:chat");
-					log.error("OpenAI chat error", { status: upstream.status });
-					json(req, res, upstream.status, { error: err });
-					return;
-				}
-				recordOpenAiResult(true, "", "api-proxy:chat");
+			if (!upstream.ok) {
+				const err = await upstream.text();
+				recordOpenAiResult(false, err, "api-proxy:chat");
+				log.error("OpenAI chat error", { status: upstream.status });
+				json(req, res, upstream.status, { error: err });
+				return;
+			}
+			recordOpenAiResult(true, "", "api-proxy:chat");
 
-				const data = await upstream.json();
+			const data = await upstream.json();
 			json(req, res, 200, data);
 		} catch (e) {
 			log.error("OpenAI chat exception", { error: (e as Error).message });
@@ -1399,6 +1488,7 @@ const server = createServer(async (req, res) => {
 	// ─── OpenAI Image Generation (DALL-E) ───
 	if (url.pathname === "/api/openai/images" && req.method === "POST") {
 		if (!requireKey(req, res, KEYS.openai, "OpenAI")) return;
+		if (rejectOpenAiCooldown(req, res, "api-proxy:images")) return;
 		const body = await parseBody(req);
 		if (body === null) {
 			json(req, res, 413, { error: "요청 본문이 너무 큽니다 (최대 1MB)" });
@@ -1419,16 +1509,16 @@ const server = createServer(async (req, res) => {
 				{ timeout: 60_000 },
 			);
 
-				if (!upstream.ok) {
-					const err = await upstream.text();
-					recordOpenAiResult(false, err, "api-proxy:images");
-					log.error("DALL-E error", { status: upstream.status });
-					json(req, res, upstream.status, { error: err });
-					return;
-				}
-				recordOpenAiResult(true, "", "api-proxy:images");
+			if (!upstream.ok) {
+				const err = await upstream.text();
+				recordOpenAiResult(false, err, "api-proxy:images");
+				log.error("DALL-E error", { status: upstream.status });
+				json(req, res, upstream.status, { error: err });
+				return;
+			}
+			recordOpenAiResult(true, "", "api-proxy:images");
 
-				const data = await upstream.json();
+			const data = await upstream.json();
 			json(req, res, 200, data);
 		} catch (e) {
 			log.error("DALL-E exception", { error: (e as Error).message });
@@ -1442,6 +1532,7 @@ const server = createServer(async (req, res) => {
 	// ─── OpenAI TTS ───
 	if (url.pathname === "/api/openai/tts" && req.method === "POST") {
 		if (!requireKey(req, res, KEYS.openai, "OpenAI")) return;
+		if (rejectOpenAiCooldown(req, res, "api-proxy:tts")) return;
 		const body = await parseBody(req);
 		if (body === null) {
 			json(req, res, 413, { error: "요청 본문이 너무 큽니다 (최대 1MB)" });
@@ -1462,16 +1553,16 @@ const server = createServer(async (req, res) => {
 				{ timeout: 60_000 },
 			);
 
-				if (!upstream.ok) {
-					const err = await upstream.text();
-					recordOpenAiResult(false, err, "api-proxy:tts");
-					log.error("TTS error", { status: upstream.status });
-					json(req, res, upstream.status, { error: err });
-					return;
-				}
-				recordOpenAiResult(true, "", "api-proxy:tts");
+			if (!upstream.ok) {
+				const err = await upstream.text();
+				recordOpenAiResult(false, err, "api-proxy:tts");
+				log.error("TTS error", { status: upstream.status });
+				json(req, res, upstream.status, { error: err });
+				return;
+			}
+			recordOpenAiResult(true, "", "api-proxy:tts");
 
-				streamUpstreamBody(req, res, upstream, "audio/mpeg");
+			streamUpstreamBody(req, res, upstream, "audio/mpeg");
 		} catch (e) {
 			log.error("TTS exception", { error: (e as Error).message });
 			json(req, res, 500, {
@@ -1484,6 +1575,7 @@ const server = createServer(async (req, res) => {
 	// ─── OpenAI Whisper 전사 (단어별 타이밍) ───
 	if (url.pathname === "/api/openai/transcribe" && req.method === "POST") {
 		if (!requireKey(req, res, KEYS.openai, "OpenAI")) return;
+		if (rejectOpenAiCooldown(req, res, "api-proxy:transcribe")) return;
 
 		try {
 			// 요청 body는 multipart/form-data로 받아 그대로 upstream에 전달
@@ -1528,16 +1620,16 @@ const server = createServer(async (req, res) => {
 				{ timeout: 120_000 },
 			);
 
-				if (!upstream.ok) {
-					const err = await upstream.text();
-					recordOpenAiResult(false, err, "api-proxy:transcribe");
-					log.error("Whisper error", { status: upstream.status });
-					json(req, res, upstream.status, { error: err });
-					return;
-				}
-				recordOpenAiResult(true, "", "api-proxy:transcribe");
+			if (!upstream.ok) {
+				const err = await upstream.text();
+				recordOpenAiResult(false, err, "api-proxy:transcribe");
+				log.error("Whisper error", { status: upstream.status });
+				json(req, res, upstream.status, { error: err });
+				return;
+			}
+			recordOpenAiResult(true, "", "api-proxy:transcribe");
 
-				const data = await upstream.json();
+			const data = await upstream.json();
 			json(req, res, 200, data);
 		} catch (e) {
 			log.error("Whisper exception", { error: (e as Error).message });
@@ -1894,7 +1986,12 @@ const server = createServer(async (req, res) => {
 			25,
 			12,
 		);
-		const daysBack = sanitizeInt(url.searchParams.get("daysBack"), 7, 3650, 365);
+		const daysBack = sanitizeInt(
+			url.searchParams.get("daysBack"),
+			7,
+			3650,
+			365,
+		);
 		const orderRaw = sanitizeString(url.searchParams.get("order"), 20);
 		const order =
 			orderRaw === "date" || orderRaw === "relevance" ? orderRaw : "viewCount";
@@ -1940,7 +2037,10 @@ const server = createServer(async (req, res) => {
 	}
 
 	// ─── YouTube 포맷 법칙 분석: 상위 영상 앞부분의 훅/컷/오프닝 패턴 추정 ───
-	if (url.pathname === "/api/youtube/format-analysis" && req.method === "POST") {
+	if (
+		url.pathname === "/api/youtube/format-analysis" &&
+		req.method === "POST"
+	) {
 		const body = await parseBody(req);
 		if (!body) {
 			json(req, res, 413, { error: "요청 본문이 너무 큽니다 (최대 1MB)" });

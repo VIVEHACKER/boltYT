@@ -32,6 +32,20 @@ describe("bgm-quality", () => {
 		expect(result.reasons).toContain("dark mood match");
 	});
 
+	it("mood 지정 시 분위기 긍정 키워드가 없으면 통과시키지 않는다 (mood gate)", () => {
+		// 긴 무난한 트랙이라 다른 보너스로 64를 넘길 수 있지만, mood 미스매치면 캡되어 탈락
+		const result = assessBgmTrackQuality(
+			track({
+				title: "Generic Calm Background Loop",
+				tags: ["calm", "ambient", "loop"],
+				duration: 180,
+			}),
+			{ mood: "tense" },
+		);
+		expect(result.passed).toBe(false);
+		expect(result.warnings).toContain("mood gate: no positive mood match");
+	});
+
 	it("보컬/가사/징글성 후보는 배경음으로 탈락시킨다", () => {
 		const result = assessBgmTrackQuality(
 			track({

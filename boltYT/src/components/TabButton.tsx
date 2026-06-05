@@ -14,6 +14,7 @@ export default function TabButton({
 	return (
 		<button
 			type="button"
+			aria-pressed={active}
 			className={`px-static-md py-static-xs rounded-[4px] text-[13px] border transition-colors cursor-pointer ${
 				active
 					? "bg-primary text-[#fff] border-primary"

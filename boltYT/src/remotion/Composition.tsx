@@ -186,10 +186,15 @@ function useBgmCueEnvelope(
 
 	const resolveMid = Math.min(resolveEnd, resolveStart + 32);
 	if (resolveMid >= resolveEnd) {
-		const resolveFade = interpolate(frame, [resolveStart, resolveEnd], [1, 0.9], {
-			extrapolateLeft: "clamp",
-			extrapolateRight: "clamp",
-		});
+		const resolveFade = interpolate(
+			frame,
+			[resolveStart, resolveEnd],
+			[1, 0.9],
+			{
+				extrapolateLeft: "clamp",
+				extrapolateRight: "clamp",
+			},
+		);
 		return lift * resolveFade;
 	}
 
@@ -409,6 +414,7 @@ export function VideoComposition({
 							>
 								<SceneView
 									scene={scene}
+									sceneStartFrame={from}
 									subtitleStyle={sub}
 									hasGlobalNarration={hasNarration}
 									captionStyle={captionStyle}

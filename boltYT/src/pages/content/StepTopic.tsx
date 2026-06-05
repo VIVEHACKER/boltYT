@@ -8,38 +8,55 @@ import {
 	PTag,
 	PText,
 } from "@porsche-design-system/components-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { fetchTopicSuggestions } from "../../lib/ai";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-	buildContentRecommendationPlan,
-	type ContentPerformanceSample,
-} from "../../lib/content-recommendation-ranker";
+	buildDeterministicTopicSuggestions,
+	fetchTopicSuggestions,
+} from "../../lib/ai";
+import { type ApiKeysStatus, useApiKeys } from "../../lib/api-keys-context";
+import type { ContentPerformanceSample } from "../../lib/content-recommendation-ranker";
+import { buildReferenceProductionPlan } from "../../lib/reference-production-orchestrator";
 import {
 	attachNicheHandoffToTopic,
 	formatCompactNumber,
 	type NicheResearchHandoff,
 } from "../../lib/niche-research";
 import { supabase } from "../../lib/supabase";
-import type { Channel } from "../../types/database";
+import type { Channel, ReferenceTemplate } from "../../types/database";
+import type { ContentMode } from "./ContentWizardPage";
 
 interface StepTopicProps {
+	mode?: ContentMode;
 	channels: Channel[];
 	selectedChannelId: string;
 	onChannelChange: (id: string) => void;
 	onNext: (topicId: string, topicTitle: string) => void;
 	initialTitle?: string;
 	source?: string;
+	referenceTemplate?: ReferenceTemplate | null;
+	referenceCandidates?: ReferenceTemplate[];
 	nicheHandoff?: NicheResearchHandoff | null;
 	performanceHistory?: ContentPerformanceSample[];
 }
 
+function hasUnrecoveredOpenAiQuota(status: ApiKeysStatus) {
+	const runtime = status.openaiRuntime;
+	if (!runtime?.lastQuotaAt) return false;
+	const quotaAt = Date.parse(runtime.lastQuotaAt);
+	const okAt = runtime.lastOkAt ? Date.parse(runtime.lastOkAt) : 0;
+	return Number.isFinite(quotaAt) && quotaAt > (Number.isFinite(okAt) ? okAt : 0);
+}
+
 export default function StepTopic({
+	mode = "ai",
 	channels,
 	selectedChannelId,
 	onChannelChange,
 	onNext,
 	initialTitle = "",
 	source = "manual",
+	referenceTemplate,
+	referenceCandidates = [],
 	nicheHandoff,
 	performanceHistory = [],
 }: StepTopicProps) {
@@ -49,36 +66,94 @@ export default function StepTopic({
 	const [suggestions, setSuggestions] = useState<string[]>([]);
 	const [loadingSuggestions, setLoadingSuggestions] = useState(false);
 	const [suggestionsError, setSuggestionsError] = useState("");
-	const recommendationPlan = useMemo(
+	const [suggestionsMode, setSuggestionsMode] = useState<"ai" | "rules">("ai");
+	const { status: apiStatus, loaded: apiStatusLoaded } = useApiKeys();
+	const suggestionRequestId = useRef(0);
+	const productionPlan = useMemo(
 		() =>
-			buildContentRecommendationPlan({
+			buildReferenceProductionPlan({
 				topicTitle: title,
+				mode,
+				selectedFormat: "both",
+				referenceTemplate,
+				referenceCandidates,
 				nicheHandoff,
 				performanceHistory,
 			}),
-		[title, nicheHandoff, performanceHistory],
+		[
+			title,
+			mode,
+			referenceTemplate,
+			referenceCandidates,
+			nicheHandoff,
+			performanceHistory,
+		],
+	);
+	const recommendationPlan = productionPlan.recommendationPlan;
+
+	const loadSuggestions = useCallback(
+		async (channelId: string, seedTopic = "") => {
+			const requestId = suggestionRequestId.current + 1;
+			suggestionRequestId.current = requestId;
+			const isCurrentRequest = () => suggestionRequestId.current === requestId;
+			const selectedChannel =
+				channels.find((channel) => channel.id === channelId) ?? null;
+			const fallback = () =>
+				buildDeterministicTopicSuggestions(
+					selectedChannel
+						? {
+								name: selectedChannel.name,
+								category: String(selectedChannel.category ?? ""),
+								description: String(selectedChannel.description ?? ""),
+							}
+						: null,
+					seedTopic,
+					);
+			const applyFallback = (message: string) => {
+				if (!isCurrentRequest()) return;
+				setSuggestionsMode("rules");
+				setSuggestions(fallback());
+				setSuggestionsError(message);
+			};
+
+			setLoadingSuggestions(true);
+			setSuggestionsError("");
+			setSuggestions([]);
+			try {
+				if (!apiStatus.openai) {
+					applyFallback("OpenAI 키가 없어 룰 기반 추천을 사용합니다.");
+					return;
+				}
+				if (
+					apiStatus.openaiRuntime?.quotaBlocked ||
+					hasUnrecoveredOpenAiQuota(apiStatus)
+				) {
+					applyFallback("OpenAI 쿼터 대기 중이라 룰 기반 추천을 사용합니다.");
+					return;
+				}
+				const result = await fetchTopicSuggestions(channelId, seedTopic);
+				if (!isCurrentRequest()) return;
+				setSuggestionsMode("ai");
+				setSuggestions(result);
+			} catch (err) {
+				const message =
+					err instanceof Error ? err.message : "추천 주제를 불러올 수 없습니다.";
+				if (/429|quota|쿼터|OpenAI API 오류/i.test(message)) {
+					applyFallback("AI 추천이 제한되어 룰 기반 추천으로 전환했습니다.");
+				} else if (isCurrentRequest()) {
+					setSuggestionsError(message);
+				}
+			} finally {
+				if (isCurrentRequest()) setLoadingSuggestions(false);
+			}
+		},
+		[apiStatus, channels],
 	);
 
-	const loadSuggestions = useCallback(async (channelId: string) => {
-		setLoadingSuggestions(true);
-		setSuggestionsError("");
-		setSuggestions([]);
-		try {
-			const result = await fetchTopicSuggestions(channelId);
-			setSuggestions(result);
-		} catch (err) {
-			setSuggestionsError(
-				err instanceof Error ? err.message : "추천 주제를 불러올 수 없습니다.",
-			);
-		} finally {
-			setLoadingSuggestions(false);
-		}
-	}, []);
-
 	useEffect(() => {
-		if (!selectedChannelId) return;
-		loadSuggestions(selectedChannelId);
-	}, [selectedChannelId, loadSuggestions]);
+		if (!selectedChannelId || !apiStatusLoaded) return;
+		loadSuggestions(selectedChannelId, initialTitle);
+	}, [selectedChannelId, initialTitle, apiStatusLoaded, loadSuggestions]);
 
 	useEffect(() => {
 		if (!initialTitle.trim()) return;
@@ -128,7 +203,14 @@ export default function StepTopic({
 					name="channel"
 					label="채널 선택"
 					value={selectedChannelId}
-					onChange={(e) => onChannelChange(e.detail.value)}
+					onUpdate={(e) => onChannelChange(String(e.detail.value ?? ""))}
+					onChange={(e) => {
+						const next =
+							e.detail?.value ??
+							(e.target as HTMLSelectElement | null)?.value ??
+							"";
+						onChannelChange(String(next));
+					}}
 				>
 					{channels.map((ch) => (
 						<PSelectOption key={ch.id} value={ch.id}>
@@ -164,6 +246,28 @@ export default function StepTopic({
 							</div>
 							<PTag color="notification-info-soft">순위화</PTag>
 						</div>
+						{productionPlan.selectedTemplate && (
+							<div className="mb-static-sm flex flex-wrap items-center gap-static-xs">
+								<PTag color="notification-success-soft">
+									{productionPlan.autoSelected
+										? "자동 레퍼런스 적용"
+										: "선택 레퍼런스 적용"}
+								</PTag>
+								<PTag color="background-surface">
+									{productionPlan.selectedTemplate.name ||
+										productionPlan.selectedTemplate.source_title}
+								</PTag>
+								{productionPlan.selectedCandidate && (
+									<PTag color="background-surface">
+										R{productionPlan.selectedCandidate.score} ·{" "}
+										{productionPlan.selectedCandidate.categoryLabel}
+									</PTag>
+								)}
+								<PText size="x-small" color="contrast-medium">
+									저장된 레퍼런스의 편집 문법을 현재 주제로 변환해 추천합니다.
+								</PText>
+							</div>
+						)}
 						<div className="grid grid-cols-1 md:grid-cols-3 gap-static-sm">
 							{recommendationPlan.scripts.slice(0, 3).map((script) => (
 								<div
@@ -223,13 +327,13 @@ export default function StepTopic({
 							AI 추천 주제
 						</PText>
 						<PTag color="background-frosted" icon="ai-spark">
-							AI
+							{suggestionsMode === "ai" ? "AI" : "룰 기반"}
 						</PTag>
 						{!loadingSuggestions && suggestions.length > 0 && (
 							<button
 								type="button"
 								className="text-[12px] text-contrast-medium hover:text-primary transition-colors cursor-pointer underline"
-								onClick={() => loadSuggestions(selectedChannelId)}
+								onClick={() => loadSuggestions(selectedChannelId, title)}
 							>
 								새로고침
 							</button>
@@ -246,7 +350,14 @@ export default function StepTopic({
 					)}
 
 					{suggestionsError && (
-						<PText size="small" color="notification-error">
+						<PText
+							size="small"
+							color={
+								suggestionsMode === "rules"
+									? "contrast-medium"
+									: "notification-error"
+							}
+						>
 							{suggestionsError}
 						</PText>
 					)}

@@ -1182,6 +1182,7 @@ function ReferenceDetailTabs({
 					<button
 						key={tab.id}
 						type="button"
+						aria-pressed={activeTab === tab.id}
 						onClick={() => onChange(tab.id)}
 						className={`rounded-[18px] px-4 py-3 text-left transition-[transform,background-color,color,box-shadow] duration-300 [transition-timing-function:cubic-bezier(.2,.8,.2,1)] active:scale-[.99] ${
 							activeTab === tab.id

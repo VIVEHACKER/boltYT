@@ -51,7 +51,10 @@ import {
 	searchAndDownloadVideoToPath,
 	type MediaSearchOptions,
 } from "../../lib/media-download";
-import { referenceToPreset, type ReferencePreset } from "../../lib/reference-bridge";
+import {
+	referenceToPreset,
+	type ReferencePreset,
+} from "../../lib/reference-bridge";
 import {
 	buildSceneImagePrompt,
 	buildSceneSearchQueries,
@@ -146,7 +149,8 @@ function isYouTubeVideoUrl(value?: string): boolean {
 
 function getShotVideoDurationSeconds(shot: SceneShot): number {
 	const rawDuration = Number(shot.duration_seconds);
-	const duration = Number.isFinite(rawDuration) && rawDuration > 0 ? rawDuration : 8;
+	const duration =
+		Number.isFinite(rawDuration) && rawDuration > 0 ? rawDuration : 8;
 	return Math.min(30, Math.max(8, Math.ceil(duration) + 4));
 }
 
@@ -183,7 +187,8 @@ function sanitizeFileStem(value: string): string {
 function videoExtensionFromFile(file: File): "mp4" | "webm" | "mov" {
 	const lowerName = file.name.toLowerCase();
 	if (lowerName.endsWith(".webm") || file.type === "video/webm") return "webm";
-	if (lowerName.endsWith(".mov") || file.type === "video/quicktime") return "mov";
+	if (lowerName.endsWith(".mov") || file.type === "video/quicktime")
+		return "mov";
 	return "mp4";
 }
 
@@ -192,7 +197,12 @@ function isSupportedManualVideo(file: File): boolean {
 	return /\.(mp4|webm|mov)$/i.test(file.name);
 }
 
-function sanitizeClipSeconds(value: number, fallback: number, min: number, max: number) {
+function sanitizeClipSeconds(
+	value: number,
+	fallback: number,
+	min: number,
+	max: number,
+) {
 	if (!Number.isFinite(value)) return fallback;
 	return Math.max(min, Math.min(max, Number(value.toFixed(2))));
 }
@@ -253,7 +263,9 @@ function maxDefined(...values: Array<number | undefined>): number | undefined {
 }
 
 function uniqueTerms(values: Array<string | undefined>): string[] {
-	return [...new Set(values.filter((value): value is string => Boolean(value)))];
+	return [
+		...new Set(values.filter((value): value is string => Boolean(value))),
+	];
 }
 
 function nestedReferenceRecord(
@@ -274,7 +286,9 @@ function referenceNumber(
 	key: string,
 ): number | undefined {
 	const value = nestedReferenceRecord(preset, section)?.[key];
-	return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+	return typeof value === "number" && Number.isFinite(value)
+		? value
+		: undefined;
 }
 
 function referenceString(
@@ -298,7 +312,11 @@ function referenceMediaSearchOptions(
 		"camera",
 		"cutDensityPerMinute",
 	);
-	const first3Motion = referenceNumber(referencePreset, "camera", "first3Motion");
+	const first3Motion = referenceNumber(
+		referencePreset,
+		"camera",
+		"first3Motion",
+	);
 	const pixelPrecision =
 		referencePreset?.productionDna?.analysisDepth === "pixel_frame_audio_edit";
 	const evidenceLike =
@@ -399,7 +417,10 @@ function isGenericStockShot(shot: SceneShot): boolean {
 
 function shouldRepairSelectedShot(shot: SceneShot): boolean {
 	if (shot.selection_provider === "animation") return false;
-	if (shot.selection_provider === "ai" || shot.visual_role === "reconstruction") {
+	if (
+		shot.selection_provider === "ai" ||
+		shot.visual_role === "reconstruction"
+	) {
 		return false;
 	}
 	if (!shot.source_url) return true;
@@ -419,8 +440,7 @@ function shouldRepairSelectedShot(shot: SceneShot): boolean {
 	}
 	if (
 		(shot.media_type ?? "video") === "video" &&
-		(typeof shot.dynamic_score === "number" &&
-			shot.dynamic_score < 22 ||
+		((typeof shot.dynamic_score === "number" && shot.dynamic_score < 22) ||
 			(shot.dynamic_issues ?? []).includes("low_motion_video"))
 	) {
 		return true;
@@ -494,7 +514,10 @@ function getVideoShots(
 function buildSocialClipVideoShot(
 	scene: Scene & { searchQueryKo?: string; searchQueryEn?: string },
 ): SceneShot {
-	const duration = Math.max(2.2, Math.min(4.2, Number(scene.duration_seconds) || 3));
+	const duration = Math.max(
+		2.2,
+		Math.min(4.2, Number(scene.duration_seconds) || 3),
+	);
 	const caption =
 		(scene.narration_text ?? "").replace(/\s+/g, " ").trim() ||
 		scene.news_title ||
@@ -537,13 +560,22 @@ function buildSocialClipVideoShot(
 			"street interview",
 			"nightlife conversation",
 		].filter(Boolean),
-		reject_terms: ["static", "slideshow", "podcast", "logo only", "screen recording"],
+		reject_terms: [
+			"static",
+			"slideshow",
+			"podcast",
+			"logo only",
+			"screen recording",
+		],
 		source_confidence: 0,
 	};
 }
 
 function buildManualVideoShot(scene: SceneWithMedia): SceneShot {
-	const duration = Math.max(2.2, Math.min(8, Number(scene.duration_seconds) || 4));
+	const duration = Math.max(
+		2.2,
+		Math.min(8, Number(scene.duration_seconds) || 4),
+	);
 	return {
 		id: `manual-video-${scene.id}`,
 		kind: "context",
@@ -711,12 +743,12 @@ export default function StepMedia({
 		current: number;
 		total: number;
 	} | null>(null);
-	const [manualVideoUrls, setManualVideoUrls] = useState<Record<string, string>>(
-		{},
-	);
-	const [manualVideoBusy, setManualVideoBusy] = useState<Record<string, boolean>>(
-		{},
-	);
+	const [manualVideoUrls, setManualVideoUrls] = useState<
+		Record<string, string>
+	>({});
+	const [manualVideoBusy, setManualVideoBusy] = useState<
+		Record<string, boolean>
+	>({});
 	useEffect(() => {
 		detectVideoGen()
 			.then((s) => setAiVideoAvailable(s.available))
@@ -730,9 +762,10 @@ export default function StepMedia({
 					.select("format, content_json")
 					.eq("id", scriptId)
 					.maybeSingle();
-				const script = data as
-					| { format?: string; content_json?: Record<string, unknown> }
-					| null;
+				const script = data as {
+					format?: string;
+					content_json?: Record<string, unknown>;
+				} | null;
 				scriptContentJsonRef.current = script?.content_json ?? {};
 				const fmt = script?.format;
 				if (fmt === "longform" || fmt === "shorts") setScriptFormat(fmt);
@@ -795,8 +828,10 @@ export default function StepMedia({
 			else if (a.type === "image") imageMap.set(a.scene_id, a);
 		}
 
-		const socialClipShotUpdates: Array<{ sceneId: string; shots: SceneShot[] }> =
-			[];
+		const socialClipShotUpdates: Array<{
+			sceneId: string;
+			shots: SceneShot[];
+		}> = [];
 		const mapped: SceneWithMedia[] = scenesRaw.map((s) => {
 			const normalizedScene = s as Scene & {
 				searchQueryKo?: string;
@@ -1086,7 +1121,9 @@ export default function StepMedia({
 		scenesRef.current = nextScenes;
 		setScenes(nextScenes);
 		await Promise.all(
-			nextScenes.map((scene) => persistSceneShots(scene.id, getSceneShots(scene))),
+			nextScenes.map((scene) =>
+				persistSceneShots(scene.id, getSceneShots(scene)),
+			),
 		);
 	}
 
@@ -1180,7 +1217,9 @@ export default function StepMedia({
 
 		const nextShots =
 			videoShotIndex >= 0
-				? shots.map((shot, index) => (index === videoShotIndex ? nextShot : shot))
+				? shots.map((shot, index) =>
+						index === videoShotIndex ? nextShot : shot,
+					)
 				: [nextShot, ...shots];
 		await persistSceneShots(scene.id, nextShots);
 
@@ -1197,7 +1236,9 @@ export default function StepMedia({
 
 	async function updatePrimaryVideoShot(
 		sceneIndex: number,
-		patch: Partial<Pick<SceneShot, "trim_start" | "trim_end" | "duration_seconds" | "crop">>,
+		patch: Partial<
+			Pick<SceneShot, "trim_start" | "trim_end" | "duration_seconds" | "crop">
+		>,
 	) {
 		const scene = scenesRef.current[sceneIndex];
 		const shots = getSceneShots(scene);
@@ -1213,7 +1254,9 @@ export default function StepMedia({
 		};
 		const nextShots =
 			videoShotIndex >= 0
-				? shots.map((shot, index) => (index === videoShotIndex ? nextShot : shot))
+				? shots.map((shot, index) =>
+						index === videoShotIndex ? nextShot : shot,
+					)
 				: [nextShot, ...shots];
 		const sceneDuration =
 			typeof patch.duration_seconds === "number" &&
@@ -1256,7 +1299,8 @@ export default function StepMedia({
 		if (file.size > MAX_MANUAL_VIDEO_BYTES) {
 			updateScene(sceneIndex, {
 				videoStatus: "error",
-				errorMsg: "영상 파일이 250MB를 초과합니다. 짧은 클립으로 잘라 넣으세요.",
+				errorMsg:
+					"영상 파일이 250MB를 초과합니다. 짧은 클립으로 잘라 넣으세요.",
 			});
 			return;
 		}
@@ -1381,7 +1425,7 @@ export default function StepMedia({
 					storagePath,
 					animationPrompt,
 					referencePreset,
-					manifest ? animationImageOptions(manifest) : undefined,
+					buildSceneImageGenOptions(scene.mood, manifest),
 				);
 				shot.source_url = storagePath;
 				shot.media_type = "image";
@@ -1390,7 +1434,8 @@ export default function StepMedia({
 					shot.animation_family = manifest.productionFamily;
 					shot.continuity_key =
 						shot.continuity_key ?? `${manifest.productionFamily}-${shot.id}`;
-					shot.source_title = shot.source_title ?? manifest.productionFamilyLabel;
+					shot.source_title =
+						shot.source_title ?? manifest.productionFamilyLabel;
 				}
 				markShotSelected(shot, {
 					provider: "animation",
@@ -1448,17 +1493,18 @@ export default function StepMedia({
 					);
 					shot.source_url = cardPath;
 					shot.media_type = "image";
-						markShotSelected(shot, {
-							provider: "source_card",
-							qualityScore: 72,
-							sourceConfidence: Math.max(shot.source_confidence ?? 0, 72),
-							sourceTitle: shot.source_title || scene.news_title,
-						});
+					markShotSelected(shot, {
+						provider: "source_card",
+						qualityScore: 72,
+						sourceConfidence: Math.max(shot.source_confidence ?? 0, 72),
+						sourceTitle: shot.source_title || scene.news_title,
+					});
 				} else {
 					url = await aiGenerateImageToPath(
 						storagePath,
 						imagePrompt,
 						referencePreset,
+						buildSceneImageGenOptions(scene.mood),
 					);
 					shot.source_url = storagePath;
 					markShotGeneratedFallback(
@@ -1492,6 +1538,23 @@ export default function StepMedia({
 		return true;
 	}
 
+	// 모든 AI 이미지 생성(씬·샷)에 공통 적용할 옵션:
+	// 종횡비(영상과 일치, Shorts 9:16 크롭 방지) + mood(시네마틱 톤) + 시드(컷 간 톤 일관성).
+	// 애니메이션 manifest 가 있으면 styleSeed/styleMode/네거티브가 우선하고 종횡비·mood 는 base 에서 온다.
+	function buildSceneImageGenOptions(
+		mood?: string,
+		manifest?: AnimationAssetManifest | null,
+	) {
+		const base = {
+			aspectRatio: (scriptFormat === "longform" ? "16:9" : "9:16") as
+				| "16:9"
+				| "9:16",
+			mood,
+			seed: deriveLockedSeed(scriptId),
+		};
+		return manifest ? { ...base, ...animationImageOptions(manifest) } : base;
+	}
+
 	async function generateFallbackSceneImage(
 		scene: SceneWithMedia,
 		imagePrompt: string,
@@ -1510,7 +1573,7 @@ export default function StepMedia({
 			scene.id,
 			prompt,
 			referencePreset,
-			manifest ? animationImageOptions(manifest) : undefined,
+			buildSceneImageGenOptions(scene.mood, manifest),
 		);
 	}
 
@@ -1571,12 +1634,12 @@ export default function StepMedia({
 				shot.source_url = cardPath;
 				shot.trim_start = undefined;
 				shot.trim_end = undefined;
-					markShotSelected(shot, {
-						provider: "source_card",
-						qualityScore: 72,
-						sourceConfidence: Math.max(shot.source_confidence ?? 0, 72),
-						sourceTitle: shot.source_title || scene.news_title,
-					});
+				markShotSelected(shot, {
+					provider: "source_card",
+					qualityScore: 72,
+					sourceConfidence: Math.max(shot.source_confidence ?? 0, 72),
+					sourceTitle: shot.source_title || scene.news_title,
+				});
 				if (!previewImageUrl) previewImageUrl = cardUrl;
 				changed = true;
 				continue;
@@ -1586,6 +1649,7 @@ export default function StepMedia({
 				storagePath,
 				imagePrompt,
 				referencePreset,
+				buildSceneImageGenOptions(scene.mood),
 			);
 			shot.media_type = "image";
 			shot.source_url = storagePath;
@@ -1695,12 +1759,12 @@ export default function StepMedia({
 				shot.source_url = cardPath;
 				shot.trim_start = undefined;
 				shot.trim_end = undefined;
-					markShotSelected(shot, {
-						provider: "source_card",
-						qualityScore: 72,
-						sourceConfidence: Math.max(shot.source_confidence ?? 0, 72),
-						sourceTitle: shot.source_title || scene.news_title,
-					});
+				markShotSelected(shot, {
+					provider: "source_card",
+					qualityScore: 72,
+					sourceConfidence: Math.max(shot.source_confidence ?? 0, 72),
+					sourceTitle: shot.source_title || scene.news_title,
+				});
 				if (!previewImageUrl) previewImageUrl = cardUrl;
 				changed = true;
 				continue;
@@ -1710,6 +1774,7 @@ export default function StepMedia({
 				`scenes/${scene.id}/shots/${shot.id}-repair.png`,
 				imagePrompt,
 				referencePreset,
+				buildSceneImageGenOptions(scene.mood),
 			);
 			shot.media_type = "image";
 			shot.source_url = `scenes/${scene.id}/shots/${shot.id}-repair.png`;
@@ -1772,11 +1837,7 @@ export default function StepMedia({
 			}
 			if (isDirectVideoUrl(shot.source_url)) {
 				const isYouTube = isYouTubeVideoUrl(shot.source_url);
-				const sharedKey = getVideoReuseKey(
-					shot.source_url!,
-					shot,
-					shotIndex,
-				);
+				const sharedKey = getVideoReuseKey(shot.source_url!, shot, shotIndex);
 				const reused = sharedVideoSources.get(sharedKey);
 				if (reused) {
 					shot.source_url = reused.storagePath;
@@ -2052,8 +2113,7 @@ export default function StepMedia({
 					queryEn,
 					queryKo,
 					locale,
-				)) ||
-				(await generateFallbackSceneImage(latestScene, imagePrompt));
+				)) || (await generateFallbackSceneImage(latestScene, imagePrompt));
 			updateScene(sceneIndex, {
 				videoStatus: "not_needed",
 				imageStatus: "complete",
@@ -2161,12 +2221,14 @@ export default function StepMedia({
 
 			const { url } = await generateSceneVideo(scene.id, {
 				provider: aiVideoProvider,
+				quality: "final",
 				prompt: enriched.prompt,
 				imageUrl,
 				duration,
 				aspectRatio: enriched.aspectRatio,
 				cameraCommands: enriched.cameraCommands,
-				seed: deriveLockedSeed(scriptId),
+				// 씬마다 다른 시드 → I2V 모션 정체/드리프트 방지 (인물 일관성은 init image·네거티브가 담당).
+				seed: deriveLockedSeed(scriptId, sceneIndex),
 				chainFromVideoUrl: options.chainFromVideoUrl,
 			});
 
@@ -2666,8 +2728,9 @@ export default function StepMedia({
 					✂️ 편집 우선 제작
 				</PText>
 				<PText size="x-small" color="contrast-medium">
-					외부 영상/뉴스/이미지/문서 자료를 샷 단위로 재구성하고, 컷 리듬·줌·자막·SFX·BGM으로 완성합니다.
-					AI 영상 모델은 필요할 때만 쓰는 선택 보강입니다.
+					외부 영상/뉴스/이미지/문서 자료를 샷 단위로 재구성하고, 컷
+					리듬·줌·자막·SFX·BGM으로 완성합니다. AI 영상 모델은 필요할 때만 쓰는
+					선택 보강입니다.
 				</PText>
 			</div>
 
@@ -2685,8 +2748,8 @@ export default function StepMedia({
 							setActiveVideoProvider(next);
 						}}
 					>
-						<option value="kling3">Kling 3.0 (고품질)</option>
-						<option value="wan26">Wan 2.6 (가성비)</option>
+						<option value="kling3">Kling 3.0 (고품질 · 최종 권장)</option>
+						<option value="wan26">Wan 2.6 (가성비 · 빠른 미리보기)</option>
 						<option value="ltx2">LTX-2 (빠름)</option>
 						<option value="hailuo">Hailuo (T2V + 카메라)</option>
 						<option value="klingO1">Kling O1 (보간)</option>
@@ -2710,8 +2773,8 @@ export default function StepMedia({
 						</PTag>
 					)}
 					<PText size="x-small" color="contrast-low">
-						{scriptFormat === "shorts" ? "9:16 세로" : "16:9 가로"} · 시드 잠금 ·
-						마지막 프레임 체이닝
+						{scriptFormat === "shorts" ? "9:16 세로" : "16:9 가로"} · 시드 잠금
+						· 마지막 프레임 체이닝
 					</PText>
 				</div>
 			)}
@@ -2757,13 +2820,11 @@ export default function StepMedia({
 						</PTag>
 						<PTag color="background-surface">
 							모션{" "}
-							{Math.round(animationQcReport.metrics.motionCoverageRatio * 100)}
-							%
+							{Math.round(animationQcReport.metrics.motionCoverageRatio * 100)}%
 						</PTag>
 						<PTag color="background-surface">
 							에셋{" "}
-							{Math.round(animationQcReport.metrics.sourceResolvedRatio * 100)}
-							%
+							{Math.round(animationQcReport.metrics.sourceResolvedRatio * 100)}%
 						</PTag>
 						<PTag color="background-surface">
 							리깅{" "}
@@ -2771,8 +2832,7 @@ export default function StepMedia({
 						</PTag>
 						<PTag color="background-surface">
 							SFX{" "}
-							{Math.round(animationQcReport.metrics.sfxCueCoverageRatio * 100)}
-							%
+							{Math.round(animationQcReport.metrics.sfxCueCoverageRatio * 100)}%
 						</PTag>
 					</div>
 					{!animationQcReport.passed && (
@@ -2938,8 +2998,8 @@ export default function StepMedia({
 										color="contrast-medium"
 										className="mt-static-xs"
 									>
-										삽입된 영상은 이 씬의 중앙 클립 슬롯에 우선 사용됩니다. 렌더 전에는
-										렌더 서버 자산으로 자동 미러링됩니다.
+										삽입된 영상은 이 씬의 중앙 클립 슬롯에 우선 사용됩니다. 렌더
+										전에는 렌더 서버 자산으로 자동 미러링됩니다.
 									</PText>
 								</div>
 								{(() => {
@@ -3022,8 +3082,9 @@ export default function StepMedia({
 														className="mt-[4px] w-full rounded-[4px] border border-[var(--p-color-state-base)] bg-canvas px-static-sm py-[7px] text-[12px] text-contrast-high"
 														onChange={(event) => {
 															void updatePrimaryVideoShot(i, {
-																crop: event.currentTarget
-																	.value as NonNullable<SceneShot["crop"]>,
+																crop: event.currentTarget.value as NonNullable<
+																	SceneShot["crop"]
+																>,
 															});
 														}}
 													>

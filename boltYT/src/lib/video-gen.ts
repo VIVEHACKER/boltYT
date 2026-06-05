@@ -71,7 +71,19 @@ export function getActiveVideoProvider(): VideoGenProvider {
 	) {
 		return stored;
 	}
-	return "wan26"; // 기본: 선택 보강용 가성비 I2V
+	return "kling3"; // 기본: 최종 렌더 품질 우선 고품질 I2V (미리보기는 quality:'preview'로 wan26)
+}
+
+/** 품질 티어 → provider 매핑. 명시 provider 가 없을 때만 사용. */
+export type VideoQualityTier = "final" | "preview";
+
+export function resolveVideoProvider(
+	quality?: VideoQualityTier,
+	explicit?: VideoGenProvider,
+): VideoGenProvider {
+	if (explicit) return explicit;
+	// 미리보기/드래프트는 가성비, 최종은 사용자 선택(기본 kling3 고품질).
+	return quality === "preview" ? "wan26" : getActiveVideoProvider();
 }
 
 export function setActiveVideoProvider(p: VideoGenProvider): void {
@@ -81,10 +93,11 @@ export function setActiveVideoProvider(p: VideoGenProvider): void {
 // ─── 프롬프트 보강 ───
 
 const CINEMATIC_SUFFIX =
-	"cinematic, 35mm film look, shallow depth of field, professional color grading, natural dynamic lighting, sharp focus, 4K";
+	"cinematic, 35mm film look, shallow depth of field, professional color grading, natural dynamic lighting, sharp focus, 4K, smooth natural motion, temporally consistent, stable subject, fluid camera movement";
 
+// I2V 흔한 결함(워핑/모핑/플리커/손가락 기형/플라스틱 피부 등)을 명시적으로 차단.
 const NEGATIVE_DEFAULTS =
-	"low quality, blurry, watermark, text overlay, distorted faces, deformed limbs, jittery motion, oversaturated";
+	"low quality, blurry, watermark, text overlay, distorted faces, deformed limbs, jittery motion, oversaturated, morphing, warping, flickering, strobing, duplicated limbs, extra fingers, melting faces, plastic skin, unnatural slow motion, frame stutter, ghosting, color banding";
 
 function enrichPrompt(prompt: string): string {
 	const trimmed = prompt.trim();
@@ -117,6 +130,8 @@ export function buildFalInput(
 	const enriched = enrichPrompt(opts.prompt);
 	const negative = opts.negative ?? NEGATIVE_DEFAULTS;
 	const duration = Math.max(3, Math.min(10, Math.floor(opts.duration ?? 5)));
+	// kling/wan 류는 5s 또는 10s 이산 옵션만 안정 지원 → 거부/무음 폴백 방지 위해 스냅.
+	const snappedDuration = duration <= 5 ? 5 : 10;
 
 	const aspectField = opts.aspectRatio ?? "16:9";
 
@@ -129,7 +144,7 @@ export function buildFalInput(
 			return {
 				prompt: enriched,
 				image_url: opts.imageUrl,
-				duration: String(duration),
+				duration: String(snappedDuration),
 				negative_prompt: negative,
 				aspect_ratio: aspectField,
 				...(opts.seed !== undefined ? { seed: opts.seed } : {}),
@@ -143,7 +158,7 @@ export function buildFalInput(
 				prompt: enriched,
 				start_image_url: opts.imageUrl,
 				end_image_url: opts.endImageUrl,
-				duration: String(duration),
+				duration: String(snappedDuration),
 				negative_prompt: negative,
 				aspect_ratio: aspectField,
 			};
@@ -183,6 +198,11 @@ export function buildFalInput(
 
 export interface GenerateVideoOptions extends BuildInputOptions {
 	provider?: VideoGenProvider;
+	/**
+	 * 품질 티어. provider 미지정 시 final→고품질(kling3 기본), preview→wan26.
+	 * provider 를 명시하면 티어보다 우선한다.
+	 */
+	quality?: VideoQualityTier;
 	/** 서버 폴링 타임아웃 ms (기본 5분) */
 	timeoutMs?: number;
 	/**
@@ -206,16 +226,25 @@ async function generateVideoInternal(
 	opts: GenerateVideoOptions,
 	sceneIdForAsset?: string,
 ): Promise<GenerateVideoResult> {
-	const provider = opts.provider ?? getActiveVideoProvider();
+	const provider = resolveVideoProvider(opts.quality, opts.provider);
 
 	// chainFromVideoUrl 지정 시 마지막 프레임을 추출하여 imageUrl 로 사용 (씬 연속성)
 	let effectiveOpts: BuildInputOptions = opts;
 	if (opts.chainFromVideoUrl) {
 		try {
+			// 체인 프레임은 data URL 로 /api/fal/video-gen JSON 본문에 실린다. 프록시 parseBody 한도가
+			// 1MB 이므로, base64(+33%) 후에도 안전하도록 ~0.9MP 픽셀 예산(종횡비별 width) + q0.88 로 제한.
+			// (maxWidth 는 가로폭 기준 → 9:16 은 작은 변이 가로라 더 작게 잡아야 총 픽셀이 비슷해진다.)
+			const chainMaxWidth =
+				opts.aspectRatio === "9:16"
+					? 720
+					: opts.aspectRatio === "1:1"
+						? 960
+						: 1280;
 			const frame = await extractLastFrameDataUrl(opts.chainFromVideoUrl, {
 				mimeType: "image/jpeg",
-				quality: 0.9,
-				maxWidth: 1280,
+				quality: 0.88,
+				maxWidth: chainMaxWidth,
 			});
 			effectiveOpts = { ...opts, imageUrl: frame.dataUrl };
 		} catch (e) {

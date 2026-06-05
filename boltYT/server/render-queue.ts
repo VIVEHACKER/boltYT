@@ -84,6 +84,10 @@ const ALLOWED_ORIGINS = new Set([
 	"http://localhost:5174",
 	"http://localhost:4173",
 	`http://localhost:${PORT}`,
+	"http://127.0.0.1:5173",
+	"http://127.0.0.1:5174",
+	"http://127.0.0.1:4173",
+	`http://127.0.0.1:${PORT}`,
 ]);
 
 function cors(
@@ -91,12 +95,17 @@ function cors(
 	headers: Record<string, string> = {},
 ) {
 	const origin = req.headers.origin ?? "";
-	return {
+	const baseHeaders = {
 		...headers,
-		"Access-Control-Allow-Origin": ALLOWED_ORIGINS.has(origin) ? origin : "",
 		"Access-Control-Allow-Methods": "GET, POST, OPTIONS",
 		"Access-Control-Allow-Headers": "Content-Type, Authorization",
 		Vary: "Origin",
+	};
+	if (!ALLOWED_ORIGINS.has(origin)) return baseHeaders;
+	return {
+		...baseHeaders,
+		"Access-Control-Allow-Origin": origin,
+		"Access-Control-Allow-Credentials": "true",
 	};
 }
 

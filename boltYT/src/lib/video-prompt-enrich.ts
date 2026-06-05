@@ -243,12 +243,20 @@ export function enrichVideoPrompt(input: SceneEnrichInput): EnrichedPrompt {
 	return { prompt, aspectRatio, cameraCommands };
 }
 
-/** 시드를 모든 씬에 동일하게 적용하기 위한 결정론적 시드 생성기 (script_id 해시) */
-export function deriveLockedSeed(scriptId: string): number {
+/**
+ * 결정론적 시드 생성기 (script_id 해시).
+ * - sceneIndex 생략(0): 한 스크립트의 모든 컷이 동일 시드 → 이미지 톤/그레이딩 일관성.
+ * - sceneIndex 지정: 씬마다 다른 노이즈 시작점 → I2V 모션 정체/드리프트 방지.
+ */
+export function deriveLockedSeed(scriptId: string, sceneIndex = 0): number {
 	// FNV-1a hash → 31-bit 정수
 	let hash = 2166136261;
 	for (let i = 0; i < scriptId.length; i++) {
 		hash ^= scriptId.charCodeAt(i);
+		hash = Math.imul(hash, 16777619);
+	}
+	if (sceneIndex) {
+		hash ^= sceneIndex + 0x9e3779b9;
 		hash = Math.imul(hash, 16777619);
 	}
 	return hash >>> 1; // 양의 정수 (0 ~ 2^31-1)
