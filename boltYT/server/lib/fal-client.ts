@@ -5,7 +5,7 @@
  * - poll: GET {endpoint}/requests/{id}/status (1.5s 간격)
  * - fetch: GET {endpoint}/requests/{id} → 결과
  *
- * 영상 생성은 짧으면 30초, 길면 5분+ 소요. 클라이언트 timeout 차단을
+ * 영상/오디오 생성은 짧으면 30초, 길면 5분+ 소요. 클라이언트 timeout 차단을
  * 피하기 위해 서버에서 동기 폴링 후 결과 반환.
  */
 
@@ -26,6 +26,17 @@ export const FAL_ENDPOINTS = {
 
 export type FalProvider = keyof typeof FAL_ENDPOINTS;
 
+/**
+ * 오디오(BGM) 생성 엔드포인트 — 영상과 분리해 provider 검증이 섞이지 않게 한다.
+ * Stable Audio 2.5: 라이선스 학습데이터 기반이라 Content ID claim을 트리거하지 않음(수익화 안전).
+ */
+export const FAL_AUDIO_ENDPOINTS = {
+	/** Stable Audio 2.5 text-to-audio — 인스트루멘탈 BGM 생성 */
+	stableAudio25: "fal-ai/stable-audio-25/text-to-audio",
+} as const;
+
+export type FalAudioProvider = keyof typeof FAL_AUDIO_ENDPOINTS;
+
 const QUEUE_BASE = "https://queue.fal.run";
 
 interface SubmitResponse {
@@ -45,6 +56,14 @@ export interface FalVideoResult {
 	video_url: string;
 	request_id: string;
 	provider: FalProvider;
+	endpoint: string;
+	raw: Record<string, unknown>;
+}
+
+export interface FalAudioResult {
+	audio_url: string;
+	request_id: string;
+	provider: FalAudioProvider;
 	endpoint: string;
 	raw: Record<string, unknown>;
 }
@@ -77,6 +96,32 @@ function extractVideoUrl(result: unknown): string | null {
 	return null;
 }
 
+/** fal.ai 오디오 결과에서 URL 추출. Stable Audio: { audio: "url" } 또는 { audio: { url } } */
+function extractAudioUrl(result: unknown): string | null {
+	if (!result || typeof result !== "object") return null;
+	const obj = result as Record<string, unknown>;
+
+	const audioField = obj.audio;
+	// 문자열 직접 형태: { audio: "https://..." }
+	if (typeof audioField === "string" && audioField) return audioField;
+	// File 객체 형태: { audio: { url } }
+	if (audioField && typeof audioField === "object") {
+		const url = (audioField as Record<string, unknown>).url;
+		if (typeof url === "string" && url) return url;
+	}
+
+	// 일부 응답: { audio_file: { url } } 또는 { audio_url }
+	const audioFile = obj.audio_file;
+	if (audioFile && typeof audioFile === "object") {
+		const url = (audioFile as Record<string, unknown>).url;
+		if (typeof url === "string" && url) return url;
+	}
+	if (typeof obj.audio_url === "string" && obj.audio_url) return obj.audio_url;
+	if (typeof obj.url === "string" && obj.url) return obj.url;
+
+	return null;
+}
+
 export interface SubmitFalOptions {
 	apiKey: string;
 	provider: FalProvider;
@@ -89,19 +134,31 @@ export interface SubmitFalOptions {
 	onLog?: (msg: string) => void;
 }
 
+export interface SubmitFalAudioOptions {
+	apiKey: string;
+	provider: FalAudioProvider;
+	input: Record<string, unknown>;
+	pollIntervalMs?: number;
+	timeoutMs?: number;
+	onLog?: (msg: string) => void;
+}
+
+interface RunFalJobOptions {
+	endpoint: string;
+	apiKey: string;
+	input: Record<string, unknown>;
+	pollIntervalMs?: number;
+	timeoutMs?: number;
+	onLog?: (msg: string) => void;
+}
+
 /**
- * fal.ai 큐에 작업 제출 → 완료까지 폴링 → video URL 반환.
- *
- * 호출자는 timeoutMs 내에서 결과를 기다린다. 타임아웃 시 큐 작업은
- * fal.ai 측에서 계속 진행되지만 클라이언트는 에러를 받는다.
+ * fal.ai 큐에 작업 제출 → 완료까지 폴링 → 원시 결과 반환.
+ * video/audio 공통 흐름. URL 추출은 호출자가 모델별 함수로 처리.
  */
-export async function submitFalVideo(
-	opts: SubmitFalOptions,
-): Promise<FalVideoResult> {
-	const endpoint = FAL_ENDPOINTS[opts.provider];
-	if (!endpoint) {
-		throw new Error(`Unknown fal provider: ${opts.provider}`);
-	}
+async function runFalJob(
+	opts: RunFalJobOptions,
+): Promise<{ raw: Record<string, unknown>; requestId: string }> {
 	if (!opts.apiKey) {
 		throw new Error("FAL_KEY is required");
 	}
@@ -113,7 +170,7 @@ export async function submitFalVideo(
 
 	// 1. 제출
 	const submitRes = await fetchWithRetry(
-		`${QUEUE_BASE}/${endpoint}`,
+		`${QUEUE_BASE}/${opts.endpoint}`,
 		{
 			method: "POST",
 			headers,
@@ -135,10 +192,10 @@ export async function submitFalVideo(
 
 	const statusUrl =
 		submitJson.status_url ??
-		`${QUEUE_BASE}/${endpoint}/requests/${requestId}/status`;
+		`${QUEUE_BASE}/${opts.endpoint}/requests/${requestId}/status`;
 	const responseUrl =
 		submitJson.response_url ??
-		`${QUEUE_BASE}/${endpoint}/requests/${requestId}`;
+		`${QUEUE_BASE}/${opts.endpoint}/requests/${requestId}`;
 
 	// 2. 폴링
 	const pollIntervalMs = Math.max(10, opts.pollIntervalMs ?? 1500);
@@ -152,9 +209,7 @@ export async function submitFalVideo(
 		const statusRes = await fetchWithRetry(
 			statusUrl,
 			{ headers },
-			{
-				timeout: 15_000,
-			},
+			{ timeout: 15_000 },
 		);
 		if (!statusRes.ok) {
 			// 일시적 장애로 보고 계속 폴링 (deadline 까지)
@@ -183,14 +238,38 @@ export async function submitFalVideo(
 	const resultRes = await fetchWithRetry(
 		responseUrl,
 		{ headers },
-		{
-			timeout: 30_000,
-		},
+		{ timeout: 30_000 },
 	);
 	if (!resultRes.ok) {
 		throw new Error(`fal result fetch failed: ${resultRes.status}`);
 	}
 	const raw = (await resultRes.json()) as Record<string, unknown>;
+	return { raw, requestId };
+}
+
+/**
+ * fal.ai 큐에 영상 작업 제출 → 완료까지 폴링 → video URL 반환.
+ *
+ * 호출자는 timeoutMs 내에서 결과를 기다린다. 타임아웃 시 큐 작업은
+ * fal.ai 측에서 계속 진행되지만 클라이언트는 에러를 받는다.
+ */
+export async function submitFalVideo(
+	opts: SubmitFalOptions,
+): Promise<FalVideoResult> {
+	const endpoint = FAL_ENDPOINTS[opts.provider];
+	if (!endpoint) {
+		throw new Error(`Unknown fal provider: ${opts.provider}`);
+	}
+
+	const { raw, requestId } = await runFalJob({
+		endpoint,
+		apiKey: opts.apiKey,
+		input: opts.input,
+		pollIntervalMs: opts.pollIntervalMs,
+		timeoutMs: opts.timeoutMs,
+		onLog: opts.onLog,
+	});
+
 	const videoUrl = extractVideoUrl(raw);
 	if (!videoUrl) {
 		throw new Error("fal result has no video URL");
@@ -205,9 +284,43 @@ export async function submitFalVideo(
 	};
 }
 
+/**
+ * fal.ai 큐에 오디오(BGM) 작업 제출 → 완료까지 폴링 → audio URL 반환.
+ */
+export async function submitFalAudio(
+	opts: SubmitFalAudioOptions,
+): Promise<FalAudioResult> {
+	const endpoint = FAL_AUDIO_ENDPOINTS[opts.provider];
+	if (!endpoint) {
+		throw new Error(`Unknown fal audio provider: ${opts.provider}`);
+	}
+
+	const { raw, requestId } = await runFalJob({
+		endpoint,
+		apiKey: opts.apiKey,
+		input: opts.input,
+		pollIntervalMs: opts.pollIntervalMs,
+		timeoutMs: opts.timeoutMs,
+		onLog: opts.onLog,
+	});
+
+	const audioUrl = extractAudioUrl(raw);
+	if (!audioUrl) {
+		throw new Error("fal result has no audio URL");
+	}
+
+	return {
+		audio_url: audioUrl,
+		request_id: requestId,
+		provider: opts.provider,
+		endpoint,
+		raw,
+	};
+}
+
 function sleep(ms: number): Promise<void> {
 	return new Promise((r) => setTimeout(r, ms));
 }
 
 /** Test-only export */
-export const __test = { extractVideoUrl };
+export const __test = { extractVideoUrl, extractAudioUrl };

@@ -4,9 +4,9 @@
  * 실행: npx tsx server/api-proxy.ts
  */
 
-import { createServer } from "node:http";
 import { execFile } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
+import { createServer } from "node:http";
 import { join } from "node:path";
 import { Readable } from "node:stream";
 import { promisify } from "node:util";
@@ -33,8 +33,11 @@ import {
 	recordError,
 } from "./lib/errors-buffer.ts";
 import {
+	FAL_AUDIO_ENDPOINTS,
 	FAL_ENDPOINTS,
+	type FalAudioProvider,
 	type FalProvider,
+	submitFalAudio,
 	submitFalVideo,
 } from "./lib/fal-client.ts";
 import { fetchWithRetry } from "./lib/fetch-retry.ts";
@@ -45,8 +48,8 @@ import {
 	snapshot as metricsSnapshot,
 } from "./lib/metrics.ts";
 import {
-	getOpenAiSkipReason,
 	getOpenAiRuntimeHealth,
+	getOpenAiSkipReason,
 	isOpenAiQuotaError,
 	markOpenAiOk,
 	markOpenAiQuotaBlocked,
@@ -1265,8 +1268,7 @@ function extractArticleMedia(
 
 	const imageUrls: string[] = [];
 	const imgRegex = /<img[^>]+src=["']([^"']+)["'][^>]*>/gi;
-	let match: RegExpExecArray | null;
-	while ((match = imgRegex.exec(html)) !== null) {
+	for (const match of html.matchAll(imgRegex)) {
 		const abs = absolutize(match[1]);
 		if (!abs) continue;
 		if (
@@ -1743,7 +1745,80 @@ const server = createServer(async (req, res) => {
 				message: maskSecrets(msg),
 				context: { route: "/api/fal/video-gen", provider },
 			});
-			log.error("fal video-gen exception", { provider, error: msg });
+			log.error("fal video-gen exception", {
+				provider,
+				error: maskSecrets(msg),
+			});
+			json(req, res, 500, { error: maskSecrets(msg) });
+		}
+		return;
+	}
+
+	if (url.pathname === "/api/fal/audio-gen" && req.method === "POST") {
+		if (!requireKey(req, res, KEYS.fal, "fal.ai")) return;
+		const body = await parseBody(req);
+		if (body === null) {
+			json(req, res, 413, { error: "요청 본문이 너무 큽니다 (최대 1MB)" });
+			return;
+		}
+
+		const providerStr = sanitizeString(body.provider, 48) || "stableAudio25";
+		if (!(providerStr in FAL_AUDIO_ENDPOINTS)) {
+			json(req, res, 400, {
+				error: `provider 잘못됨. 허용: ${Object.keys(FAL_AUDIO_ENDPOINTS).join(", ")}`,
+			});
+			return;
+		}
+		const provider = providerStr as FalAudioProvider;
+
+		const input = (body.input ?? {}) as Record<string, unknown>;
+		const prompt = sanitizeString(input.prompt, 2000);
+		if (!input || typeof input !== "object" || !prompt) {
+			json(req, res, 400, { error: "input.prompt 가 필요합니다" });
+			return;
+		}
+		// 길이 제한된 프롬프트로 교체해 과도한 업스트림 요청 방지
+		input.prompt = prompt;
+
+		const timeoutMs = sanitizeInt(body.timeout_ms, 10_000, 600_000, 300_000);
+
+		try {
+			recordAudit({
+				actor: actorFromReq(req),
+				action: "fal.audio-gen.submit",
+				resource: provider,
+				outcome: "ok",
+				service: SERVICE,
+				details: { promptLen: String(input.prompt ?? "").length },
+			});
+			const result = await submitFalAudio({
+				apiKey: KEYS.fal,
+				provider,
+				input,
+				timeoutMs,
+				onLog: (m) => log.info("fal audio status", { provider, m }),
+			});
+			metricCounter("fal_audio_gen_total", { provider, outcome: "ok" });
+			json(req, res, 200, {
+				audio_url: result.audio_url,
+				request_id: result.request_id,
+				provider: result.provider,
+				endpoint: result.endpoint,
+			});
+		} catch (e) {
+			metricCounter("fal_audio_gen_total", { provider, outcome: "error" });
+			const msg = e instanceof Error ? e.message : "fal proxy error";
+			recordError({
+				service: SERVICE,
+				source: "server",
+				level: "error",
+				message: maskSecrets(msg),
+				context: { route: "/api/fal/audio-gen", provider },
+			});
+			log.error("fal audio-gen exception", {
+				provider,
+				error: maskSecrets(msg),
+			});
 			json(req, res, 500, { error: maskSecrets(msg) });
 		}
 		return;

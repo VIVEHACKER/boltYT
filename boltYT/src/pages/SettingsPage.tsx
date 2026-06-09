@@ -10,7 +10,15 @@ import {
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "../hooks/useAuth";
 import { type ApiKeysStatus, useApiKeys } from "../lib/api-keys-context";
-import { loadChannelBranding, saveChannelBranding } from "../lib/channel-branding";
+import {
+	type BgmSourceMode,
+	getBgmSourceMode,
+	setBgmSourceMode,
+} from "../lib/bgm";
+import {
+	loadChannelBranding,
+	saveChannelBranding,
+} from "../lib/channel-branding";
 import { getApiProxyUrl } from "../lib/proxy";
 import {
 	checkYouTubeServer,
@@ -113,11 +121,16 @@ const API_KEY_FIELD_SET = new Set<EnvKeyName>(
 	API_KEY_FIELDS.map((field) => field.key),
 );
 
-function sanitizedKeyDrafts(value: unknown): Partial<Record<EnvKeyName, string>> {
+function sanitizedKeyDrafts(
+	value: unknown,
+): Partial<Record<EnvKeyName, string>> {
 	if (!value || typeof value !== "object" || Array.isArray(value)) return {};
 	const drafts: Partial<Record<EnvKeyName, string>> = {};
 	for (const [key, draft] of Object.entries(value)) {
-		if (!API_KEY_FIELD_SET.has(key as EnvKeyName) || typeof draft !== "string") {
+		if (
+			!API_KEY_FIELD_SET.has(key as EnvKeyName) ||
+			typeof draft !== "string"
+		) {
 			continue;
 		}
 		if (draft.trim()) drafts[key as EnvKeyName] = draft;
@@ -190,7 +203,8 @@ function loadLastKnownKeysStatus(): ApiKeysStatus | null {
 }
 
 function saveLastKnownKeysStatus(status: ApiKeysStatus) {
-	if (typeof localStorage === "undefined" || !hasConfiguredStatus(status)) return;
+	if (typeof localStorage === "undefined" || !hasConfiguredStatus(status))
+		return;
 	localStorage.setItem(
 		API_KEY_STATUS_CACHE_KEY,
 		JSON.stringify({ savedAt: new Date().toISOString(), status }),
@@ -202,6 +216,13 @@ export default function SettingsPage() {
 	const [displayName, setDisplayName] = useState(
 		user?.user_metadata?.display_name ?? "로컬 사용자",
 	);
+	const [bgmSourceMode, setBgmMode] = useState<BgmSourceMode>(() =>
+		getBgmSourceMode(),
+	);
+	const applyBgmMode = (mode: BgmSourceMode) => {
+		setBgmSourceMode(mode);
+		setBgmMode(mode);
+	};
 	const [brandName, setBrandName] = useState(
 		() => loadChannelBranding().channelName,
 	);
@@ -212,7 +233,9 @@ export default function SettingsPage() {
 		() => loadChannelBranding().tagline,
 	);
 	const [message, setMessage] = useState("");
-	const [messageState, setMessageState] = useState<"success" | "error">("success");
+	const [messageState, setMessageState] = useState<"success" | "error">(
+		"success",
+	);
 	const [saving, setSaving] = useState(false);
 	const [keyDrafts, setKeyDrafts] = useState<
 		Partial<Record<EnvKeyName, string>>
@@ -385,7 +408,9 @@ export default function SettingsPage() {
 		} catch (error) {
 			setMessageState("error");
 			setMessage(
-				error instanceof Error ? error.message : "설정 저장 중 오류가 발생했습니다.",
+				error instanceof Error
+					? error.message
+					: "설정 저장 중 오류가 발생했습니다.",
 			);
 		} finally {
 			setSaving(false);
@@ -404,9 +429,7 @@ export default function SettingsPage() {
 		try {
 			const savedKeyCount = await persistApiKeyDrafts(keys);
 			setMessageState("success");
-			setMessage(
-				`API 키 ${savedKeyCount}개를 저장하고 서버에 반영했습니다.`,
-			);
+			setMessage(`API 키 ${savedKeyCount}개를 저장하고 서버에 반영했습니다.`);
 		} catch (error) {
 			setMessageState("error");
 			setMessage(
@@ -521,7 +544,9 @@ export default function SettingsPage() {
 						label="채널 핸들"
 						description="@ 없이 입력해도 저장 시 자동으로 붙습니다."
 						value={brandHandle}
-						onInput={(e) => setBrandHandle((e.target as HTMLInputElement).value)}
+						onInput={(e) =>
+							setBrandHandle((e.target as HTMLInputElement).value)
+						}
 					/>
 					<PInputText
 						name="brandTagline"
@@ -536,15 +561,51 @@ export default function SettingsPage() {
 
 			<PDivider className="my-fluid-md" />
 
+			{/* BGM 소스 */}
+			<div className="bg-surface rounded-[8px] p-static-lg">
+				<PHeading size="small" tag="h2" className="mb-static-md">
+					BGM 소스
+				</PHeading>
+				<PText size="small" color="contrast-medium" className="mb-static-lg">
+					자동 BGM 선택 방식입니다. <strong>AI 생성</strong>은 Stable Audio
+					2.5(fal.ai)로 주제별 고유 인스트루멘탈을 만들어 Content ID claim 없이
+					수익화에 안전합니다. 생성 실패 시 라이브러리로 자동 폴백하며,
+					FAL_KEY가 필요합니다. 유료 라이브러리(Epidemic/Artlist 등) 트랙은
+					트랙별로 직접 가져옵니다.
+				</PText>
+				<div className="flex gap-static-sm">
+					<PButton
+						type="button"
+						variant={bgmSourceMode === "library" ? "primary" : "secondary"}
+						icon="none"
+						onClick={() => applyBgmMode("library")}
+						aria-pressed={bgmSourceMode === "library"}
+					>
+						라이브러리 (Pixabay)
+					</PButton>
+					<PButton
+						type="button"
+						variant={bgmSourceMode === "ai" ? "primary" : "secondary"}
+						icon="none"
+						onClick={() => applyBgmMode("ai")}
+						aria-pressed={bgmSourceMode === "ai"}
+					>
+						AI 생성 (Stable Audio)
+					</PButton>
+				</div>
+			</div>
+
+			<PDivider className="my-fluid-md" />
+
 			{/* API 프록시 서버 상태 */}
 			<div className="bg-surface rounded-[8px] p-static-lg">
 				<PHeading size="small" tag="h2" className="mb-static-md">
 					API 프록시 서버
 				</PHeading>
-					<PText size="small" color="contrast-medium" className="mb-static-lg">
-						여기서 입력한 값은 Vite가 감시하지 않는 로컬 런타임 키 저장소에
-						저장되고 서버에 즉시 재로드됩니다. 기존 키 값은 보안상 화면에
-						표시하지 않습니다.
+				<PText size="small" color="contrast-medium" className="mb-static-lg">
+					여기서 입력한 값은 Vite가 감시하지 않는 로컬 런타임 키 저장소에
+					저장되고 서버에 즉시 재로드됩니다. 기존 키 값은 보안상 화면에 표시하지
+					않습니다.
 				</PText>
 
 				<div className="flex flex-col gap-static-md">
@@ -559,27 +620,27 @@ export default function SettingsPage() {
 						)}
 					</div>
 
-						{!proxyOk && (
-							<PInlineNotification state="warning" dismissButton={false}>
-								API 프록시 서버가 실행 중이지 않습니다. 터미널에서 실행하세요: npm
-								run servers
-							</PInlineNotification>
-						)}
+					{!proxyOk && (
+						<PInlineNotification state="warning" dismissButton={false}>
+							API 프록시 서버가 실행 중이지 않습니다. 터미널에서 실행하세요: npm
+							run servers
+						</PInlineNotification>
+					)}
 
-						{!proxyOk && hasConfiguredStatus(lastKnownKeysStatus) && (
-							<PInlineNotification state="info" dismissButton={false}>
-								저장된 키 값이 지워진 것은 아닙니다. 현재는 API 프록시가 꺼져
-								실시간 검증을 못 해서 마지막 저장 상태를 표시합니다.
-							</PInlineNotification>
-						)}
+					{!proxyOk && hasConfiguredStatus(lastKnownKeysStatus) && (
+						<PInlineNotification state="info" dismissButton={false}>
+							저장된 키 값이 지워진 것은 아닙니다. 현재는 API 프록시가 꺼져
+							실시간 검증을 못 해서 마지막 저장 상태를 표시합니다.
+						</PInlineNotification>
+					)}
 
-						{openAiQuotaBlocked && (
-							<PInlineNotification state="warning" dismissButton={false}>
-								OpenAI 키는 저장되어 있지만 현재 계정 quota/billing 오류가 감지되어
-								전사와 Vision 호출을 자동 우회 중입니다.
-								{openAiQuotaRetryAt ? ` 재시도 예정: ${openAiQuotaRetryAt}` : ""}
-							</PInlineNotification>
-						)}
+					{openAiQuotaBlocked && (
+						<PInlineNotification state="warning" dismissButton={false}>
+							OpenAI 키는 저장되어 있지만 현재 계정 quota/billing 오류가
+							감지되어 전사와 Vision 호출을 자동 우회 중입니다.
+							{openAiQuotaRetryAt ? ` 재시도 예정: ${openAiQuotaRetryAt}` : ""}
+						</PInlineNotification>
+					)}
 
 					<div className="rounded-[8px] bg-base p-static-md">
 						<div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-static-sm mb-static-md">
@@ -591,32 +652,34 @@ export default function SettingsPage() {
 									저장할 키만 붙여넣으세요. 빈 칸은 기존 값을 유지합니다.
 								</PText>
 							</div>
-								<PTag color="notification-info-soft">저장 위치: 로컬 키 저장소</PTag>
-							</div>
+							<PTag color="notification-info-soft">
+								저장 위치: 로컬 키 저장소
+							</PTag>
+						</div>
 
-							{hasUnsavedKeyDrafts && (
-								<PInlineNotification
-									state="warning"
-									dismissButton={false}
-									className="mb-static-md"
-								>
-									입력 중인 API 키가 아직 로컬 키 저장소에 저장되지 않았습니다.
-									현재 탭에서만 임시 보존 중이며, 저장 성공 후 자동으로 비웁니다.
-								</PInlineNotification>
-							)}
+						{hasUnsavedKeyDrafts && (
+							<PInlineNotification
+								state="warning"
+								dismissButton={false}
+								className="mb-static-md"
+							>
+								입력 중인 API 키가 아직 로컬 키 저장소에 저장되지 않았습니다.
+								현재 탭에서만 임시 보존 중이며, 저장 성공 후 자동으로 비웁니다.
+							</PInlineNotification>
+						)}
 
-							<div className="grid grid-cols-1 gap-static-md">
+						<div className="grid grid-cols-1 gap-static-md">
 							{API_KEY_FIELDS.map((field) => (
 								<div
 									key={field.key}
 									className="rounded-[8px] bg-surface p-static-sm"
 								>
 									<div className="mb-static-xs flex items-center justify-between gap-static-sm">
-											<PText size="small" weight="semi-bold">
-												{field.label}
-											</PText>
-											{renderKeyTag(field)}
-										</div>
+										<PText size="small" weight="semi-bold">
+											{field.label}
+										</PText>
+										{renderKeyTag(field)}
+									</div>
 									<label className="block">
 										<span className="mb-static-xs block text-xs font-semibold text-contrast-medium">
 											{field.key}
@@ -744,11 +807,15 @@ export default function SettingsPage() {
 				</div>
 			</div>
 
-				<div className="mt-fluid-md">
-					<PButton loading={saving} disabled={saving || keySaving} onClick={handleSave}>
-						설정 저장
-					</PButton>
-				</div>
+			<div className="mt-fluid-md">
+				<PButton
+					loading={saving}
+					disabled={saving || keySaving}
+					onClick={handleSave}
+				>
+					설정 저장
+				</PButton>
+			</div>
 		</div>
 	);
 }
