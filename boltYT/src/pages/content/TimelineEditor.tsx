@@ -30,10 +30,11 @@ import {
 	Trash2,
 	Undo2,
 } from "lucide-react";
-import { useMemo, useRef, type CSSProperties } from "react";
+import { type CSSProperties, useMemo, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import { AudioEffectsPanel } from "../../components/timeline/AudioEffectsPanel";
+import { BgmSourcePanel } from "../../components/timeline/BgmSourcePanel";
 import { ColorPanel } from "../../components/timeline/ColorPanel";
 import { CurveEditor } from "../../components/timeline/CurveEditor";
 import { MixerPanel } from "../../components/timeline/MixerPanel";
@@ -413,6 +414,7 @@ export default function TimelineEditor() {
 				<div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
 					<TimelineV2 />
 					{mixerOpen && <MixerPanel />}
+					{mixerOpen && <BgmSourcePanel scriptId={scriptId} />}
 					{scopesOpen && <Scopes />}
 					{colorOpen && <ColorPanel />}
 					{transformOpen && <TransformPanel />}
