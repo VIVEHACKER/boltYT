@@ -54,6 +54,13 @@ export function BgmSourcePanel({ scriptId }: { scriptId: string }) {
 	const libraryInfo = PAID_BGM_LIBRARIES[library];
 
 	function applyBgm(url: string) {
+		// useTimelineLoad는 bgm_url_<scriptId>에서 복원하므로 같은 키에 저장해야
+		// 새로고침/재진입 후에도 선택한 BGM이 유지된다.
+		try {
+			localStorage.setItem(`bgm_url_${scriptId}`, url);
+		} catch {
+			/* localStorage 불가 환경 무시 */
+		}
 		snapshot();
 		setBgmUrl(url);
 	}

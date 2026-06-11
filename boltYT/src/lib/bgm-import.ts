@@ -211,10 +211,12 @@ export function assessImportedBgmClaimReadiness(
 				break;
 			}
 			default: {
-				warnings.push(
-					"claim 클리어 방식이 불명확합니다 — 라이브러리 정책을 확인하세요.",
+				// claim이 예상되는데 클리어 방식이 불명 → 차단(증적 없이 cleared로 보고하지 않는다).
+				blockers.push("Content ID claim 클리어 방식이 불명확합니다.");
+				addUnique(
+					requiredActions,
+					"claim 클리어 방식(채널 등록/영상별 코드/도구)을 확인해 기록하세요.",
 				);
-				addUnique(requiredActions, "claim 클리어 방식을 확인해 기록하세요.");
 			}
 		}
 	} else if (license.basis === "licensed" && !contentId) {

@@ -94,6 +94,17 @@ describe("assessImportedBgmClaimReadiness", () => {
 		expect(r.warnings.join(" ")).toContain("claim clear 도구");
 	});
 
+	it("blocks a claim-expected track with an unknown clearance method", () => {
+		const license: BgmLicense = {
+			basis: "licensed",
+			library: "other",
+			contentId: { claimExpected: true, clearMethod: "unknown" },
+		};
+		const r = assessImportedBgmClaimReadiness(license);
+		expect(r.cleared).toBe(false);
+		expect(r.blockers.join(" ")).toContain("불명확");
+	});
+
 	it("blocks an unrecognized license basis", () => {
 		const r = assessImportedBgmClaimReadiness({ basis: "unknown" });
 		expect(r.cleared).toBe(false);
