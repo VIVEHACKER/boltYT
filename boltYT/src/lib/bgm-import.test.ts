@@ -26,6 +26,16 @@ describe("PAID_BGM_LIBRARIES", () => {
 		);
 		expect(PAID_BGM_LIBRARIES.uppbeat.claimClearMethod).toBe("claim_free");
 	});
+
+	it("includes Korean Shorts BGM sources for manual import", () => {
+		expect(PAID_BGM_LIBRARIES.bgm_president.downloadUrl).toContain(
+			"bgmpresident.com",
+		);
+		expect(PAID_BGM_LIBRARIES.mewpot.downloadUrl).toContain("mewpot.com");
+		expect(PAID_BGM_LIBRARIES.sellbuymusic.downloadUrl).toContain(
+			"sellbuymusic.com",
+		);
+	});
 });
 
 describe("assessImportedBgmClaimReadiness", () => {

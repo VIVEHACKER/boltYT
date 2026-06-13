@@ -18,6 +18,9 @@ export type PaidBgmLibrary =
 	| "soundstripe"
 	| "envato_elements"
 	| "uppbeat"
+	| "bgm_president"
+	| "mewpot"
+	| "sellbuymusic"
 	| "other";
 
 /** Content ID claim을 클리어하는 방식 — 라이브러리마다 다르다. */
@@ -114,6 +117,33 @@ export const PAID_BGM_LIBRARIES: Record<PaidBgmLibrary, PaidBgmLibraryInfo> = {
 		recommendedForMonetization: true,
 		claimClearMethod: "claim_free",
 		notes: "프리미엄 트랙은 claim-free. 무료 티어는 크레딧 제한.",
+	},
+	bgm_president: {
+		id: "bgm_president",
+		label: "브금대통령",
+		downloadUrl: "https://www.bgmpresident.com",
+		recommendedForMonetization: true,
+		claimClearMethod: "unknown",
+		notes:
+			"한국 쇼츠에서 많이 쓰이는 BGM 소스. 곡별 이용조건/출처 표기/claim 여부를 확인해 메타데이터에 남긴다.",
+	},
+	mewpot: {
+		id: "mewpot",
+		label: "뮤팟",
+		downloadUrl: "https://www.mewpot.com",
+		recommendedForMonetization: true,
+		claimClearMethod: "unknown",
+		notes:
+			"국내 영상 제작용 BGM 라이브러리. 다운로드한 파일을 import하고 곡별 라이선스 정보를 기록한다.",
+	},
+	sellbuymusic: {
+		id: "sellbuymusic",
+		label: "셀바이뮤직",
+		downloadUrl: "https://sellbuymusic.com",
+		recommendedForMonetization: true,
+		claimClearMethod: "unknown",
+		notes:
+			"국내 BGM 거래/라이선스 플랫폼. 구매·다운로드 후 파일과 라이선스 메모를 함께 import한다.",
 	},
 	other: {
 		id: "other",

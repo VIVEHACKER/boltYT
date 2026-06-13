@@ -40,6 +40,8 @@ export interface CompositionProps extends Record<string, unknown> {
 		tagline?: string;
 	};
 	bgmUrl?: string;
+	/** Real library tracks default to one pass; set true only for deliberately loopable beds. */
+	bgmLoop?: boolean;
 	narrationUrl?: string;
 	bgmCuePlan?: BgmCuePlan;
 	subtitleStyle?: SubtitleStyle;
@@ -307,6 +309,7 @@ export function VideoComposition({
 	scenes,
 	brand,
 	bgmUrl,
+	bgmLoop = false,
 	narrationUrl,
 	bgmCuePlan,
 	subtitleStyle,
@@ -494,7 +497,7 @@ export function VideoComposition({
 				<Audio
 					src={bgmUrl}
 					volume={bgmVolume}
-					loop
+					loop={bgmLoop}
 					startFrom={bgmCuePlan?.startFromFrame ?? 0}
 				/>
 			)}

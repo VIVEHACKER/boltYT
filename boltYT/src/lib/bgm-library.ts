@@ -12,17 +12,33 @@
  */
 
 import type { BgmMood } from "./bgm";
+import {
+	buildLocalPresetMetadataPath,
+	buildLocalPresetPath,
+} from "./bgm-local-preset";
 
 /** 로컬 프리셋 경로 (public/bgm/ 기준, Vite staticFile 처리) */
 export const LOCAL_PRESETS: Record<BgmMood, string> = {
-	dark: "/bgm/dark/default.mp3",
-	tense: "/bgm/tense/default.mp3",
-	mysterious: "/bgm/mysterious/default.mp3",
-	dramatic: "/bgm/dramatic/default.mp3",
-	calm: "/bgm/calm/default.mp3",
-	upbeat: "/bgm/upbeat/default.mp3",
-	epic: "/bgm/epic/default.mp3",
-	sad: "/bgm/sad/default.mp3",
+	dark: buildLocalPresetPath("dark"),
+	tense: buildLocalPresetPath("tense"),
+	mysterious: buildLocalPresetPath("mysterious"),
+	dramatic: buildLocalPresetPath("dramatic"),
+	calm: buildLocalPresetPath("calm"),
+	upbeat: buildLocalPresetPath("upbeat"),
+	epic: buildLocalPresetPath("epic"),
+	sad: buildLocalPresetPath("sad"),
+};
+
+/** 로컬 프리셋 메타데이터 경로. import CLI가 오디오 옆에 기록한다. */
+export const LOCAL_PRESET_METADATA: Record<BgmMood, string> = {
+	dark: buildLocalPresetMetadataPath("dark"),
+	tense: buildLocalPresetMetadataPath("tense"),
+	mysterious: buildLocalPresetMetadataPath("mysterious"),
+	dramatic: buildLocalPresetMetadataPath("dramatic"),
+	calm: buildLocalPresetMetadataPath("calm"),
+	upbeat: buildLocalPresetMetadataPath("upbeat"),
+	epic: buildLocalPresetMetadataPath("epic"),
+	sad: buildLocalPresetMetadataPath("sad"),
 };
 
 /**

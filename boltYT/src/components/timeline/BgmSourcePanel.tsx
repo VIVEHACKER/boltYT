@@ -3,7 +3,7 @@
  *
  * 타임라인 에디터에서 이 영상의 BGM을 직접 정한다:
  *  - AI 생성: Stable Audio 2.5(fal.ai)로 주제 무드에 맞는 고유 인스트루멘탈 생성(claim-free).
- *  - 유료 트랙 가져오기: Epidemic/Artlist 등에서 받은 파일 import + 라이선스/Content ID claim 기록.
+ *  - 외부 트랙 가져오기: BGM 라이브러리에서 받은 파일 import + 라이선스/Content ID claim 기록.
  * 설정한 BGM은 timeline-store의 project.bgmUrl로 반영된다(MixerPanel과 동일한 패턴).
  */
 
@@ -214,9 +214,9 @@ export function BgmSourcePanel({ scriptId }: { scriptId: string }) {
 				</div>
 			</div>
 
-			{/* 유료 트랙 가져오기 */}
+			{/* 외부 트랙 가져오기 */}
 			<div style={cardStyle}>
-				<div style={cardTitleStyle}>유료 트랙 가져오기</div>
+				<div style={cardTitleStyle}>외부 BGM 가져오기</div>
 				<div
 					style={{
 						display: "flex",
@@ -229,7 +229,7 @@ export function BgmSourcePanel({ scriptId }: { scriptId: string }) {
 						value={library}
 						onChange={(e) => setLibrary(e.target.value as PaidBgmLibrary)}
 						style={inputStyle}
-						aria-label="유료 라이브러리"
+						aria-label="BGM 라이브러리"
 					>
 						{PAID_LIBRARY_IDS.map((id) => (
 							<option key={id} value={id}>

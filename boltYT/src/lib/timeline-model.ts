@@ -255,6 +255,8 @@ export interface TimelineProject {
 
 	/** 전역 오디오 */
 	bgmUrl?: string;
+	/** true일 때만 BGM 반복. 라이브러리 트랙 기본값은 한 번 재생이다. */
+	bgmLoop?: boolean;
 	bgmVolume: number;
 	narrationUrl?: string;
 

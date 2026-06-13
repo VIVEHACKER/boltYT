@@ -277,7 +277,11 @@ export function CompositionV2({ project }: CompositionV2Props) {
 
 			{/* BGM — Composition 레벨 */}
 			{project.bgmUrl && (
-				<Audio src={project.bgmUrl} volume={project.bgmVolume} loop />
+				<Audio
+					src={project.bgmUrl}
+					volume={project.bgmVolume}
+					loop={project.bgmLoop === true}
+				/>
 			)}
 		</AbsoluteFill>
 	);
