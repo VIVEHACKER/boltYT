@@ -56,6 +56,7 @@ import {
 	type NarrationTtsSignal,
 	OPENAI_VOICES,
 	setDefaultVoice,
+	ttsOverrideForProfile,
 } from "./tts";
 
 // localStorage stub (node 환경에 없으므로 전역 주입)
@@ -182,6 +183,23 @@ describe("inferNarrationTtsOptions", () => {
 			provider: "openai",
 			speed: 0.97,
 		});
+	});
+});
+
+describe("ttsOverrideForProfile", () => {
+	it("지원 profile 은 toneKeywords/direction/endingHold 로 변환한다", () => {
+		const override = ttsOverrideForProfile("suspense");
+		expect(override.toneKeywords?.length).toBeGreaterThan(0);
+		expect(typeof override.direction).toBe("string");
+		expect(override.direction?.length ?? 0).toBeGreaterThan(0);
+		expect(typeof override.endingHoldSeconds).toBe("number");
+	});
+
+	it("미지원 profile 과 prototype 상속 키('constructor'/'toString')는 빈 객체", () => {
+		expect(ttsOverrideForProfile("unknown")).toEqual({});
+		expect(ttsOverrideForProfile("constructor")).toEqual({});
+		expect(ttsOverrideForProfile("toString")).toEqual({});
+		expect(ttsOverrideForProfile("__proto__")).toEqual({});
 	});
 });
 

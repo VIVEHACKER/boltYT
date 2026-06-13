@@ -60,6 +60,26 @@ const PROFILE_ENDING_HOLD: Record<NarrationProfile, number> = {
 	neutral: 0.32,
 };
 
+/**
+ * 벤치마크 profile(suspense/news/warm/upbeat/neutral)을 실제 TtsOptions 로 변환한다.
+ * TtsOptions 에는 profile 필드가 없어 provider 가 읽지 못하므로, toneKeywords/endingHold
+ * 로 풀어야 retake 가 실제로 톤을 교정한다. 미지원 profile 은 빈 객체.
+ */
+export function ttsOverrideForProfile(profile: string): Partial<TtsOptions> {
+	// own-key 체크 — profile 은 fix params 의 임의 문자열이라 'constructor'/'toString'
+	// 같은 상속 키가 in 연산자를 통과하는 prototype pollution 을 막는다.
+	if (!Object.hasOwn(PROFILE_TONE_KEYWORDS, profile)) return {};
+	const resolved = profile as NarrationProfile;
+	const toneKeywords = PROFILE_TONE_KEYWORDS[resolved];
+	return {
+		toneKeywords,
+		endingHoldSeconds: PROFILE_ENDING_HOLD[resolved],
+		// generateContinuousNarration 은 options.direction 을 그대로 OpenAI 에 전달하므로
+		// (재합성 안 함) 타깃 profile 의 direction 까지 함께 줘야 톤이 실제로 바뀐다.
+		direction: buildNarrationDirection(resolved, toneKeywords),
+	};
+}
+
 // ─── 음성 목록 ───
 
 export const OPENAI_VOICES: TtsVoice[] = [
@@ -245,7 +265,9 @@ function countMatches(text: string, patterns: RegExp[]): number {
 }
 
 function uniqueToneKeywords(groups: Array<string[] | undefined>): string[] {
-	const merged = groups.flatMap((group) => group ?? []).map((item) => item.trim());
+	const merged = groups
+		.flatMap((group) => group ?? [])
+		.map((item) => item.trim());
 	return [...new Set(merged.filter(Boolean))].slice(0, 6);
 }
 
@@ -356,10 +378,7 @@ function buildNarrationDirection(
 }
 
 function inferProfileFromOptions(options?: TtsOptions): NarrationProfile {
-	const hints = [
-		options?.direction,
-		(options?.toneKeywords ?? []).join(" "),
-	]
+	const hints = [options?.direction, (options?.toneKeywords ?? []).join(" ")]
 		.filter(Boolean)
 		.join(" ")
 		.toLowerCase();

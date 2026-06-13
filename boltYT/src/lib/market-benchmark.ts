@@ -19,6 +19,7 @@ export type BenchmarkGenre =
 	| "news_issue"
 	| "drama_recap"
 	| "docu_story"
+	| "historical_vlog"
 	| "generic";
 
 export interface EditingBar {
@@ -171,6 +172,25 @@ const GENRE_PRESETS: Record<BenchmarkGenre, GenrePreset> = {
 		structureRoles: ["hook", "context", "journey", "reflection"],
 		shortsCutDensitySec: 2.9,
 		longformCutDensitySec: 4.8,
+	},
+	// AI 역사 시간여행 1인칭 브이로그 — 검증된 포맷("Chloe VS History").
+	// 몰입형이라 컷이 다큐보다 약간 느리고, 따뜻한 스토리텔링 톤.
+	// structureRoles 는 historical-vlog-format.HISTORICAL_VLOG_STRUCTURE_ROLES 와 일치(저수준 모듈이라 인라인).
+	historical_vlog: {
+		bgmMood: "epic",
+		duckingDb: -10,
+		ttsProfile: "warm",
+		ttsSpeed: 1.0,
+		structureRoles: [
+			"hook",
+			"arrival",
+			"immersion",
+			"conflict",
+			"revelation",
+			"farewell",
+		],
+		shortsCutDensitySec: 2.8,
+		longformCutDensitySec: 4.5,
 	},
 	generic: {
 		bgmMood: "calm",
@@ -574,6 +594,22 @@ const GENRE_KEYWORDS: Record<Exclude<BenchmarkGenre, "generic">, string[]> = {
 		"true story",
 		"biography",
 	],
+	// 시간여행 1인칭 브이로그 — 다큐(역사/history)·일반 브이로그·사극(시대극)과 겹치지 않도록
+	// *시간여행* 특화 신호만 사용. ("사극"/"시대극"은 시간여행 아닌 일반 시대물도 포함해 제외)
+	historical_vlog: [
+		"시간여행",
+		"시간 여행",
+		"타임슬립",
+		"타임머신",
+		"타임트래블",
+		"time travel",
+		"time-travel",
+		"time traveled",
+		"time traveler",
+		"time-traveling",
+		"pov vlog",
+		"i went back to",
+	],
 };
 
 /** YouTube categoryId → 장르 힌트 (25=News&Politics, 1=Film&Animation, 27=Education) */
@@ -604,6 +640,8 @@ const GENRE_PRIORITY: Exclude<BenchmarkGenre, "generic">[] = [
 	"horror_mystery",
 	"news_issue",
 	"drama_recap",
+	// 시간여행 신호가 있으면 역사 다큐보다 브이로그 포맷을 우선(동점 시).
+	"historical_vlog",
 	"docu_story",
 ];
 
@@ -617,6 +655,7 @@ export function classifyBenchmarkGenre(
 		horror_mystery: 0,
 		news_issue: 0,
 		drama_recap: 0,
+		historical_vlog: 0,
 		docu_story: 0,
 	};
 

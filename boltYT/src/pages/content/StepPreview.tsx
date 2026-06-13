@@ -48,6 +48,7 @@ import {
 	classifyBenchmarkGenre,
 	resolveMarketBenchmark,
 } from "../../lib/market-benchmark";
+import { isQualityLoopEnabled } from "../../lib/quality-loop-flag";
 import { scheduleQualityLoop } from "../../lib/quality-loop-orchestrator";
 import {
 	type AutoFixPlan,
@@ -95,7 +96,7 @@ import {
 	assessThumbnailReadiness,
 	type ThumbnailReadiness,
 } from "../../lib/thumbnail-intelligence";
-import type { TtsOptions } from "../../lib/tts";
+import { type TtsOptions, ttsOverrideForProfile } from "../../lib/tts";
 import {
 	buildYouTubeMetadata,
 	type YouTubeMetadata,
@@ -955,6 +956,25 @@ function marketDimensionStatusColor(
 
 /** 이미 매핑된 scenes/tts/bgm 상태를 판정 입력 번들로 투영 (결측 가드 포함) */
 /** import한 BGM의 Content ID claim 차단 여부. 라이선스 기록이 없으면 판단 보류(undefined). */
+/**
+ * 실행기가 composeNarrationTtsOptions 로 만든 전체 옵션(provider/openAiModel/direction 등)에
+ * planner 의 profile 교정만 덮어쓴다. profile 은 TtsOptions 필드가 아니므로 toneKeywords/
+ * direction/endingHold 로 변환해 병합 — composed 필드를 버리지 않는다(특히 OpenAI direction).
+ */
+function buildTtsOverrideFromFixParams(
+	params: Record<string, unknown>,
+): Partial<TtsOptions> {
+	const { profile, ...rest } = params;
+	const override: Partial<TtsOptions> = { ...(rest as Partial<TtsOptions>) };
+	if (typeof profile === "string") {
+		Object.assign(override, ttsOverrideForProfile(profile));
+	}
+	if (typeof params.speed === "number" && Number.isFinite(params.speed)) {
+		override.speed = params.speed;
+	}
+	return override;
+}
+
 function loadBgmClaimBlocked(scriptId: string): boolean | undefined {
 	try {
 		const raw = localStorage.getItem(`bgm_license_${scriptId}`);
@@ -1161,7 +1181,11 @@ export default function StepPreview({
 		useState<SourceSafetyReport | null>(null);
 
 	// ── quality_loop_v2 (feature flag, 기본 off): 시장 품질 루프 상태 ──
-	const qualityLoopEnabled = isQualityLoopV2Enabled();
+	// 전역 플래그가 off 여도 historical_vlog(시리즈 일관성·시장바 준수가 수익 직결)는 기본 ON.
+	const qualityLoopEnabled = isQualityLoopEnabled({
+		flagEnabled: isQualityLoopV2Enabled(),
+		genre: classifyBenchmarkGenre(title),
+	});
 	const [marketVerdictReport, setMarketVerdictReport] =
 		useState<QualityVerdictReport | null>(null);
 	const [marketLoopError, setMarketLoopError] = useState("");
@@ -1174,6 +1198,9 @@ export default function StepPreview({
 		boolean | undefined
 	>(undefined);
 	const titleRef = useRef("");
+	// 대사 텍스트만 바뀐 fix 가 적용돼 나레이션 오디오가 stale 한지 추적(effect 재시작에도
+	// 유지되도록 ref). 승인/렌더 직전 handleApprove 에서 1회 재합성한다.
+	const narrationStaleRef = useRef(false);
 	const regenerateNarrationRef = useRef<typeof regenerateNarration | null>(
 		null,
 	);
@@ -1820,9 +1847,6 @@ export default function StepPreview({
 		setMarketVerdictReport(null);
 
 		let active = true;
-		// 대사 텍스트를 바꾸는 fix(opening_hook_rewrite/ending_narration_patch)가 적용되면
-		// 나레이션 오디오가 stale 해진다 — 루프 종료 후 1회 재합성해 자막/오디오를 일치시킨다.
-		let narrationTextChanged = false;
 		const getBundle = (): ContentBundle =>
 			buildPreviewContentBundle({
 				scriptId,
@@ -1910,15 +1934,19 @@ export default function StepPreview({
 			applyScenePatch,
 			replaceNarration: (sceneId, narration) => {
 				applyScenePatch(sceneId, { narration_text: narration });
-				narrationTextChanged = true;
+				// 텍스트만 바뀌고 오디오는 그대로 — stale 표시(ref). scenes 변경으로 이 effect 가
+				// 재시작돼도 ref 는 유지되며, 승인/렌더 직전 handleApprove 에서 재합성한다.
+				narrationStaleRef.current = true;
 			},
 			// 기존 핸들러(regenerateNarration) 연결 — 연속 나레이션 전체 재합성.
-			// 벤치마크가 지시한 TTS 옵션을 그대로 넘겨 retake 가 실제로 설정을 교정한다.
+			// 벤치마크 profile 은 TtsOptions 필드가 아니므로 toneKeywords/endingHold 로 변환해
+			// retake 가 실제로 톤을 교정하게 한다.
 			retakeTts: async (_sceneIds, options) => {
 				const regenerate = regenerateNarrationRef.current;
 				if (!regenerate) {
 					throw new Error("TTS 재생성 핸들러가 아직 준비되지 않았습니다.");
 				}
+				const ttsOverride = buildTtsOverrideFromFixParams(options);
 				const workingScenes = scenesRef.current.map((scene) => ({
 					...scene,
 					shots: cloneShots(sceneShots(scene)),
@@ -1926,14 +1954,10 @@ export default function StepPreview({
 				const workingRemotionScenes = remotionScenesRef.current.map(
 					(scene) => ({ ...scene, shots: cloneShots(scene.shots) }),
 				);
-				await regenerate(
-					workingScenes,
-					workingRemotionScenes,
-					options as Partial<TtsOptions>,
-				);
+				await regenerate(workingScenes, workingRemotionScenes, ttsOverride);
 				if (!active) return;
-				// 오디오를 새로 합성했으므로 텍스트-오디오는 다시 일치 — stale 플래그 해제
-				narrationTextChanged = false;
+				// 오디오를 새로 합성했으므로 텍스트-오디오는 다시 일치 — stale 해제
+				narrationStaleRef.current = false;
 				// 다음 라운드 재판정이 재합성 결과를 읽도록 ref 도 동기 갱신
 				scenesRef.current = workingScenes;
 				remotionScenesRef.current = workingRemotionScenes;
@@ -1969,26 +1993,11 @@ export default function StepPreview({
 			},
 		);
 		void scheduled.promise
-			.then(async (result) => {
+			.then((result) => {
 				if (!active) return;
-				// 대사 텍스트만 바뀌고 오디오 재합성이 안 된 fix 가 있었다면, 승인 전에
-				// 나레이션을 1회 재합성해 자막(새 텍스트)과 오디오(이전)가 어긋나지 않게 한다.
-				const regenerate = regenerateNarrationRef.current;
-				if (narrationTextChanged && regenerate) {
-					const workingScenes = scenesRef.current.map((scene) => ({
-						...scene,
-						shots: cloneShots(sceneShots(scene)),
-					}));
-					const workingRemotionScenes = remotionScenesRef.current.map(
-						(scene) => ({ ...scene, shots: cloneShots(scene.shots) }),
-					);
-					await regenerate(workingScenes, workingRemotionScenes);
-					if (!active) return;
-					scenesRef.current = workingScenes;
-					remotionScenesRef.current = workingRemotionScenes;
-					setScenes(workingScenes);
-					setRemotionScenes(workingRemotionScenes);
-				}
+				// 대사 텍스트만 바뀐 fix 의 나레이션 재합성은 narrationStaleRef 로 표시해 두고
+				// 승인/렌더 직전(handleApprove)에 1회 처리한다 — scenes 변경이 이 effect 를
+				// 재시작시키므로 여기서 await 하면 누락된다.
 				marketVerdictReportRef.current = result.finalReport;
 				setMarketVerdictReport(result.finalReport);
 			})
@@ -2118,6 +2127,12 @@ export default function StepPreview({
 			forcedIssueCodes?: string[];
 			denseMotion?: boolean;
 			progressMessage?: string;
+			// 품질 루프가 이미 보강·재합성한 씬/나레이션을 시작점으로 주입(없으면 현재 state).
+			seed?: {
+				scenes: SceneWithAssets[];
+				remotionScenes: RemotionScene[];
+				narrationUrl: string;
+			};
 		} = {},
 	): Promise<{
 		report: ProductionQualityReport;
@@ -2126,11 +2141,14 @@ export default function StepPreview({
 		narrationUrl: string;
 		repaired: boolean;
 	}> {
-		const workingScenes = scenes.map((scene) => ({
+		const seedScenes = options.seed?.scenes ?? scenes;
+		const seedRemotionScenes = options.seed?.remotionScenes ?? remotionScenes;
+		const seedNarrationUrl = options.seed?.narrationUrl ?? narrationUrl;
+		const workingScenes = seedScenes.map((scene) => ({
 			...scene,
 			shots: cloneShots(sceneShots(scene)),
 		}));
-		const workingRemotionScenes = remotionScenes.map((scene) => ({
+		const workingRemotionScenes = seedRemotionScenes.map((scene) => ({
 			...scene,
 			shots: cloneShots(scene.shots),
 		}));
@@ -2139,20 +2157,21 @@ export default function StepPreview({
 			"",
 			workingScenes,
 			workingRemotionScenes,
+			seedNarrationUrl,
 		);
 		if (report.passed && !options.forcedIssueCodes?.length) {
 			return {
 				report,
 				scenes: workingScenes,
 				remotionScenes: workingRemotionScenes,
-				narrationUrl,
+				narrationUrl: seedNarrationUrl,
 				repaired: false,
 			};
 		}
 
 		let repaired = false;
 		let narrationDirty = false;
-		let finalNarrationUrl = narrationUrl;
+		let finalNarrationUrl = seedNarrationUrl;
 		const issueCodes = [
 			...new Set([
 				...report.issues.map((issue) => issue.code),
@@ -2293,19 +2312,64 @@ export default function StepPreview({
 
 		try {
 			const ensuredBgmUrl = await ensureBgmUrl();
+			// quality_loop_v2: 대사 텍스트만 바뀐 fix 로 나레이션 오디오가 stale 하면, 렌더 직전
+			// 1회 재합성해 새 자막과 오디오가 어긋나지 않게 한다. effect 재시작과 무관하게
+			// ref 로 추적하므로 여기가 유일한 보장 지점이다.
+			let qlScenes = scenes;
+			let qlRemotionScenes = remotionScenes;
+			let qlNarrationUrl = narrationUrl;
+			let narrationRegenerated = false;
+			// 대사 텍스트만 바뀐 fix 의 오디오 stale 은 루프 에러/비활성과 무관하게 재합성한다
+			// — fallback(repairProductionQuality)도 stale 오디오에 새 자막을 얹으면 안 된다.
+			if (narrationStaleRef.current) {
+				const ws = scenesRef.current.map((scene) => ({
+					...scene,
+					shots: cloneShots(sceneShots(scene)),
+				}));
+				const wrs = remotionScenesRef.current.map((scene) => ({
+					...scene,
+					shots: cloneShots(scene.shots),
+				}));
+				qlNarrationUrl = await regenerateNarration(ws, wrs);
+				qlScenes = ws;
+				qlRemotionScenes = wrs;
+				scenesRef.current = ws;
+				remotionScenesRef.current = wrs;
+				setScenes(ws);
+				setRemotionScenes(wrs);
+				narrationStaleRef.current = false;
+				narrationRegenerated = true;
+			}
 			// quality_loop_v2: ad-hoc repair 대신 백그라운드 품질 루프가 보강을 담당.
 			// 기존 repair 블록은 플래그 off 경로로 보존되며, 루프가 오류로 죽었을
-			// 때도 레거시 repair 로 폴백해 무보강 승인을 막는다.
+			// 때도 레거시 repair 로 폴백해 무보강 승인을 막는다(이때도 재합성된 나레이션을 seed).
 			const repaired =
 				qualityLoopEnabled && marketLoopError === ""
 					? {
-							report: buildProductionReport(ensuredBgmUrl, ""),
-							scenes,
-							remotionScenes,
-							narrationUrl,
+							report: buildProductionReport(
+								ensuredBgmUrl,
+								"",
+								qlScenes,
+								qlRemotionScenes,
+								qlNarrationUrl,
+							),
+							scenes: qlScenes,
+							remotionScenes: qlRemotionScenes,
+							narrationUrl: qlNarrationUrl,
 							repaired: false,
 						}
-					: await repairProductionQuality(ensuredBgmUrl);
+					: await repairProductionQuality(
+							ensuredBgmUrl,
+							narrationRegenerated
+								? {
+										seed: {
+											scenes: qlScenes,
+											remotionScenes: qlRemotionScenes,
+											narrationUrl: qlNarrationUrl,
+										},
+									}
+								: {},
+						);
 			if (!repaired.report.passed) {
 				const blockingIssue =
 					repaired.report.issues.find(

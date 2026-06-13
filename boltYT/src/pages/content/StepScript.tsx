@@ -21,63 +21,59 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import TabButton from "../../components/TabButton";
+import { generateResearchScript, generateScript } from "../../lib/ai";
+import { planSceneSourceAssignments, researchTopic } from "../../lib/ai-agents";
 import {
+	type AnimationBible,
+	type AnimationProductionFamily,
+	type AnimationProductionReadinessReport,
 	analyzeAnimationProductionReadiness,
 	applyAnimationPacingRules,
 	ensureAnimationSceneShots,
 	formatAnimationReadinessForPrompt,
 	summarizeAnimationBible,
-	type AnimationBible,
-	type AnimationProductionFamily,
-	type AnimationProductionReadinessReport,
 } from "../../lib/animation-production";
-import { generateResearchScript, generateScript } from "../../lib/ai";
-import { planSceneSourceAssignments, researchTopic } from "../../lib/ai-agents";
 import { snapDurationToBeat } from "../../lib/beat-sync";
 import { collectBenchmarkSamples } from "../../lib/benchmark-reference-adapter";
-import {
-	classifyBenchmarkGenre,
-	resolveMarketBenchmark,
-} from "../../lib/market-benchmark";
-import {
-	buildQualityProfile,
-	qualityProfileToPromptContext,
-	type QualityProfile,
-	saveQualityProfile,
-} from "../../lib/quality-profile";
 import { suggestColorGrade } from "../../lib/color-grades";
-import {
-	type ContentPerformanceSample,
-	type RankedScriptRecommendation,
+import type {
+	ContentPerformanceSample,
+	RankedScriptRecommendation,
 } from "../../lib/content-recommendation-ranker";
 import {
 	buildReferenceKnowledgeProfile,
 	compactKnowledgeProfile,
 } from "../../lib/knowledge-system";
 import {
-	assessReferenceApplicationScore,
-	type ReferenceApplicationScoreReport,
-} from "../../lib/reference-application-score";
-import { buildReferenceProductionPlan } from "../../lib/reference-production-orchestrator";
+	classifyBenchmarkGenre,
+	resolveMarketBenchmark,
+} from "../../lib/market-benchmark";
 import { assignMotionGraphicsForScene } from "../../lib/motion-graphics";
-import { referenceToPreset } from "../../lib/reference-bridge";
-import {
-	getReferenceTemplateReadiness,
-	getReferenceTemplateSupportedFormats,
-} from "../../lib/reference-template-presets";
 import {
 	formatNicheHandoffForPrompt,
 	type NicheResearchHandoff,
 } from "../../lib/niche-research";
 import {
+	buildQualityProfile,
+	type QualityProfile,
+	qualityProfileToPromptContext,
+	saveQualityProfile,
+} from "../../lib/quality-profile";
+import {
+	assessReferenceApplicationScore,
+	type ReferenceApplicationScoreReport,
+} from "../../lib/reference-application-score";
+import { referenceToPreset } from "../../lib/reference-bridge";
+import { buildReferenceProductionPlan } from "../../lib/reference-production-orchestrator";
+import {
+	getReferenceTemplateReadiness,
+	getReferenceTemplateSupportedFormats,
+} from "../../lib/reference-template-presets";
+import {
 	applySceneSourcePlan,
 	buildFallbackSceneSourcePlan,
 } from "../../lib/scene-sequence";
 import type { SceneShot } from "../../lib/scene-shot-types";
-import {
-	analyzeSourceSafety,
-	type SourceSafetyReport,
-} from "../../lib/source-safety-gate";
 import {
 	applyLongformVideoRules,
 	applyShortsVideoRules,
@@ -89,7 +85,10 @@ import {
 	type ShotSource,
 	syncSceneMetadataFromSource,
 } from "../../lib/scene-shots";
-import { supabase } from "../../lib/supabase";
+import {
+	analyzeSourceSafety,
+	type SourceSafetyReport,
+} from "../../lib/source-safety-gate";
 import {
 	buildStoryEditDraft,
 	createEmptyStoryEditDraft,
@@ -97,9 +96,10 @@ import {
 	duplicateStoryScene,
 	insertStorySceneAfter,
 	moveStoryScene,
-	summarizeStoryEditDraft,
 	type StoryEditDraft,
+	summarizeStoryEditDraft,
 } from "../../lib/story-editing";
+import { supabase } from "../../lib/supabase";
 import {
 	analyzeTopicProductionReadiness,
 	type TopicProductionReadinessReport,
@@ -434,7 +434,16 @@ export default function StepScript({
 	);
 
 	// 생성 시점 품질 프로파일 — handleSubmit에서 scriptId 확정 후 저장
-	const qualityProfileRef = useRef<QualityProfile | null>(null);
+	// format/genre/samples/topic 은 제출 시점 포맷 변경 시 재계산에 사용
+	const qualityProfileRef = useRef<{
+		profile: QualityProfile;
+		format: "shorts" | "longform";
+		genre: ReturnType<typeof classifyBenchmarkGenre>;
+		// 필터된 samples 가 아니라 원본 references 를 보관 — 제출 시점 포맷으로 다시
+		// collectBenchmarkSamples 해야 포맷 변경 시에도 학습 샘플이 누락되지 않는다.
+		references: Parameters<typeof collectBenchmarkSamples>[0];
+		topic: string;
+	} | null>(null);
 
 	const doGenerate = useCallback(async () => {
 		setGenerating(true);
@@ -583,7 +592,13 @@ export default function StepScript({
 					durationSec,
 					benchmark,
 				});
-				qualityProfileRef.current = profile;
+				qualityProfileRef.current = {
+					profile,
+					format: benchmarkFormat,
+					genre,
+					references: loadedReferences,
+					topic: currentTopicTitle,
+				};
 				qualityPromptContext = qualityProfileToPromptContext(profile);
 			} catch {
 				// 품질 프로파일 산출 실패는 대본 생성을 막지 않음
@@ -935,9 +950,33 @@ export default function StepScript({
 		}
 
 		// 생성 시점 품질 프로파일을 scriptId 키로 영속화 — StepMedia TTS/BGM·판정 단계가 공유
+		// 제출 시점에 format 이 바뀌었으면 해당 포맷으로 재계산 후 저장한다
 		if (qualityProfileRef.current) {
 			try {
-				saveQualityProfile(script.id, qualityProfileRef.current);
+				const submitBenchmarkFormat: "shorts" | "longform" =
+					format === "shorts" ? "shorts" : "longform";
+				const snap = qualityProfileRef.current;
+				let profileToSave = snap.profile;
+				if (submitBenchmarkFormat !== snap.format) {
+					const durationSec = submitBenchmarkFormat === "shorts" ? 45 : 480;
+					// collectBenchmarkSamples 는 포맷으로 필터하므로 제출 포맷으로 다시 수집해야
+					// 새 포맷 레퍼런스 샘플이 살아남는다(옛 samples 재사용 시 전부 탈락→builtin).
+					const resampled = snap.references.length
+						? collectBenchmarkSamples(snap.references, submitBenchmarkFormat)
+						: undefined;
+					const benchmark = resolveMarketBenchmark({
+						genre: snap.genre,
+						format: submitBenchmarkFormat,
+						samples: resampled,
+					});
+					profileToSave = buildQualityProfile({
+						topic: snap.topic,
+						format: submitBenchmarkFormat,
+						durationSec,
+						benchmark,
+					});
+				}
+				saveQualityProfile(script.id, profileToSave);
 			} catch {
 				// 품질 프로파일 저장 실패는 제출 흐름을 막지 않음
 			}
