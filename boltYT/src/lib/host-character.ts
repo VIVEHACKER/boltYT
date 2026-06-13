@@ -61,11 +61,13 @@ export interface HostMediaLock {
 	seed: number;
 }
 
+// 호스트 id 는 스토리지 경로(channels/{ch}/host/{id}/...)에 들어가므로 ASCII 로 강제한다.
+// 비ASCII(한글 등) 이름은 제거 후 fallback 으로 대체해 경로 호환성을 보장.
 function slugify(value: string, fallback: string): string {
 	const slug = value
 		.trim()
 		.toLowerCase()
-		.replace(/[^a-z0-9가-힣]+/g, "-")
+		.replace(/[^a-z0-9]+/g, "-")
 		.replace(/^-|-$/g, "")
 		.slice(0, 48);
 	return slug || fallback;
@@ -220,7 +222,8 @@ export function createStarterHost(
 ): HostCharacter {
 	const name = locale === "en" ? "Aria" : "아리";
 	return {
-		id: slugify(`${name}-time-traveler`, "host-1"),
+		// 고정 ASCII id — 같은 채널이면 KO/EN 무관하게 동일 호스트(동일 시드/시트).
+		id: "aria-time-traveler",
 		channelId,
 		name,
 		appearance:

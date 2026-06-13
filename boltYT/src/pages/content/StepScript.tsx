@@ -44,6 +44,11 @@ import {
 	buildReferenceKnowledgeProfile,
 	compactKnowledgeProfile,
 } from "../../lib/knowledge-system";
+import { resolveEra } from "../../lib/historical-vlog-format";
+import {
+	createStarterHost,
+	type HostCharacter,
+} from "../../lib/host-character";
 import {
 	classifyBenchmarkGenre,
 	resolveMarketBenchmark,
@@ -110,6 +115,8 @@ import type { CollectedSource, ContentMode } from "./ContentWizardPage";
 
 interface StepScriptProps {
 	briefId: string;
+	/** 채널 스코프 고정 호스트(시간여행 브이로그) 생성을 위해 사용 */
+	channelId?: string;
 	mode?: ContentMode;
 	sources?: CollectedSource[];
 	referenceTemplate?: ReferenceTemplate | null;
@@ -140,6 +147,7 @@ interface SceneData {
 
 export default function StepScript({
 	briefId,
+	channelId = "",
 	mode = "ai",
 	sources = [],
 	referenceTemplate,
@@ -893,6 +901,19 @@ export default function StepScript({
 		setSaving(true);
 		setSubmitError("");
 
+		// 시간여행 역사 브이로그: 채널 스코프 고정 호스트를 content_json 에 영속화.
+		// StepMedia 가 이를 읽어 모든 에피소드에 동일 시드/레퍼런스 시트를 적용(에피소드 간 동일 인물).
+		// genre 는 품질 프로파일 산출 실패(try/catch)와 무관하게 직접 분류로 폴백 — 절대 throw 안 함.
+		const vlogTopic = qualityProfileRef.current?.topic || initialTopicTitle;
+		const vlogGenre =
+			qualityProfileRef.current?.genre ?? classifyBenchmarkGenre(vlogTopic);
+		// AI 모드(production_type=standard)만 — research(documentary)/animation 은 호스트 제외.
+		const historicalHost: HostCharacter | undefined =
+			mode === "ai" && vlogGenre === "historical_vlog" && channelId
+				? createStarterHost(channelId, "ko")
+				: undefined;
+		const vlogEra = historicalHost ? resolveEra(vlogTopic).id : undefined;
+
 		const { data: script, error: scriptError } = await supabase
 			.from("scripts")
 			.insert({
@@ -933,6 +954,9 @@ export default function StepScript({
 								playbook: nicheHandoff.playbook,
 							}
 						: null,
+					...(historicalHost
+						? { host_character: historicalHost, vlog_era: vlogEra }
+						: {}),
 				},
 				status: "approved",
 				reference_template_id: effectiveReferenceTemplate?.id ?? null,

@@ -172,14 +172,20 @@ function josaRo(subject: string): "로" | "으로" {
 export function findEra(idOrLabel: string): HistoricalEra | undefined {
 	const needle = idOrLabel.trim().toLowerCase();
 	if (!needle) return undefined;
-	return HISTORICAL_ERAS.find(
-		(era) =>
+	return HISTORICAL_ERAS.find((era) => {
+		const ko = era.subjectKo.toLowerCase();
+		const en = era.subjectEn.toLowerCase();
+		return (
 			era.id === needle ||
-			era.subjectKo.toLowerCase() === needle ||
-			era.subjectEn.toLowerCase() === needle ||
-			era.subjectKo.toLowerCase().includes(needle) ||
-			era.subjectEn.toLowerCase().includes(needle),
-	);
+			ko === needle ||
+			en === needle ||
+			// 양방향 포함: 짧은 라벨 검색("로마")과 전체 주제("고대 로마 시간여행 브이로그") 모두 매칭.
+			ko.includes(needle) ||
+			en.includes(needle) ||
+			needle.includes(ko) ||
+			needle.includes(en)
+		);
+	});
 }
 
 /**

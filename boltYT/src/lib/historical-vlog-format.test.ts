@@ -145,6 +145,17 @@ describe("findEra / resolveEra", () => {
 		expect(findEra("Ancient Egypt")?.id).toBe("ancient-egypt");
 	});
 
+	it("전체 주제 문자열에서도 내장 시대를 추출한다(양방향 포함)", () => {
+		// 라이브 위저드의 실제 입력 형태 — 주제에 시대가 임베드됨
+		expect(findEra("고대 로마 시간여행 브이로그")?.id).toBe(
+			"ancient-rome-44ad",
+		);
+		expect(findEra("I time traveled to Ancient Rome")?.id).toBe(
+			"ancient-rome-44ad",
+		);
+		expect(findEra("1912년 타이타닉호로 떠난 여행")?.id).toBe("titanic-1912");
+	});
+
 	it("매칭 실패 시 undefined", () => {
 		expect(findEra("zzz존재하지않는zzz")).toBeUndefined();
 	});

@@ -32,22 +32,28 @@ boltYT(이미 AI 쇼츠+AI 영상 생성 80% 구현)를 **"AI 역사 시간여�
 - `hostReferenceSheetPath` = `channels/{channelId}/host/{hostId}/reference-sheet.png` (채널 1회 생성, 전 에피소드 공유).
 - 기존 파이프라인은 시드를 `deriveLockedSeed(scriptId)`(영상마다 다름)로 잠갔다 = 일관성 0의 원인.
 
-## 4. 남은 작업 — 호스트를 실제 렌더에 연결 (라이브 실행 필요)
-엔진은 완성·검증됐지만 **렌더 파이프라인 연결**이 남았다. StepMedia/StepScript는 현재 채널·호스트·장르
-컨텍스트를 로드하지 않으므로(2300줄+ 컴포넌트, 헤드리스 검증 불가) 아래는 앱 구동 + FAL_KEY로
-실제 렌더를 보며 작업해야 안전하다.
+## 4. 호스트 렌더 연결 — 구현 완료 (라이브 검증은 사용자 몫)
+엔진을 실제 렌더 파이프라인에 연결했다. **historical_vlog + 호스트가 있을 때만** 동작하고,
+그 외(애니/일반/리서치)는 바이트 동일(무회귀). tsc/2352 tests/eslint 통과.
 
-1. **호스트 레퍼런스 시트 1회 생성**: `buildHostReferencePrompt(identity)` → 이미지 생성 →
-   `hostReferenceSheetPath` 경로에 업로드. (없으면 img2img가 "파일 없음"으로 실패하므로 필수 선행.)
-2. **StepMedia `buildSceneImageGenOptions`**(비애니 경로, ~`src/pages/content/StepMedia.tsx:1618`):
-   historical_vlog + 호스트 존재 시 `seed = hostMediaLock.seed`, `referenceImagePath = hostMediaLock.referenceImagePath` 주입.
-   (현재 비애니는 `referenceImagePath` 미설정 → 애니 경로 `:668`이 참고 모델.)
-3. **씬 프롬프트 주입**(`StepMedia.tsx:2042` `buildSceneImagePrompt`): `applyHostToScenePrompt(prompt, identity, {era})`로
-   호스트 외형 잠금 + POV 주입. (애니는 `enrichAnimationPromptWithContinuity` 사용 = 참고 모델.)
-4. 호스트는 `hostFromStyleBible(channelStyleBible)`로 기존 채널 설정에서 가져온다(새 DB 불필요).
+연결 지점:
+1. **StepScript.handleSubmit**: genre=historical_vlog + channelId 있으면 `createStarterHost(channelId,"ko")`를
+   `content_json.host_character` + `vlog_era` 로 영속화. (genre 는 `classifyBenchmarkGenre` 폴백으로 항상 결정.)
+2. **ContentWizard** → StepScript 에 `channelId={selectedChannelId}` 전달.
+3. **StepMedia.ensureHostIdentity**: `content_json.host_character` 해석 → `buildHostIdentity` →
+   `channels/{ch}/host/{id}/reference-sheet.png` 시트 **채널당 1회 생성**(in-flight 락 + 시트 준비 후에만 캐시 노출 = 경합 방지).
+4. **StepMedia.buildSceneImageGenOptions**: 호스트 해석 시 모든 이미지 생성 경로(샷+씬)에서
+   `seed = styleSeed`, `referenceImagePath = referenceSheetPath`, `referenceStrength 0.4` 적용.
+5. **withHostPrompt**: 샷/씬 AI 생성 프롬프트에 호스트 외형 잠금 + 시대 의상 주입
+   (referenceImagePath 를 무시하는 DALL-E/ComfyUI 에서도 외형 일관성 확보).
+6. **generateImage** 진입 시 1회 `ensureHostIdentity` → 대량 동시 생성 + 단일 재생성 모두 커버.
 
-> 안전 증분: 2·3의 **seed + 프롬프트 주입만** 먼저 적용하면(파일 불필요) 동일 시드+동일 외형 묘사로
-> 일관성이 크게 오른다. referenceImagePath(img2img)는 1의 시트 생성 후 추가.
+> img2img(referenceImagePath)는 A1111(로컬)에서 가장 강력. DALL-E/ComfyUI는 참조 이미지를 무시하므로
+> 그 경우 **고정 시드 + 외형 프롬프트**가 일관성을 담당(여전히 scriptId 시드보다 크게 개선).
+> 호스트는 추후 `hostFromStyleBible(channelStyleBible)`로 채널 브랜드 캐릭터를 쓰도록 교체 가능(새 DB 불필요).
+
+**라이브 검증 체크**: `npm run dev` + FAL_KEY 로 시간여행 주제(예: "고대 로마 시간여행 브이로그") 생성 →
+같은 채널의 두 번째 에피소드에서 호스트 얼굴이 동일한지 확인.
 
 ## 5. 로컬 실행
 ```bash

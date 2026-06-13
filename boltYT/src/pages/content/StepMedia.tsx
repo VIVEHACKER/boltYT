@@ -35,6 +35,13 @@ import {
 	scoreAnimationProductionQuality,
 } from "../../lib/animation-production";
 import { autoPickBgm, inferAutoBgmPreset } from "../../lib/bgm";
+import {
+	applyHostToScenePrompt,
+	buildHostIdentity,
+	buildHostReferencePrompt,
+	type HostCharacter,
+	type HostIdentity,
+} from "../../lib/host-character";
 import { ensureBlobUrls, storeLocalFile } from "../../lib/local-db";
 import {
 	downloadImageToLocal,
@@ -745,6 +752,12 @@ export default function StepMedia({
 	const [scenes, setScenes] = useState<SceneWithMedia[]>([]);
 	const scriptContentJsonRef = useRef<Record<string, unknown>>({});
 	const animationAssetManifestRef = useRef<AnimationAssetManifest | null>(null);
+	// 시간여행 역사 브이로그 고정 호스트 — content_json.host_character 에서 1회 해석 후 캐시.
+	const hostIdentityRef = useRef<HostIdentity | null>(null);
+	// 동시 호출 시 레퍼런스 시트가 중복 생성되지 않도록 in-flight 약속을 공유(경합 방지).
+	const hostIdentityPromiseRef = useRef<Promise<HostIdentity | null> | null>(
+		null,
+	);
 	const [animationReferenceSheetPath, setAnimationReferenceSheetPath] =
 		useState("");
 	const [animationQcReport, setAnimationQcReport] =
@@ -829,6 +842,9 @@ export default function StepMedia({
 					content_json?: Record<string, unknown>;
 				} | null;
 				scriptContentJsonRef.current = script?.content_json ?? {};
+				// 스크립트 전환 시 호스트 캐시 리셋 — 이전 스크립트의 호스트가 누수되지 않게.
+				hostIdentityRef.current = null;
+				hostIdentityPromiseRef.current = null;
 				const fmt = script?.format;
 				if (fmt === "longform" || fmt === "shorts") setScriptFormat(fmt);
 				const rawProductionType = script?.content_json?.production_type;
@@ -1174,6 +1190,58 @@ export default function StepMedia({
 		return manifest;
 	}
 
+	// 시간여행 역사 브이로그 고정 호스트 해석 + 채널 스코프 레퍼런스 시트 1회 생성.
+	// content_json.host_character 가 없으면 null → 기존 비애니 경로와 동일 동작(무회귀).
+	// in-flight 약속을 공유해 동시 호출에도 시트는 1회만 생성되고, 시트가 준비된 뒤에만
+	// hostIdentityRef 를 채운다(준비 전 img2img 가 존재하지 않는 시트를 참조하는 경합 방지).
+	async function ensureHostIdentity(
+		contentJson: Record<string, unknown>,
+	): Promise<HostIdentity | null> {
+		if (hostIdentityRef.current) return hostIdentityRef.current;
+		if (!hostIdentityPromiseRef.current) {
+			hostIdentityPromiseRef.current = (async () => {
+				const raw = contentJson.host_character as HostCharacter | undefined;
+				if (!raw || typeof raw !== "object" || !raw.channelId || !raw.id) {
+					return null;
+				}
+				try {
+					const identity = buildHostIdentity(raw);
+					const existing = await ensureBlobUrls([identity.referenceSheetPath]);
+					const referenceSheetUrl =
+						existing.get(identity.referenceSheetPath) ?? "";
+					if (!referenceSheetUrl) {
+						// 채널당 1회: 모든 에피소드가 공유하는 호스트 레퍼런스 시트 생성.
+						await aiGenerateImageToPath(
+							identity.referenceSheetPath,
+							buildHostReferencePrompt(identity),
+							referencePreset,
+							{ seed: identity.styleSeed },
+						);
+					}
+					// 시트가 준비된 뒤에만 캐시에 노출.
+					hostIdentityRef.current = identity;
+					await persistScriptContentPatch({
+						host_reference_sheet_path: identity.referenceSheetPath,
+					});
+					return identity;
+				} catch {
+					// 시트 생성 실패(제공자 없음/API 장애) → throw 하지 않고 null 반환.
+					// 호출부는 호스트 없이 진행 → 기존 검색/직접 소스 폴백이 그대로 동작(무회귀).
+					return null;
+				}
+			})();
+		}
+		const inflight = hostIdentityPromiseRef.current;
+		try {
+			return await inflight;
+		} finally {
+			// 실패 시 재시도가 시트를 다시 만들 수 있도록 약속을 비운다(성공 시엔 ref 캐시가 가드).
+			if (hostIdentityPromiseRef.current === inflight) {
+				hostIdentityPromiseRef.current = null;
+			}
+		}
+	}
+
 	async function applyAnimationContinuityToAllScenes(
 		manifest: AnimationAssetManifest,
 	) {
@@ -1458,6 +1526,15 @@ export default function StepMedia({
 		const imageShots = shots.filter((shot) => shot.media_type === "image");
 		if (imageShots.length === 0 && scene.scene_type === "video") return false;
 
+		// 시간여행 호스트: 샷 생성 전 1회 해석 — 모든 호출자(generateImage·generateVideo·단일 재생성)를
+		// 이 단일 진입점에서 커버한다. in-flight 락이 동시 호출에도 시트를 1회만 만든다.
+		if (
+			productionType !== "animation" &&
+			scriptContentJsonRef.current.production_type !== "animation"
+		) {
+			await ensureHostIdentity(scriptContentJsonRef.current);
+		}
+
 		let previewImageUrl = scene.imageUrl;
 		let changed = false;
 		const sharedImageSources = new Map<
@@ -1565,7 +1642,7 @@ export default function StepMedia({
 				} else {
 					url = await aiGenerateImageToPath(
 						storagePath,
-						imagePrompt,
+						withHostPrompt(imagePrompt),
 						referencePreset,
 						buildSceneImageGenOptions(scene.mood),
 					);
@@ -1615,7 +1692,31 @@ export default function StepMedia({
 			mood,
 			seed: deriveLockedSeed(scriptId),
 		};
-		return manifest ? { ...base, ...animationImageOptions(manifest) } : base;
+		if (manifest) return { ...base, ...animationImageOptions(manifest) };
+		// 고정 호스트가 해석돼 있으면(시간여행 브이로그) 모든 이미지 생성 경로(씬/샷)에서
+		// 채널 스코프 고정 시드 + 레퍼런스 시트(img2img) 적용 → 에피소드 간 동일 인물.
+		const host = hostIdentityRef.current;
+		if (host) {
+			return {
+				...base,
+				seed: host.styleSeed,
+				referenceImagePath: host.referenceSheetPath,
+				referenceStrength: 0.4,
+			};
+		}
+		return base;
+	}
+
+	// 고정 호스트가 해석돼 있으면 프롬프트에 호스트 외형 잠금 + 시대 의상을 주입.
+	// (referenceImagePath 를 무시하는 제공자[DALL-E/ComfyUI]에서도 외형 일관성을 확보.)
+	function withHostPrompt(prompt: string): string {
+		const host = hostIdentityRef.current;
+		if (!host) return prompt;
+		const era =
+			typeof scriptContentJsonRef.current.vlog_era === "string"
+				? (scriptContentJsonRef.current.vlog_era as string)
+				: undefined;
+		return applyHostToScenePrompt(prompt, host, { era });
 	}
 
 	async function generateFallbackSceneImage(
@@ -1631,7 +1732,7 @@ export default function StepMedia({
 			: null;
 		const prompt = manifest
 			? enrichAnimationPromptWithContinuity(imagePrompt, manifest)
-			: imagePrompt;
+			: withHostPrompt(imagePrompt);
 		return aiGenerateImage(
 			scene.id,
 			prompt,
@@ -1710,7 +1811,7 @@ export default function StepMedia({
 
 			const generatedUrl = await aiGenerateImageToPath(
 				storagePath,
-				imagePrompt,
+				withHostPrompt(imagePrompt),
 				referencePreset,
 				buildSceneImageGenOptions(scene.mood),
 			);
@@ -1835,7 +1936,7 @@ export default function StepMedia({
 
 			const generatedUrl = await aiGenerateImageToPath(
 				`scenes/${scene.id}/shots/${shot.id}-repair.png`,
-				imagePrompt,
+				withHostPrompt(imagePrompt),
 				referencePreset,
 				buildSceneImageGenOptions(scene.mood),
 			);
@@ -2034,6 +2135,15 @@ export default function StepMedia({
 		updateScene(sceneIndex, { imageStatus: "generating", errorMsg: undefined });
 
 		try {
+			// 고정 호스트(시간여행 브이로그)를 샷/씬 생성 전에 1회 해석 — in-flight 락이
+			// 대량 동시 생성에서도 시트를 1회만 만들고 모든 경로가 같은 호스트를 쓰게 한다.
+			const isAnimation =
+				productionType === "animation" ||
+				scriptContentJsonRef.current.production_type === "animation";
+			if (!isAnimation) {
+				await ensureHostIdentity(scriptContentJsonRef.current);
+			}
+
 			const usedShotImages = await generateShotImages(sceneIndex);
 			if (usedShotImages) return;
 
@@ -2096,6 +2206,14 @@ export default function StepMedia({
 		updateScene(sceneIndex, { videoStatus: "generating", errorMsg: undefined });
 
 		try {
+			// 고정 호스트 1회 해석 — 비디오 전용 씬(generateShotImages 조기 반환)·영상→이미지
+			// 폴백까지 모든 비디오 경로에서 호스트가 적용되도록 진입 시 보장.
+			const isAnimation =
+				productionType === "animation" ||
+				scriptContentJsonRef.current.production_type === "animation";
+			if (!isAnimation) {
+				await ensureHostIdentity(scriptContentJsonRef.current);
+			}
 			await generateShotImages(sceneIndex);
 			const latestScene = scenesRef.current[sceneIndex];
 			const { queryKo, queryEn, locale } = buildSceneSearchQueries(latestScene);
@@ -2272,6 +2390,14 @@ export default function StepMedia({
 		updateScene(sceneIndex, { videoStatus: "generating", errorMsg: undefined });
 
 		try {
+			// 고정 호스트 1회 해석 — AI 영상 버튼 경로의 init 이미지도 호스트 잠금되도록(영상 일관성).
+			const isAnimation =
+				productionType === "animation" ||
+				scriptContentJsonRef.current.production_type === "animation";
+			if (!isAnimation) {
+				await ensureHostIdentity(scriptContentJsonRef.current);
+			}
+
 			// 이미지가 없으면 먼저 생성
 			let imageUrl = scene.imageUrl;
 			if (!imageUrl) {
@@ -2528,6 +2654,11 @@ export default function StepMedia({
 					await applyAnimationContinuityToAllScenes(animationManifest);
 					contentJson = scriptContentJsonRef.current;
 				}
+			} else {
+				// 비애니: 시간여행 호스트를 fan-out/repair 전에 1회 해석 — generateImage/Video 를
+				// 건너뛰고 repairWeakSceneShots 만 도는 경우까지 호스트가 적용되도록 보장.
+				// (ensureHostIdentity 는 실패 시 null 반환 — 무회귀.)
+				await ensureHostIdentity(contentJson);
 			}
 
 			if (topicTitle && currentProductionType !== "animation") {
