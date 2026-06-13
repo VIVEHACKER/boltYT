@@ -21,6 +21,11 @@ import {
 } from "../lib/channel-branding";
 import { getApiProxyUrl } from "../lib/proxy";
 import {
+	getVisualSourceMode,
+	setVisualSourceMode,
+	type VisualSourceMode,
+} from "../lib/visual-source-mode";
+import {
 	checkYouTubeServer,
 	getAuthStatus,
 	openAuthPopup,
@@ -222,6 +227,13 @@ export default function SettingsPage() {
 	const applyBgmMode = (mode: BgmSourceMode) => {
 		setBgmSourceMode(mode);
 		setBgmMode(mode);
+	};
+	const [visualSourceMode, setVisualMode] = useState<VisualSourceMode>(() =>
+		getVisualSourceMode(),
+	);
+	const applyVisualMode = (mode: VisualSourceMode) => {
+		setVisualSourceMode(mode);
+		setVisualMode(mode);
 	};
 	const [brandName, setBrandName] = useState(
 		() => loadChannelBranding().channelName,
@@ -591,6 +603,43 @@ export default function SettingsPage() {
 						aria-pressed={bgmSourceMode === "ai"}
 					>
 						AI 생성 (Stable Audio)
+					</PButton>
+				</div>
+			</div>
+
+			<PDivider className="my-fluid-md" />
+
+			{/* 비주얼 소스 */}
+			<div className="bg-surface rounded-[8px] p-static-lg">
+				<PHeading size="small" tag="h2" className="mb-static-md">
+					비주얼 소스
+				</PHeading>
+				<PText size="small" color="contrast-medium" className="mb-static-lg">
+					씬 이미지/영상의 기본 생성 방식입니다. <strong>AI 생성</strong>은
+					주제에 맞는 고유·일관된 비주얼을 만들어 "스톡 짜깁기" 느낌을
+					피합니다(생성 실패 시 스톡 검색으로 자동 폴백).{" "}
+					<strong>스톡 검색</strong>은 비용을 아끼지만 출처가 제각각이라 품질
+					편차가 큽니다. AI 생성은 FAL_KEY/이미지 provider가 필요하고 씬당 생성
+					비용이 듭니다.
+				</PText>
+				<div className="flex gap-static-sm">
+					<PButton
+						type="button"
+						variant={visualSourceMode === "ai" ? "primary" : "secondary"}
+						icon="none"
+						onClick={() => applyVisualMode("ai")}
+						aria-pressed={visualSourceMode === "ai"}
+					>
+						AI 생성 (고유·일관)
+					</PButton>
+					<PButton
+						type="button"
+						variant={visualSourceMode === "search" ? "primary" : "secondary"}
+						icon="none"
+						onClick={() => applyVisualMode("search")}
+						aria-pressed={visualSourceMode === "search"}
+					>
+						스톡 검색 (저비용)
 					</PButton>
 				</div>
 			</div>
