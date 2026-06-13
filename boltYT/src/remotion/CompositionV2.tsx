@@ -280,7 +280,7 @@ export function CompositionV2({ project }: CompositionV2Props) {
 				<Audio
 					src={project.bgmUrl}
 					volume={project.bgmVolume}
-					loop={project.bgmLoop === true}
+					loop={project.bgmLoop !== false}
 				/>
 			)}
 		</AbsoluteFill>

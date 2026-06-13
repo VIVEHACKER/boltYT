@@ -12,6 +12,11 @@ import {
 	compactKnowledgeProfile,
 	type CompactKnowledgeProfile,
 } from "./knowledge-system";
+import {
+	classifyBenchmarkGenre,
+	type MarketBenchmark,
+	resolveMarketBenchmark,
+} from "./market-benchmark";
 import type { NicheResearchHandoff } from "./niche-research";
 import {
 	buildReferenceTopicPlan,
@@ -117,6 +122,14 @@ export function buildReferenceProductionPlan(
 			(cluster) =>
 				`${cluster.label} S${cluster.score}: ${cluster.signals.slice(0, 2).join(" / ")}`,
 		);
+	// 시장 품질 바 — 주제 장르 + 제작 포맷의 내장 벤치마크 (결정론, 외부 I/O 없음)
+	const marketBenchmark = resolveMarketBenchmark({
+		genre: classifyBenchmarkGenre(
+			topicTitle,
+			selectedTemplate ? { visualMood: selectedTemplate.visual_mood } : {},
+		),
+		format: toDomainFormat(input.selectedFormat, selectedTemplate),
+	});
 	const directives = buildDirectives({
 		topicTitle,
 		selectedTemplate,
@@ -124,6 +137,7 @@ export function buildReferenceProductionPlan(
 		recommendationPlan,
 		topicPlan,
 		trendSummary,
+		marketBenchmark,
 	});
 	const qualityGates = [
 		...recommendationPlan.qualityGates,
@@ -152,6 +166,7 @@ export function buildReferenceProductionPlan(
 		directives,
 		qualityGates,
 		trendSummary,
+		marketBenchmark,
 	});
 
 	return {
@@ -290,6 +305,7 @@ function buildDirectives(input: {
 	recommendationPlan: ContentRecommendationPlan;
 	topicPlan: ReferenceTopicPlan | null;
 	trendSummary: string[];
+	marketBenchmark: MarketBenchmark;
 }): ReferenceProductionDirective[] {
 	const {
 		topicTitle,
@@ -298,6 +314,7 @@ function buildDirectives(input: {
 		recommendationPlan,
 		topicPlan,
 		trendSummary,
+		marketBenchmark,
 	} = input;
 	const topScript = recommendationPlan.scripts[0];
 	const topHook = recommendationPlan.hooks[0];
@@ -336,6 +353,12 @@ function buildDirectives(input: {
 				: "쇼츠는 30-55초, 롱폼은 20분 이내에서 자료 밀도에 맞춤",
 		},
 		{
+			id: "market-bar",
+			label: "시장 품질 바",
+			priority: "high",
+			directive: `시장 상위 기준 충족: ${summarizeMarketBenchmark(marketBenchmark)}. 이 바에 못 미치는 컷 호흡·훅 길이·챕터 밀도는 저장 전에 보정`,
+		},
+		{
 			id: "thumbnail",
 			label: "썸네일",
 			priority: "high",
@@ -365,6 +388,19 @@ function buildDirectives(input: {
 	];
 }
 
+/**
+ * 시장 벤치마크 1줄 요약 — 컷 밀도/훅/챕터 바.
+ * promptContext 와 market-bar directive 가 같은 문구를 공유한다.
+ */
+function summarizeMarketBenchmark(benchmark: MarketBenchmark): string {
+	const chapterEverySec = benchmark.script.chapterEverySec;
+	const chapterBar =
+		chapterEverySec !== undefined && chapterEverySec > 0
+			? `챕터 ${chapterEverySec}초 간격`
+			: "챕터 분할 없음";
+	return `컷 ${benchmark.editing.cutDensitySec}초/컷 · 훅 ${benchmark.script.hookSec}초 이내 · ${chapterBar} (${benchmark.genre}/${benchmark.format})`;
+}
+
 function buildPromptContext(input: {
 	topicTitle: string;
 	selectedTemplate: ReferenceTemplate | null;
@@ -374,6 +410,7 @@ function buildPromptContext(input: {
 	directives: ReferenceProductionDirective[];
 	qualityGates: string[];
 	trendSummary: string[];
+	marketBenchmark: MarketBenchmark;
 }): string {
 	const {
 		topicTitle,
@@ -384,6 +421,7 @@ function buildPromptContext(input: {
 		directives,
 		qualityGates,
 		trendSummary,
+		marketBenchmark,
 	} = input;
 	const topScript = recommendationPlan.scripts[0];
 	const topThumbnail = recommendationPlan.thumbnails[0];
@@ -403,6 +441,7 @@ function buildPromptContext(input: {
 ${topicBindingLines ? `${topicBindingLines}\n` : ""}${candidateLine}
 ${knowledgeLine}
 카테고리: ${recommendationPlan.categoryLabel} / 신뢰도 ${recommendationPlan.confidence}
+시장 벤치마크 바: ${summarizeMarketBenchmark(marketBenchmark)}
 1순위 대본: ${topScript ? `${topScript.title} - ${topScript.structure}` : "없음"}
 1순위 훅: ${topScript?.hook ?? directives.find((item) => item.id === "hook")?.directive ?? ""}
 1순위 썸네일: ${topThumbnail ? `${topThumbnail.text} - ${topThumbnail.layout}` : ""}

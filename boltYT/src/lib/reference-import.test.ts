@@ -187,9 +187,7 @@ describe("startYouTubeAnalysis", () => {
 		);
 		await startYouTubeAnalysis("https://youtu.be/abc", { mode: "deep" });
 		const call = vi.mocked(fetch).mock.calls[0];
-		expect(JSON.parse(String((call[1] as RequestInit).body)).mode).toBe(
-			"deep",
-		);
+		expect(JSON.parse(String((call[1] as RequestInit).body)).mode).toBe("deep");
 	});
 
 	it("HTTP 오류 → throw", async () => {
@@ -339,7 +337,7 @@ describe("saveReferenceTemplate", () => {
 		expect(result).toEqual(template);
 		expect(mocks.mockFrom).toHaveBeenCalledWith("reference_templates");
 		expect(mocks.mockInsert).toHaveBeenCalled();
-		const payload = (mocks.mockInsert.mock.calls.at(0)?.at(0) as unknown) as {
+		const payload = mocks.mockInsert.mock.calls.at(0)?.at(0) as unknown as {
 			raw_analysis?: { thumbnail_dna?: { version?: string } };
 		};
 		expect(payload.raw_analysis?.thumbnail_dna?.version).toBe(
@@ -355,6 +353,33 @@ describe("saveReferenceTemplate", () => {
 		await expect(
 			saveReferenceTemplate("ch-1", "T", makeResult()),
 		).rejects.toThrow("저장 실패");
+	});
+
+	it("관측 신호가 있으면 raw_analysis.benchmark_observation 다이제스트를 중첩한다", async () => {
+		mocks.mockSingle.mockResolvedValue({
+			data: { id: "ref-2", name: "Obs" },
+			error: null,
+		});
+		await saveReferenceTemplate("ch-1", "Obs", makeResult());
+		const payload = mocks.mockInsert.mock.calls.at(0)?.at(0) as unknown as {
+			raw_analysis?: {
+				benchmark_observation?: {
+					hookSec?: number;
+					ttsSpeed?: number;
+					bgmMood?: string;
+					extractedAt?: string;
+				};
+				thumbnail_dna?: unknown;
+			};
+		};
+		const observation = payload.raw_analysis?.benchmark_observation;
+		// makeResult: hook_duration 5, tts_speed 0.97, bgm_mood "dark"
+		expect(observation?.hookSec).toBe(5);
+		expect(observation?.ttsSpeed).toBe(0.97);
+		expect(observation?.bgmMood).toBe("dark");
+		expect(typeof observation?.extractedAt).toBe("string");
+		// 기존 thumbnail_dna 중첩은 그대로 유지된다
+		expect(payload.raw_analysis?.thumbnail_dna).toBeDefined();
 	});
 });
 

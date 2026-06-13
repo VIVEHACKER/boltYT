@@ -10,21 +10,33 @@ import {
 	PTextarea,
 } from "@porsche-design-system/components-react";
 import { Player } from "@remotion/player";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { generateContinuousNarration } from "../../lib/ai";
+import { callOpenAI, generateContinuousNarration } from "../../lib/ai";
+import type { AutoFixContext } from "../../lib/auto-fix-executor";
 import {
 	clampShortsDuration,
 	estimatedBpmFromTempo,
 	retimeScenesToBeatGrid,
 } from "../../lib/beat-sync";
+import { collectBenchmarkSamples } from "../../lib/benchmark-reference-adapter";
 import { autoPickBgm, inferAutoBgmPreset } from "../../lib/bgm";
 import { type BgmAnalysis, isBpmReliable } from "../../lib/bgm-analyze";
 import { type BgmCuePlan, planBgmCuePlan } from "../../lib/bgm-cue-plan";
 import {
+	assessImportedBgmClaimReadiness,
+	type BgmLicense,
+} from "../../lib/bgm-import";
+import {
 	type ChannelBranding,
 	loadChannelBranding,
 } from "../../lib/channel-branding";
+import {
+	type BundleBgm,
+	type BundleTts,
+	buildContentBundle,
+	type ContentBundle,
+} from "../../lib/content-bundle";
 import {
 	buildFinalOutputCritique,
 	type FinalOutputCritiqueReport,
@@ -32,6 +44,19 @@ import {
 import { buildHookFlags } from "../../lib/hook-detector";
 import { buildRenderKnowledgeEvent } from "../../lib/knowledge-system";
 import { ensureBlobUrls } from "../../lib/local-db";
+import {
+	classifyBenchmarkGenre,
+	resolveMarketBenchmark,
+} from "../../lib/market-benchmark";
+import { scheduleQualityLoop } from "../../lib/quality-loop-orchestrator";
+import {
+	type AutoFixPlan,
+	combineWithExistingVerdicts,
+	type DimensionVerdict,
+	type QualityDimension,
+	type QualityVerdict,
+	type QualityVerdictReport,
+} from "../../lib/quality-verdict";
 import {
 	assessReferenceApplicationScore,
 	type ReferenceApplicationScoreReport,
@@ -70,6 +95,7 @@ import {
 	assessThumbnailReadiness,
 	type ThumbnailReadiness,
 } from "../../lib/thumbnail-intelligence";
+import type { TtsOptions } from "../../lib/tts";
 import {
 	buildYouTubeMetadata,
 	type YouTubeMetadata,
@@ -84,6 +110,7 @@ import {
 	buildMotionRepairPatch,
 	buildReferenceRepairGuidance,
 	renderOutputIssueCodesToProductionIssueCodes,
+	type SceneRepairPatch,
 	shouldRepairMotionDesign,
 	shouldRepairNarrationEnding,
 	shouldRepairRenderOutput,
@@ -871,6 +898,222 @@ function loadStoredBgmAnalysis(scriptId: string): BgmAnalysis | null {
 	}
 }
 
+async function updateSceneRecord(
+	sceneId: string,
+	patch: Record<string, unknown>,
+) {
+	const { error } = await supabase
+		.from("scenes")
+		.update(patch)
+		.eq("id", sceneId);
+	if (error) throw new Error(`씬 품질 보강 저장 실패: ${error.message}`);
+}
+
+/** quality_loop_v2 feature flag — localStorage 'quality_loop_v2' === '1' 일 때만 활성 (기본 off) */
+function isQualityLoopV2Enabled(): boolean {
+	try {
+		return localStorage.getItem("quality_loop_v2") === "1";
+	} catch {
+		return false;
+	}
+}
+
+const QUALITY_DIMENSION_LABELS: Record<QualityDimension, string> = {
+	editing: "편집",
+	script: "대본",
+	bgm: "BGM",
+	tts: "TTS",
+};
+
+function marketVerdictColor(
+	verdict: QualityVerdict,
+):
+	| "notification-success-soft"
+	| "notification-warning-soft"
+	| "notification-error-soft" {
+	if (verdict === "ship") return "notification-success-soft";
+	if (verdict === "improve") return "notification-warning-soft";
+	return "notification-error-soft";
+}
+
+function marketVerdictLabel(verdict: QualityVerdict): string {
+	if (verdict === "ship") return "출고 가능";
+	if (verdict === "improve") return "보강 필요";
+	return "차단";
+}
+
+function marketDimensionStatusColor(
+	status: DimensionVerdict["status"],
+):
+	| "notification-success-soft"
+	| "notification-warning-soft"
+	| "notification-error-soft" {
+	if (status === "pass") return "notification-success-soft";
+	if (status === "below_bar") return "notification-warning-soft";
+	return "notification-error-soft";
+}
+
+/** 이미 매핑된 scenes/tts/bgm 상태를 판정 입력 번들로 투영 (결측 가드 포함) */
+/** import한 BGM의 Content ID claim 차단 여부. 라이선스 기록이 없으면 판단 보류(undefined). */
+function loadBgmClaimBlocked(scriptId: string): boolean | undefined {
+	try {
+		const raw = localStorage.getItem(`bgm_license_${scriptId}`);
+		if (!raw) return undefined;
+		const license = JSON.parse(raw) as BgmLicense;
+		return !assessImportedBgmClaimReadiness(license).cleared;
+	} catch {
+		return undefined;
+	}
+}
+
+function buildPreviewContentBundle(input: {
+	scriptId: string;
+	isShorts: boolean;
+	scenes: SceneWithAssets[];
+	ttsPreset?: { voice?: string; provider?: string; speed?: number };
+	bgmMood?: string;
+	hasBeatGrid: boolean;
+	/** 연속 나레이션 오디오 존재 — word timing 누락 콘텐츠의 tts_zero_coverage 오탐 방지 */
+	hasNarrationAudio: boolean;
+	bgmClaimBlocked?: boolean;
+}): ContentBundle {
+	const tts: Partial<BundleTts> = {};
+	if (
+		typeof input.ttsPreset?.speed === "number" &&
+		Number.isFinite(input.ttsPreset.speed)
+	) {
+		tts.speed = input.ttsPreset.speed;
+	}
+	if (input.ttsPreset?.provider) {
+		tts.provider = input.ttsPreset.provider;
+	}
+	if (input.ttsPreset?.voice) {
+		tts.voiceId = input.ttsPreset.voice;
+	}
+	if (input.hasNarrationAudio) {
+		// 연속 나레이션이 전 구간을 커버 — word timing 보유율과는 별개 신호다
+		tts.coverageRatio = 1;
+	}
+	const bgm: Partial<BundleBgm> = { hasBeatGrid: input.hasBeatGrid };
+	if (input.bgmMood) {
+		bgm.mood = input.bgmMood;
+	}
+	if (input.bgmClaimBlocked !== undefined) {
+		bgm.claimBlocked = input.bgmClaimBlocked;
+	}
+	return buildContentBundle({
+		contentId: input.scriptId,
+		format: input.isShorts ? "shorts" : "longform",
+		scenes: input.scenes,
+		tts,
+		bgm,
+	});
+}
+
+function MarketQualityVerdictPanel({
+	report,
+	combinedVerdict,
+}: {
+	report: QualityVerdictReport;
+	combinedVerdict: QualityVerdict;
+}) {
+	const dimensionEntries = (
+		Object.keys(QUALITY_DIMENSION_LABELS) as QualityDimension[]
+	).map((dimension) => [dimension, report.dimensions[dimension]] as const);
+	const fixActions = report.autoFixPlan.actions.slice(0, 4);
+
+	return (
+		<div className="mb-static-lg rounded-[8px] border border-contrast-low bg-canvas p-static-lg">
+			<div className="flex flex-col gap-static-sm lg:flex-row lg:items-start lg:justify-between">
+				<div>
+					<PHeading size="small" tag="h3">
+						시장 품질 판정 (베타)
+					</PHeading>
+					<PText size="small" color="contrast-medium" className="mt-static-xs">
+						시장 벤치마크 대비 편집/대본/BGM/TTS 품질을 자동 판정하고 보강
+						비용을 추정합니다.
+					</PText>
+				</div>
+				<div className="flex flex-wrap gap-static-xs">
+					<PTag color={marketVerdictColor(combinedVerdict)}>
+						종합 {marketVerdictLabel(combinedVerdict)}
+					</PTag>
+					<PTag color={marketVerdictColor(report.verdict)}>
+						시장 {marketVerdictLabel(report.verdict)} · {report.overallScore}/
+						{report.marketBar}점
+					</PTag>
+					<PTag color="notification-info-soft">라운드 {report.round}</PTag>
+					{report.judgeMode === "heuristic_only" && (
+						<PTag color="notification-warning-soft">
+							AI 검수 불가 — 휴먼 리뷰 필요
+						</PTag>
+					)}
+				</div>
+			</div>
+
+			{report.hardBlocks.length > 0 && (
+				<div className="mt-static-md flex flex-wrap gap-static-xs">
+					{report.hardBlocks.map((code) => (
+						<PTag key={code} color="notification-error-soft">
+							차단: {code}
+						</PTag>
+					))}
+				</div>
+			)}
+
+			<div className="mt-static-md grid grid-cols-2 gap-static-sm lg:grid-cols-4">
+				{dimensionEntries.map(([dimension, verdict]) => (
+					<div key={dimension} className="rounded-[8px] bg-surface p-static-md">
+						<div className="flex items-center justify-between gap-static-xs">
+							<PText size="small" weight="semi-bold">
+								{QUALITY_DIMENSION_LABELS[dimension]}
+							</PText>
+							<PTag color={marketDimensionStatusColor(verdict.status)}>
+								{verdict.score}/{verdict.bar}점
+							</PTag>
+						</div>
+						<PText
+							size="x-small"
+							color="contrast-medium"
+							className="mt-static-xs"
+						>
+							{verdict.findings[0] ?? "지적 사항 없음"}
+						</PText>
+						{verdict.fixIds.length > 0 && (
+							<PText
+								size="x-small"
+								color="contrast-medium"
+								className="mt-static-xs"
+							>
+								보강 {verdict.fixIds.length}건:{" "}
+								{verdict.fixIds.slice(0, 2).join(", ")}
+							</PText>
+						)}
+					</div>
+				))}
+			</div>
+
+			<div className="mt-static-md flex flex-wrap gap-static-xs">
+				<PTag
+					color={
+						report.estimatedFixCost.withinBudget
+							? "notification-success-soft"
+							: "notification-warning-soft"
+					}
+				>
+					예상 보강 비용 ${report.estimatedFixCost.usd.toFixed(2)} · LLM{" "}
+					{report.estimatedFixCost.llmCalls}콜
+				</PTag>
+				{fixActions.map((action) => (
+					<PTag key={action.id} color="background-surface">
+						{action.type}
+					</PTag>
+				))}
+			</div>
+		</div>
+	);
+}
+
 export default function StepPreview({
 	scriptId,
 	referenceTemplate,
@@ -916,6 +1159,76 @@ export default function StepPreview({
 		useState<ReferenceApplicationScoreReport | null>(null);
 	const [savedSourceSafetyReport, setSavedSourceSafetyReport] =
 		useState<SourceSafetyReport | null>(null);
+
+	// ── quality_loop_v2 (feature flag, 기본 off): 시장 품질 루프 상태 ──
+	const qualityLoopEnabled = isQualityLoopV2Enabled();
+	const [marketVerdictReport, setMarketVerdictReport] =
+		useState<QualityVerdictReport | null>(null);
+	const [marketLoopError, setMarketLoopError] = useState("");
+	const marketVerdictReportRef = useRef<QualityVerdictReport | null>(null);
+	const scenesRef = useRef<SceneWithAssets[]>([]);
+	const remotionScenesRef = useRef<RemotionScene[]>([]);
+	const bgmCuePlanRef = useRef<BgmCuePlan | null>(null);
+	// 로컬 프리셋(/bgm/...) BGM 의 claim 차단 여부 — 메타데이터 fetch 가 비동기라 state
+	const [presetClaimBlocked, setPresetClaimBlocked] = useState<
+		boolean | undefined
+	>(undefined);
+	const titleRef = useRef("");
+	const regenerateNarrationRef = useRef<typeof regenerateNarration | null>(
+		null,
+	);
+	useEffect(() => {
+		scenesRef.current = scenes;
+	}, [scenes]);
+	useEffect(() => {
+		remotionScenesRef.current = remotionScenes;
+	}, [remotionScenes]);
+	useEffect(() => {
+		bgmCuePlanRef.current = bgmCuePlan;
+	}, [bgmCuePlan]);
+	useEffect(() => {
+		titleRef.current = title;
+	}, [title]);
+	useEffect(() => {
+		// bgm:import 로컬 프리셋 경로면 옆에 기록된 라이선스 메타데이터로 claim 판정
+		if (!qualityLoopEnabled) return undefined;
+		const storedPath = localStorage.getItem(`bgm_path_${scriptId}`) ?? "";
+		if (!storedPath.startsWith("/bgm/")) {
+			setPresetClaimBlocked(undefined);
+			return undefined;
+		}
+		let active = true;
+		const metaPath = storedPath.replace(/\.[a-z0-9]+$/i, ".json");
+		void fetch(metaPath)
+			.then(async (res) => {
+				if (!res.ok) return undefined;
+				const meta = (await res.json()) as {
+					licenseBasis?: string;
+					library?: string;
+					contentId?: BgmLicense["contentId"];
+				};
+				const license = {
+					basis: meta.licenseBasis,
+					library: meta.library,
+					contentId: meta.contentId,
+				} as BgmLicense;
+				return !assessImportedBgmClaimReadiness(license).cleared;
+			})
+			.then((blocked) => {
+				if (active) setPresetClaimBlocked(blocked);
+			})
+			.catch(() => {
+				// 메타데이터 부재/파싱 실패 = 증적 없음 — 판단 보류(undefined)
+				if (active) setPresetClaimBlocked(undefined);
+			});
+		return () => {
+			active = false;
+		};
+	}, [qualityLoopEnabled, scriptId]);
+	useEffect(() => {
+		// 함수 선언 호이스팅 — 매 렌더 최신 클로저로 갱신 (deps 없음 = 의도)
+		regenerateNarrationRef.current = regenerateNarration;
+	});
 
 	const referencePreset = useMemo(() => {
 		if (!referenceTemplate) return undefined;
@@ -1436,6 +1749,271 @@ export default function StepPreview({
 			!issue.code.startsWith("opening_"),
 	);
 
+	// ── quality_loop_v2: 시장 벤치마크 + 판정 입력 번들 (critique 블록 직후) ──
+	const benchmarkGenre = useMemo(() => classifyBenchmarkGenre(title), [title]);
+	const marketBenchmark = useMemo(() => {
+		const format = isShorts ? "shorts" : "longform";
+		const samples = referenceTemplate
+			? collectBenchmarkSamples([referenceTemplate], format)
+			: [];
+		return resolveMarketBenchmark({
+			genre: benchmarkGenre,
+			format,
+			...(samples.length > 0 ? { samples } : {}),
+		});
+	}, [benchmarkGenre, isShorts, referenceTemplate]);
+	const marketQualityBundle = useMemo<ContentBundle | null>(() => {
+		if (!qualityLoopEnabled || scenes.length === 0) return null;
+		return buildPreviewContentBundle({
+			scriptId,
+			isShorts,
+			scenes,
+			ttsPreset: referencePreset?.tts,
+			bgmMood: referencePreset?.bgm.mood || undefined,
+			hasBeatGrid:
+				loadStoredBgmAnalysis(scriptId) !== null || bgmCuePlan !== null,
+			hasNarrationAudio: narrationUrl !== "",
+			bgmClaimBlocked: loadBgmClaimBlocked(scriptId) ?? presetClaimBlocked,
+		});
+	}, [
+		qualityLoopEnabled,
+		scenes,
+		scriptId,
+		isShorts,
+		referencePreset,
+		narrationUrl,
+		bgmCuePlan,
+		presetClaimBlocked,
+	]);
+	const combinedMarketVerdict = useMemo<QualityVerdict | null>(() => {
+		if (!qualityLoopEnabled || !marketVerdictReport) return null;
+		return combineWithExistingVerdicts(marketVerdictReport.verdict, [
+			finalOutputCritique.passed ? "ready" : "review",
+			productionQualityReport.passed ? "ready" : "review",
+		]);
+	}, [
+		qualityLoopEnabled,
+		marketVerdictReport,
+		finalOutputCritique,
+		productionQualityReport,
+	]);
+	const marketVerdictBlocked =
+		qualityLoopEnabled && combinedMarketVerdict === "blocked";
+	// 첫 판정 리포트 도착 전(pending)에는 승인 불가 — 백그라운드 루프 경합으로
+	// 하드 블록이 나중에 발견되는 우회를 차단한다. 루프 오류 시에는 pending 해제
+	// 후 레거시 repair 경로로 폴백한다.
+	const marketVerdictPending =
+		qualityLoopEnabled &&
+		marketQualityBundle !== null &&
+		marketVerdictReport === null &&
+		marketLoopError === "";
+
+	// quality_loop_v2: 백그라운드 품질 루프 — await 없이 시작,
+	// 씬 편집(deps 변경)/단계 이탈(unmount) 시 cleanup 에서 cancel()
+	useEffect(() => {
+		if (!marketQualityBundle) return undefined;
+
+		// 번들 입력이 바뀌면 이전 판정은 stale — null 로 리셋해 pending 게이트가 걸리게
+		// 한다. 새 루프의 첫 판정이 나오기 전 승인되어 나중에 발견될 하드 블록을 우회하는
+		// 경합을 막는다.
+		marketVerdictReportRef.current = null;
+		setMarketVerdictReport(null);
+
+		let active = true;
+		// 대사 텍스트를 바꾸는 fix(opening_hook_rewrite/ending_narration_patch)가 적용되면
+		// 나레이션 오디오가 stale 해진다 — 루프 종료 후 1회 재합성해 자막/오디오를 일치시킨다.
+		let narrationTextChanged = false;
+		const getBundle = (): ContentBundle =>
+			buildPreviewContentBundle({
+				scriptId,
+				isShorts,
+				scenes: scenesRef.current,
+				ttsPreset: referencePreset?.tts,
+				bgmMood: referencePreset?.bgm.mood || undefined,
+				hasBeatGrid:
+					loadStoredBgmAnalysis(scriptId) !== null ||
+					bgmCuePlanRef.current !== null,
+				hasNarrationAudio: narrationUrl !== "",
+				bgmClaimBlocked: loadBgmClaimBlocked(scriptId) ?? presetClaimBlocked,
+			});
+
+		// 기존 repair 의 setState 로직 재사용 — scenes/remotionScenes 를 인덱스 정합으로 갱신.
+		// ref 를 동기 갱신해야 같은 루프의 다음 라운드 getBundle() 이 보강 후 번들을 판정한다.
+		const applyScenePatch = (
+			sceneId: string,
+			patch: SceneRepairPatch,
+		): void => {
+			const index = scenesRef.current.findIndex(
+				(scene) => scene.id === sceneId,
+			);
+			if (index < 0) return;
+			const nextScenes = scenesRef.current.map((scene) =>
+				scene.id === sceneId ? { ...scene, ...patch } : scene,
+			);
+			const nextRemotionScenes = remotionScenesRef.current.map(
+				(scene, sceneIndex) => {
+					if (sceneIndex !== index) return scene;
+					return {
+						...scene,
+						...(patch.narration_text !== undefined
+							? { narration: patch.narration_text }
+							: {}),
+						...(typeof patch.duration_seconds === "number"
+							? {
+									durationInFrames: Math.ceil(
+										patch.duration_seconds * VIDEO_FPS,
+									),
+								}
+							: {}),
+						...(patch.transition !== undefined
+							? {
+									transition: patch.transition as RemotionScene["transition"],
+								}
+							: {}),
+						...(patch.shots !== undefined ? { shots: patch.shots } : {}),
+						...(patch.motion_graphics !== undefined
+							? { motionGraphics: patch.motion_graphics }
+							: {}),
+					};
+				},
+			);
+			scenesRef.current = nextScenes;
+			remotionScenesRef.current = nextRemotionScenes;
+			setScenes(nextScenes);
+			setRemotionScenes(nextRemotionScenes);
+			// state 와 DB 를 함께 갱신 — 새로고침/단계 이탈 시에도 보강이 보존돼야
+			// fix history(이미 적용됨)와 실제 콘텐츠가 어긋나지 않는다
+			void updateSceneRecord(
+				sceneId,
+				patch as unknown as Record<string, unknown>,
+			).catch((error: unknown) => {
+				if (!active) return;
+				// DB 영속 실패 → 멱등 레저가 미저장 패치의 재시도를 막지 않도록 이 콘텐츠의
+				// fix 이력을 무효화한다(다음 루프에서 재적용·재저장). render 는 state 기반이라
+				// 이번 세션 산출물은 정상이며, 에러는 사용자에게 노출한다.
+				try {
+					localStorage.removeItem(`quality_fix_history_${scriptId}`);
+				} catch {
+					/* localStorage 불가 환경 무시 */
+				}
+				setMarketLoopError(
+					error instanceof Error ? error.message : String(error),
+				);
+			});
+		};
+
+		const fixContext: AutoFixContext = {
+			// orchestrator 가 실행 직전 spread 하므로 getter 가 항상 최신 씬을 공급한다
+			get scenes() {
+				return scenesRef.current;
+			},
+			applyScenePatch,
+			replaceNarration: (sceneId, narration) => {
+				applyScenePatch(sceneId, { narration_text: narration });
+				narrationTextChanged = true;
+			},
+			// 기존 핸들러(regenerateNarration) 연결 — 연속 나레이션 전체 재합성.
+			// 벤치마크가 지시한 TTS 옵션을 그대로 넘겨 retake 가 실제로 설정을 교정한다.
+			retakeTts: async (_sceneIds, options) => {
+				const regenerate = regenerateNarrationRef.current;
+				if (!regenerate) {
+					throw new Error("TTS 재생성 핸들러가 아직 준비되지 않았습니다.");
+				}
+				const workingScenes = scenesRef.current.map((scene) => ({
+					...scene,
+					shots: cloneShots(sceneShots(scene)),
+				}));
+				const workingRemotionScenes = remotionScenesRef.current.map(
+					(scene) => ({ ...scene, shots: cloneShots(scene.shots) }),
+				);
+				await regenerate(
+					workingScenes,
+					workingRemotionScenes,
+					options as Partial<TtsOptions>,
+				);
+				if (!active) return;
+				// 오디오를 새로 합성했으므로 텍스트-오디오는 다시 일치 — stale 플래그 해제
+				narrationTextChanged = false;
+				// 다음 라운드 재판정이 재합성 결과를 읽도록 ref 도 동기 갱신
+				scenesRef.current = workingScenes;
+				remotionScenesRef.current = workingRemotionScenes;
+				setScenes(workingScenes);
+				setRemotionScenes(workingRemotionScenes);
+			},
+			// swapBgm/normalizeBgm 은 기존 무드 지정 핸들러가 없어 미연결 → unsupported skip
+			replanBgmCues: (plan) => {
+				// ref 동기 갱신 — 다음 라운드 번들의 hasBeatGrid 신호에 즉시 반영
+				bgmCuePlanRef.current = plan;
+				setBgmCuePlan(plan);
+			},
+			referenceDna: referenceProductionDnaFromTemplate(referenceTemplate),
+			format: isShorts ? "shorts" : "longform",
+			get topicTitle() {
+				return titleRef.current;
+			},
+		};
+
+		const scheduled = scheduleQualityLoop(
+			{ getBundle, benchmark: marketBenchmark, fixContext },
+			{
+				llm: callOpenAI,
+				onRound: (report) => {
+					if (!active) return;
+					marketVerdictReportRef.current = report;
+					setMarketVerdictReport(report);
+				},
+				approveOverBudget: async (plan: AutoFixPlan) =>
+					window.confirm(
+						`품질 자동 보강 예산 초과 — 예상 비용 $${plan.totalCost.usd.toFixed(2)}, LLM ${plan.totalCost.llmCalls}콜.${plan.approvalReason ? ` 사유: ${plan.approvalReason}` : ""} 계속할까요?`,
+					),
+			},
+		);
+		void scheduled.promise
+			.then(async (result) => {
+				if (!active) return;
+				// 대사 텍스트만 바뀌고 오디오 재합성이 안 된 fix 가 있었다면, 승인 전에
+				// 나레이션을 1회 재합성해 자막(새 텍스트)과 오디오(이전)가 어긋나지 않게 한다.
+				const regenerate = regenerateNarrationRef.current;
+				if (narrationTextChanged && regenerate) {
+					const workingScenes = scenesRef.current.map((scene) => ({
+						...scene,
+						shots: cloneShots(sceneShots(scene)),
+					}));
+					const workingRemotionScenes = remotionScenesRef.current.map(
+						(scene) => ({ ...scene, shots: cloneShots(scene.shots) }),
+					);
+					await regenerate(workingScenes, workingRemotionScenes);
+					if (!active) return;
+					scenesRef.current = workingScenes;
+					remotionScenesRef.current = workingRemotionScenes;
+					setScenes(workingScenes);
+					setRemotionScenes(workingRemotionScenes);
+				}
+				marketVerdictReportRef.current = result.finalReport;
+				setMarketVerdictReport(result.finalReport);
+			})
+			.catch((error: unknown) => {
+				if (!active) return;
+				setMarketLoopError(
+					error instanceof Error ? error.message : String(error),
+				);
+			});
+
+		return () => {
+			active = false;
+			scheduled.cancel();
+		};
+	}, [
+		marketQualityBundle,
+		marketBenchmark,
+		scriptId,
+		isShorts,
+		referencePreset,
+		referenceTemplate,
+		narrationUrl,
+		presetClaimBlocked,
+	]);
+
 	async function ensureBgmUrl(): Promise<string> {
 		const current =
 			bgmUrl ||
@@ -1472,29 +2050,24 @@ export default function StepPreview({
 		);
 	}
 
-	async function updateSceneRecord(
-		sceneId: string,
-		patch: Record<string, unknown>,
-	) {
-		const { error } = await supabase
-			.from("scenes")
-			.update(patch)
-			.eq("id", sceneId);
-		if (error) throw new Error(`씬 품질 보강 저장 실패: ${error.message}`);
-	}
-
 	async function regenerateNarration(
 		workingScenes: SceneWithAssets[],
 		workingRemotionScenes: RemotionScene[],
+		ttsOverride?: Partial<TtsOptions>,
 	): Promise<string> {
 		setRenderProgress("품질 자동 보강: 엔딩 TTS를 다시 생성하고 있습니다...");
+		// 벤치마크가 지시한 TTS 옵션(profile/speed)을 프리셋 위에 덮어써 retake 가
+		// 실제로 문제된 설정을 교정하도록 한다. override 없으면 기존 동작 보존.
+		const ttsOptions = ttsOverride
+			? { ...referencePreset?.tts, ...ttsOverride }
+			: referencePreset?.tts;
 		const { url, sceneDurations } = await generateContinuousNarration(
 			scriptId,
 			workingScenes.map((scene) => ({
 				id: scene.id,
 				narration_text: scene.narration_text,
 			})),
-			referencePreset?.tts,
+			ttsOptions,
 		);
 		setNarrationUrl(url);
 
@@ -1698,6 +2271,21 @@ export default function StepPreview({
 			);
 			return;
 		}
+		if (marketVerdictBlocked) {
+			const hardBlocks = marketVerdictReportRef.current?.hardBlocks ?? [];
+			setApprovalError(
+				`시장 품질 판정 차단: ${
+					hardBlocks.length > 0 ? hardBlocks.join(", ") : "하드 블록"
+				} — 보강 후 다시 시도하세요.`,
+			);
+			return;
+		}
+		if (marketVerdictPending) {
+			setApprovalError(
+				"시장 품질 판정이 진행 중입니다 — 첫 판정이 끝난 뒤 승인할 수 있습니다.",
+			);
+			return;
+		}
 		setApprovalError("");
 		setApproving(true);
 		setRendering(true);
@@ -1705,7 +2293,19 @@ export default function StepPreview({
 
 		try {
 			const ensuredBgmUrl = await ensureBgmUrl();
-			const repaired = await repairProductionQuality(ensuredBgmUrl);
+			// quality_loop_v2: ad-hoc repair 대신 백그라운드 품질 루프가 보강을 담당.
+			// 기존 repair 블록은 플래그 off 경로로 보존되며, 루프가 오류로 죽었을
+			// 때도 레거시 repair 로 폴백해 무보강 승인을 막는다.
+			const repaired =
+				qualityLoopEnabled && marketLoopError === ""
+					? {
+							report: buildProductionReport(ensuredBgmUrl, ""),
+							scenes,
+							remotionScenes,
+							narrationUrl,
+							repaired: false,
+						}
+					: await repairProductionQuality(ensuredBgmUrl);
 			if (!repaired.report.passed) {
 				const blockingIssue =
 					repaired.report.issues.find(
@@ -1825,6 +2425,11 @@ export default function StepPreview({
 						production_quality_issues: finalReport.issues,
 						production_quality_actions: finalReport.requiredActions,
 						knowledge_event: initialKnowledgeEvent,
+						// quality_loop_v2: 시장 판정 최종 리포트를 JSON 필드로 중첩
+						// (스키마 마이그레이션 없음)
+						...(qualityLoopEnabled && marketVerdictReportRef.current
+							? { market_verdict: marketVerdictReportRef.current }
+							: {}),
 					},
 				})
 				.select()
@@ -2128,6 +2733,21 @@ export default function StepPreview({
 				referenceReport={referenceApplicationReport}
 				sourceSafetyReport={savedSourceSafetyReport}
 			/>
+			{qualityLoopEnabled && marketVerdictReport && combinedMarketVerdict && (
+				<MarketQualityVerdictPanel
+					report={marketVerdictReport}
+					combinedVerdict={combinedMarketVerdict}
+				/>
+			)}
+			{qualityLoopEnabled && marketLoopError && (
+				<PInlineNotification
+					state="warning"
+					dismissButton={false}
+					className="mb-static-md"
+				>
+					시장 품질 루프 오류: {marketLoopError}
+				</PInlineNotification>
+			)}
 
 			{/* Remotion Player - Real Video Preview */}
 			{remotionScenes.length > 0 && (
@@ -2260,6 +2880,18 @@ export default function StepPreview({
 					{productionQualityReport.requiredActions[0]
 						? ` ${productionQualityReport.requiredActions[0]}`
 						: ""}
+				</PInlineNotification>
+			)}
+
+			{marketVerdictBlocked && marketVerdictReport && !approvalError && (
+				<PInlineNotification
+					state="error"
+					dismissButton={false}
+					className="mb-static-md"
+				>
+					시장 품질 판정 차단:{" "}
+					{marketVerdictReport.hardBlocks.join(", ") || "하드 블록"} — 보강
+					전에는 렌더를 시작할 수 없습니다.
 				</PInlineNotification>
 			)}
 
@@ -2456,8 +3088,14 @@ export default function StepPreview({
 						</PButton>
 					)}
 				</div>
-				<PButton loading={approving} onClick={handleApprove}>
-					승인 및 업로드 대기
+				<PButton
+					loading={approving}
+					disabled={marketVerdictBlocked || marketVerdictPending}
+					onClick={handleApprove}
+				>
+					{marketVerdictPending
+						? "시장 품질 판정 중..."
+						: "승인 및 업로드 대기"}
 				</PButton>
 			</div>
 		</div>

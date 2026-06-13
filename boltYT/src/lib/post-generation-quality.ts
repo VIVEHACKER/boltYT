@@ -94,12 +94,23 @@ export const POST_GENERATION_QUALITY_GATES: QualityGate[] = [
 			"주제, 대본, 씬, 자료, 레퍼런스, 렌더, 업로드 계약 충돌을 10개 게이트로 사전 차단한다.",
 	},
 	{
+		id: "market-benchmark-judge",
+		label: "시장 벤치마크 판정 루프",
+		phase: "verification",
+		blocking: false,
+		command:
+			"npx vitest run src/lib/quality-judge.test.ts src/lib/quality-loop-orchestrator.test.ts",
+		rationale:
+			"시장 벤치마크 기반 판정·자동 보정 루프의 불변량(결정론 verdict, 멱등 캐시, 비용 fail-closed) 회귀를 감시한다. 안정화 전까지 비차단으로 운용한다.",
+	},
+	{
 		id: "harness",
 		label: "GAN Harness 게이트",
 		phase: "verification",
 		blocking: true,
 		command: "gan-harness verify .",
-		rationale: "빌드, 테스트, 린트, 타입체크, 시크릿 스캔을 최종 게이트로 묶는다.",
+		rationale:
+			"빌드, 테스트, 린트, 타입체크, 시크릿 스캔을 최종 게이트로 묶는다.",
 	},
 ];
 

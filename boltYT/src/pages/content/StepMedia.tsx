@@ -15,6 +15,17 @@ import {
 	generateContinuousNarration,
 } from "../../lib/ai";
 import {
+	planSceneDirectives,
+	planSceneVisuals,
+	type ResearchBrief,
+	type SceneDirective,
+	verifySceneQuality,
+} from "../../lib/ai-agents";
+import {
+	type AnimationAssetManifest,
+	type AnimationBible,
+	type AnimationProductionFamily,
+	type AnimationProductionQualityReport,
 	applyAnimationContinuityToShots,
 	buildAnimationAssetManifest,
 	buildAnimationCharacterReferencePrompt,
@@ -22,18 +33,7 @@ import {
 	isAnimationProductionFamily,
 	repairAnimationScenesForQuality,
 	scoreAnimationProductionQuality,
-	type AnimationAssetManifest,
-	type AnimationBible,
-	type AnimationProductionFamily,
-	type AnimationProductionQualityReport,
 } from "../../lib/animation-production";
-import {
-	planSceneDirectives,
-	planSceneVisuals,
-	type ResearchBrief,
-	type SceneDirective,
-	verifySceneQuality,
-} from "../../lib/ai-agents";
 import { autoPickBgm, inferAutoBgmPreset } from "../../lib/bgm";
 import { ensureBlobUrls, storeLocalFile } from "../../lib/local-db";
 import {
@@ -44,16 +44,22 @@ import {
 	downloadVideoToPath,
 	downloadYouTubeVideo,
 	downloadYouTubeVideoToPath,
+	type MediaSearchOptions,
 	resetUsedVideoIds,
 	searchAndDownloadImage,
 	searchAndDownloadImageToPath,
 	searchAndDownloadVideo,
 	searchAndDownloadVideoToPath,
-	type MediaSearchOptions,
 } from "../../lib/media-download";
 import {
-	referenceToPreset,
+	loadQualityProfile,
+	type QualityProfile,
+	qualityProfileToBgmContext,
+	qualityProfileToTtsOptions,
+} from "../../lib/quality-profile";
+import {
 	type ReferencePreset,
+	referenceToPreset,
 } from "../../lib/reference-bridge";
 import {
 	buildSceneImagePrompt,
@@ -89,6 +95,7 @@ import {
 	enrichVideoPrompt,
 	type ScriptFormat,
 } from "../../lib/video-prompt-enrich";
+import { getVisualSourceMode } from "../../lib/visual-source-mode";
 import type { ReferenceTemplate, Scene } from "../../types/database";
 import type { CollectedSource, ContentMode } from "./ContentWizardPage";
 
@@ -139,7 +146,7 @@ const VIDEO_CROP_OPTIONS: Array<{
 	{ value: "detail", label: "디테일", description: "강한 확대" },
 ];
 
-function isLocalMediaPath(value?: string): boolean {
+function isLocalMediaPath(value?: string): value is string {
 	return Boolean(value?.startsWith("scenes/"));
 }
 
@@ -664,6 +671,47 @@ function animationImageOptions(
 	};
 }
 
+type AutoBgmPreset = Parameters<typeof autoPickBgm>[1];
+
+/**
+ * 품질 프로파일의 BGM mood 를 "기본 컨텍스트"로 주입한다.
+ * - moodIsExplicit=true (레퍼런스 템플릿 등 사용자 명시 경로): 기존 mood 가 있으면 그대로 유지.
+ * - moodIsExplicit=false (씬 휴리스틱 추론 경로): 프로파일 mood 가 기본값으로 우선.
+ * 프로파일이 없으면 기존 preset 을 그대로 반환한다 (무회귀).
+ */
+function applyQualityBgmDefaults(
+	preset: AutoBgmPreset,
+	profile: QualityProfile | null,
+	moodIsExplicit: boolean,
+): AutoBgmPreset {
+	if (!profile) return preset;
+	if (moodIsExplicit && preset.mood) return preset;
+	const mood = qualityProfileToBgmContext(profile).mood;
+	if (!mood) return preset;
+	return { ...preset, mood };
+}
+
+/**
+ * 품질 프로파일 TTS 옵션(speed/toneKeywords)을 base 로 깔고,
+ * 기존 명시 옵션이 항상 우선하도록 병합한다. 프로파일이 없으면 명시 옵션 그대로.
+ */
+function mergeQualityTtsBase(
+	profile: QualityProfile | null,
+	explicit: TtsOptions,
+): TtsOptions {
+	if (!profile) return explicit;
+	const base = qualityProfileToTtsOptions(profile);
+	const merged: TtsOptions = { ...base, ...explicit };
+	// 명시 옵션에 키가 undefined/빈 값으로 들어와도 base 를 지우지 않도록 방어
+	if (explicit.speed === undefined && base.speed !== undefined) {
+		merged.speed = base.speed;
+	}
+	if (!explicit.toneKeywords?.length && base.toneKeywords?.length) {
+		merged.toneKeywords = base.toneKeywords;
+	}
+	return merged;
+}
+
 export default function StepMedia({
 	scriptId,
 	mode: _mode = "ai",
@@ -685,6 +733,11 @@ export default function StepMedia({
 	);
 	const requiresRealClipVideo =
 		referencePreset?.composition.sceneLayout === "social_clip_card";
+	// 시장 품질 프로파일 (이전 스텝에서 저장). 없으면 null → 기존 동작 그대로.
+	const qualityProfile = useMemo<QualityProfile | null>(
+		() => loadQualityProfile(scriptId),
+		[scriptId],
+	);
 	const ttsOptions = useMemo<TtsOptions | undefined>(
 		() => (referencePreset ? { ...referencePreset.tts } : undefined),
 		[referencePreset],
@@ -707,16 +760,25 @@ export default function StepMedia({
 	);
 	const effectiveTtsOptions = useMemo<TtsOptions | undefined>(() => {
 		if (ttsOptions) {
-			return composeNarrationTtsOptions(ttsSignals, ttsOptions);
+			return composeNarrationTtsOptions(
+				ttsSignals,
+				mergeQualityTtsBase(qualityProfile, ttsOptions),
+			);
 		}
 		if (hasStoredTtsSettings()) {
-			return composeNarrationTtsOptions(ttsSignals, getDefaultVoice());
+			return composeNarrationTtsOptions(
+				ttsSignals,
+				mergeQualityTtsBase(qualityProfile, getDefaultVoice()),
+			);
 		}
+		// 명시 옵션이 전혀 없으면 품질 프로파일이 base 옵션 역할을 한다 (없으면 기존 추론 그대로)
 		return composeNarrationTtsOptions(
 			ttsSignals,
-			inferNarrationTtsOptions(ttsSignals),
+			qualityProfile
+				? qualityProfileToTtsOptions(qualityProfile)
+				: inferNarrationTtsOptions(ttsSignals),
 		);
-	}, [ttsOptions, ttsSignals]);
+	}, [ttsOptions, ttsSignals, qualityProfile]);
 	const [bgmAutoPicked, setBgmAutoPicked] = useState<string>("");
 	const scenesRef = useRef<SceneWithMedia[]>([]);
 	useEffect(() => {
@@ -790,6 +852,7 @@ export default function StepMedia({
 		})();
 	}, [scriptId]);
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: persistSceneShots 는 매 렌더 재생성되는 컴포넌트 메서드라 deps 에 넣으면 loadScenes 가 매 렌더 재생성돼 불필요한 재로딩을 유발한다. scriptId 변경 시에만 재생성하는 기존 동작을 보존한다.
 	const loadScenes = useCallback(async () => {
 		resetUsedVideoIds();
 		const { data: sceneData } = await supabase
@@ -1020,9 +1083,12 @@ export default function StepMedia({
 				return;
 			}
 
-			// 최초 자동 선택
+			// 최초 자동 선택 — 레퍼런스 mood 가 명시돼 있으면 그대로, 비어 있으면 품질 프로파일 mood 주입
 			try {
-				const result = await autoPickBgm(scriptId, referencePreset.bgm);
+				const result = await autoPickBgm(
+					scriptId,
+					applyQualityBgmDefaults(referencePreset.bgm, qualityProfile, true),
+				);
 				if (!cancelled && result) {
 					localStorage.setItem(`bgm_url_${scriptId}`, result.url);
 					setBgmAutoPicked(result.source);
@@ -1035,7 +1101,7 @@ export default function StepMedia({
 		return () => {
 			cancelled = true;
 		};
-	}, [scriptId, referencePreset, bgmAutoPicked]);
+	}, [scriptId, referencePreset, bgmAutoPicked, qualityProfile]);
 
 	function updateScene(index: number, patch: Partial<SceneWithMedia>) {
 		setScenes((prev) => {
@@ -1407,7 +1473,7 @@ export default function StepMedia({
 			const imagePrompt = buildShotImagePrompt(scene, shot);
 
 			if (isLocalMediaPath(shot.source_url)) {
-				const localPath = shot.source_url!;
+				const localPath = shot.source_url;
 				if (!previewImageUrl) {
 					const blobMap = await ensureBlobUrls([localPath]);
 					previewImageUrl = blobMap.get(localPath) ?? previewImageUrl;
@@ -1443,7 +1509,7 @@ export default function StepMedia({
 					sourceConfidence: Math.max(shot.source_confidence ?? 0, 84),
 				});
 			} else if (isDirectImageUrl(shot.source_url)) {
-				const sharedKey = shot.source_url!;
+				const sharedKey = shot.source_url;
 				const reused = sharedImageSources.get(sharedKey);
 				if (reused) {
 					url = reused.url;
@@ -1453,10 +1519,7 @@ export default function StepMedia({
 						sourceConfidence: Math.max(shot.source_confidence ?? 0, 88),
 					});
 				} else {
-					const downloaded = await downloadImageToPath(
-						storagePath,
-						shot.source_url!,
-					);
+					const downloaded = await downloadImageToPath(storagePath, sharedKey);
 					url = downloaded.url;
 					shot.source_url = downloaded.storagePath;
 					markShotSelected(shot, {
@@ -1828,7 +1891,7 @@ export default function StepMedia({
 
 		for (const [shotIndex, shot] of videoShots.entries()) {
 			if (isLocalMediaPath(shot.source_url)) {
-				const localPath = shot.source_url!;
+				const localPath = shot.source_url;
 				if (!previewVideoUrl) {
 					const blobMap = await ensureBlobUrls([localPath]);
 					previewVideoUrl = blobMap.get(localPath) ?? previewVideoUrl;
@@ -1836,8 +1899,9 @@ export default function StepMedia({
 				continue;
 			}
 			if (isDirectVideoUrl(shot.source_url)) {
-				const isYouTube = isYouTubeVideoUrl(shot.source_url);
-				const sharedKey = getVideoReuseKey(shot.source_url!, shot, shotIndex);
+				const sourceUrl = shot.source_url;
+				const isYouTube = isYouTubeVideoUrl(sourceUrl);
+				const sharedKey = getVideoReuseKey(sourceUrl, shot, shotIndex);
 				const reused = sharedVideoSources.get(sharedKey);
 				if (reused) {
 					shot.source_url = reused.storagePath;
@@ -1857,11 +1921,11 @@ export default function StepMedia({
 				const downloaded = isYouTube
 					? await downloadYouTubeVideoToPath(
 							storagePath,
-							shot.source_url!,
+							sourceUrl,
 							getShotVideoDurationSeconds(shot),
 							getShotClipStartSeconds(shot, shotIndex),
 						)
-					: await downloadVideoToPath(storagePath, shot.source_url!);
+					: await downloadVideoToPath(storagePath, sourceUrl);
 				shot.source_url = downloaded.storagePath;
 				if (isYouTube) {
 					shot.trim_start = undefined;
@@ -1978,12 +2042,26 @@ export default function StepMedia({
 			const imagePrompt = buildSceneImagePrompt(scene);
 
 			if (isDirectImageUrl(scene.sourceUrl)) {
-				url = await downloadImageToLocal(scene.id, scene.sourceUrl!);
+				url = await downloadImageToLocal(scene.id, scene.sourceUrl);
+			} else if (getVisualSourceMode() === "ai") {
+				// 기본(ai): AI 이미지 생성 우선 — 고유·일관 스타일로 "스톡 짜깁기" 회피.
+				// 실패 시 이미지 검색으로 폴백(무회귀).
+				try {
+					url = await generateFallbackSceneImage(scene, imagePrompt);
+				} catch {
+					url = "";
+				}
+				if (!url) {
+					url = await searchAndDownloadImage(
+						scene.id,
+						queryEn,
+						queryKo,
+						locale,
+					);
+				}
 			} else {
-				// 1순위: 이미지 검색
+				// search: 이미지 검색 우선, 실패 시 AI 생성 (기존 동작)
 				url = await searchAndDownloadImage(scene.id, queryEn, queryKo, locale);
-
-				// 2순위: AI 이미지 생성
 				if (!url) {
 					url = await generateFallbackSceneImage(scene, imagePrompt);
 				}
@@ -2043,14 +2121,11 @@ export default function StepMedia({
 			);
 
 			if (isDirectVideoUrl(latestScene.sourceUrl)) {
-				const isYouTube = isYouTubeVideoUrl(latestScene.sourceUrl);
+				const sourceUrl = latestScene.sourceUrl;
+				const isYouTube = isYouTubeVideoUrl(sourceUrl);
 				const url = isYouTube
-					? await downloadYouTubeVideo(
-							latestScene.id,
-							latestScene.sourceUrl!,
-							maxDuration,
-						)
-					: await downloadVideoToLocal(latestScene.id, latestScene.sourceUrl!);
+					? await downloadYouTubeVideo(latestScene.id, sourceUrl, maxDuration)
+					: await downloadVideoToLocal(latestScene.id, sourceUrl);
 				updateScene(sceneIndex, { videoStatus: "complete", videoUrl: url });
 
 				// 썸네일도 fallback으로 저장
@@ -2107,13 +2182,34 @@ export default function StepMedia({
 			const converted = await fallbackVideoShotsToImages(sceneIndex);
 			if (converted) return;
 
-			const fallbackImage =
-				(await searchAndDownloadImage(
-					latestScene.id,
-					queryEn,
-					queryKo,
-					locale,
-				)) || (await generateFallbackSceneImage(latestScene, imagePrompt));
+			// 비주얼 소스 모드 일관성: ai 모드면 AI 생성 우선, 실패 시 검색 폴백
+			let fallbackImage: string;
+			if (getVisualSourceMode() === "ai") {
+				try {
+					fallbackImage = await generateFallbackSceneImage(
+						latestScene,
+						imagePrompt,
+					);
+				} catch {
+					fallbackImage = "";
+				}
+				if (!fallbackImage) {
+					fallbackImage = await searchAndDownloadImage(
+						latestScene.id,
+						queryEn,
+						queryKo,
+						locale,
+					);
+				}
+			} else {
+				fallbackImage =
+					(await searchAndDownloadImage(
+						latestScene.id,
+						queryEn,
+						queryKo,
+						locale,
+					)) || (await generateFallbackSceneImage(latestScene, imagePrompt));
+			}
 			updateScene(sceneIndex, {
 				videoStatus: "not_needed",
 				imageStatus: "complete",
@@ -2537,15 +2633,20 @@ export default function StepMedia({
 			localStorage.getItem(`bgm_url_${scriptId}`);
 		if (!existingBgm) {
 			try {
-				const bgmPreset =
-					referencePreset?.bgm ??
-					inferAutoBgmPreset(
-						scenesRef.current.map((scene) => ({
-							mood: scene.mood,
-							durationSeconds: Number(scene.duration_seconds),
-							sceneType: scene.scene_type,
-						})),
-					);
+				// 레퍼런스 mood 는 사용자 명시로 보고 우선, 씬 추론 mood 는 품질 프로파일이 기본값으로 우선
+				const bgmPreset = referencePreset?.bgm
+					? applyQualityBgmDefaults(referencePreset.bgm, qualityProfile, true)
+					: applyQualityBgmDefaults(
+							inferAutoBgmPreset(
+								scenesRef.current.map((scene) => ({
+									mood: scene.mood,
+									durationSeconds: Number(scene.duration_seconds),
+									sceneType: scene.scene_type,
+								})),
+							),
+							qualityProfile,
+							false,
+						);
 				const bgmResult = await autoPickBgm(scriptId, bgmPreset);
 				if (bgmResult) {
 					localStorage.setItem(`bgm_url_${scriptId}`, bgmResult.url);

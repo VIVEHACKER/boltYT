@@ -38,7 +38,12 @@ interface OpenAICallOptions {
 	timeoutMs?: number;
 }
 
-async function callOpenAI(
+/**
+ * 내부 LLM 호출 진입점.
+ * quality-judge 의 LlmCritic=(system,user,opts?)=>Promise<string> 주입 계약과
+ * 구조적으로 호환된다 (OpenAICallOptions ⊇ {jsonMode, maxTokens, timeoutMs}).
+ */
+export async function callOpenAI(
 	systemPrompt: string,
 	userPrompt: string,
 	opts?: OpenAICallOptions,

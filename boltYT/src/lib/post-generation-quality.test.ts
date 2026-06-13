@@ -82,4 +82,30 @@ describe("post-generation-quality", () => {
 		expect(gate?.blocking).toBe(true);
 		expect(gate?.command).toBe("npm run quality:dead-exports");
 	});
+
+	it("시장 벤치마크 판정 게이트를 비차단으로 포함", () => {
+		const gate = POST_GENERATION_QUALITY_GATES.find(
+			(item) => item.id === "market-benchmark-judge",
+		);
+
+		expect(gate?.blocking).toBe(false);
+		expect(gate?.phase).toBe("verification");
+		expect(gate?.command).toBe(
+			"npx vitest run src/lib/quality-judge.test.ts src/lib/quality-loop-orchestrator.test.ts",
+		);
+	});
+
+	it("비차단 시장 벤치마크 게이트 실패는 blocked가 아니다", () => {
+		const report = judgePostGenerationQuality([
+			pass("reference-coverage"),
+			{
+				id: "market-benchmark-judge",
+				label: "market-benchmark-judge",
+				status: "fail",
+				details: "judge regression",
+			},
+		]);
+
+		expect(report.verdict).not.toBe("blocked");
+	});
 });

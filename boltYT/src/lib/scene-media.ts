@@ -42,7 +42,7 @@ function firstNonEmpty(values: Array<string | undefined>): string {
 	return values.map(normalizeText).find(Boolean) ?? "";
 }
 
-export function isDirectImageUrl(url?: string): boolean {
+export function isDirectImageUrl(url?: string): url is string {
 	return Boolean(
 		url &&
 			/^https?:\/\//.test(url) &&
@@ -50,7 +50,7 @@ export function isDirectImageUrl(url?: string): boolean {
 	);
 }
 
-export function isDirectVideoUrl(url?: string): boolean {
+export function isDirectVideoUrl(url?: string): url is string {
 	if (!url) return false;
 	if (/youtu\.be|youtube\.com/i.test(url)) return true;
 	return /^https?:\/\//.test(url) && /\.(mp4|mov|webm|m4v)(\?|#|$)/i.test(url);
