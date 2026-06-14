@@ -21,6 +21,7 @@
 import { fnv1a32 } from "./hash-seed";
 import {
 	clampWords,
+	clampWordsKeepTail,
 	type HistoricalEra,
 	resolveEra,
 	type VlogLocale,
@@ -168,12 +169,19 @@ export function applyHostToScenePrompt(
 	opts: { era?: string | HistoricalEra } = {},
 ): string {
 	const directives = buildHostContinuityDirectives(identity, opts.era);
-	return clampWords(
-		[rawPrompt.trim(), `Host continuity: ${directives.join(" ")}`]
-			.filter((part) => part.length > 0)
-			.join(" "),
+	// 호스트 잠금(레퍼런스 시트/시드)은 일관성에 필수라 절대 잘리면 안 된다. clampWords 는
+	// 끝에서 자르므로, rawPrompt 를 먼저 줄여 continuity suffix 공간을 확보한 뒤 붙인다.
+	// continuity 가 그 자체로 cap 을 넘을 수 있으므로(긴 StyleBible appearance) 먼저 cap 으로
+	// clamp — 출력은 항상 1600 이하를 보장하되 head 보다 호스트 잠금을 우선 보존한다.
+	const continuity = clampWords(
+		`Host continuity: ${directives.join(" ")}`,
 		1600,
 	);
+	const headBudget = Math.max(0, 1600 - continuity.length - 1);
+	// rawPrompt 는 buildPovVisualPrompt 산출물일 수 있고 그 필수 지시문(POV/시대/의상)이
+	// tail 에 있으므로, head(장면 묘사)에서 자르고 tail 을 보존한다. → POV·호스트 잠금 둘 다 유지.
+	const head = clampWordsKeepTail(rawPrompt.trim(), headBudget);
+	return [head, continuity].filter((part) => part.length > 0).join(" ");
 }
 
 /** 시대 의상으로 호스트 의상만 교체한 변형 호스트(외형 정체성은 유지). */

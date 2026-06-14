@@ -154,6 +154,22 @@ export function clampWords(text: string, max: number): string {
 }
 
 /**
+ * clampWords 의 tail 보존 버전 — 앞(head)에서 자르고 끝(tail)을 남긴다.
+ * 필수 지시문이 tail 에 있는 프롬프트(buildPovVisualPrompt 산출물)를 다시 감쌀 때,
+ * 그 필수 suffix 가 잘리지 않도록 보존하는 데 쓴다.
+ */
+export function clampWordsKeepTail(text: string, max: number): string {
+	if (text.length <= max) return text;
+	const tail = text.slice(text.length - max);
+	const firstSpace = tail.indexOf(" ");
+	return (
+		firstSpace >= 0 && firstSpace < max * 0.4
+			? tail.slice(firstSpace + 1)
+			: tail
+	).trimStart();
+}
+
+/**
  * 한국어 받침 기반 조사 선택 — 로/으로.
  * 받침 없음 또는 받침이 ㄹ → "로", 그 외 → "으로".
  * 마지막 글자가 한글이 아니면(숫자/영문) 안전하게 "로".
@@ -308,17 +324,21 @@ export function buildPovVisualPrompt(
 	opts: { shocked?: boolean } = {},
 ): string {
 	const era = resolveEra(input);
-	const parts = [
-		rawPrompt.trim(),
+	// POV/시대/의상은 이 헬퍼의 핵심 산출물이라 절대 잘리면 안 된다. clampWords 는
+	// 끝에서 자르므로, rawPrompt 를 먼저 줄여 필수 suffix 공간을 확보한 뒤 붙인다.
+	const required = [
 		POV_DIRECTIVE_EN,
 		era.settingKeywords,
 		`wearing ${era.wardrobeKeywords}`,
 		opts.shocked ? "shocked surprised facial expression" : "",
-	];
-	return clampWords(
-		parts.filter((part) => part && part.length > 0).join(", "),
-		1400,
-	);
+	].filter((part) => part && part.length > 0);
+	const SEP = ", ";
+	// 필수 텍스트가 그 자체로 cap 을 넘을 수 있으므로(긴 커스텀 era 키워드) 먼저 cap 으로
+	// clamp — 출력은 항상 1400 이하를 보장하되 head 보다 suffix 를 우선 보존한다.
+	const requiredText = clampWords(required.join(SEP), 1400);
+	const headBudget = Math.max(0, 1400 - requiredText.length - SEP.length);
+	const head = clampWords(rawPrompt.trim(), headBudget);
+	return [head, requiredText].filter((part) => part.length > 0).join(SEP);
 }
 
 /** 시대 풀에서 n개를 결정론적으로 제안(앞에서부터). */

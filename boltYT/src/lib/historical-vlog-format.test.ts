@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
-	clampWords,
 	buildHistoricalChapters,
 	buildHistoricalThumbnail,
 	buildHistoricalTitle,
 	buildPovVisualPrompt,
+	clampWords,
 	findEra,
 	HISTORICAL_ERAS,
 	HISTORICAL_VLOG_STRUCTURE_ROLES,
@@ -133,6 +133,25 @@ describe("buildPovVisualPrompt — POV + 시대 + 의상 주입", () => {
 	it("1400자를 넘지 않는다", () => {
 		const huge = "x ".repeat(2000);
 		expect(buildPovVisualPrompt(huge, "ice-age").length).toBeLessThanOrEqual(
+			1400,
+		);
+	});
+
+	it("긴 rawPrompt 에서도 필수 POV/시대/의상 suffix 가 절대 잘리지 않는다", () => {
+		const huge = "busy scene ".repeat(300); // 1400자 초과
+		const prompt = buildPovVisualPrompt(huge, "ancient-rome-44ad", {
+			shocked: true,
+		});
+		expect(prompt.length).toBeLessThanOrEqual(1400);
+		// rawPrompt 가 길어도 필수 지시문은 보존되어야 한다(끝에서 잘리지 않음)
+		expect(prompt).toContain(POV_DIRECTIVE_EN);
+		expect(prompt).toContain("toga");
+		expect(prompt).toContain("shocked");
+	});
+
+	it("커스텀 era 키워드가 그 자체로 cap 을 넘어도 1400 을 지킨다", () => {
+		const longEra = "x ".repeat(1000); // requiredText 자체가 1400 초과 유발
+		expect(buildPovVisualPrompt("raw", longEra).length).toBeLessThanOrEqual(
 			1400,
 		);
 	});

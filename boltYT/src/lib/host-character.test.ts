@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+	buildPovVisualPrompt,
+	POV_DIRECTIVE_EN,
+} from "./historical-vlog-format";
+import {
 	applyHostToScenePrompt,
 	buildHostContinuityDirectives,
 	buildHostIdentity,
@@ -123,6 +127,41 @@ describe("applyHostToScenePrompt", () => {
 		expect(out).toContain("a Roman street");
 		expect(out).toContain("Host continuity");
 		expect(out.length).toBeLessThanOrEqual(1600);
+	});
+
+	it("긴 rawPrompt 에서도 Host continuity 잠금이 절대 잘리지 않는다", () => {
+		const huge = "scene detail ".repeat(300); // 1600자 초과
+		const out = applyHostToScenePrompt(huge, buildHostIdentity(sampleHost()), {
+			era: "ancient-rome-44ad",
+		});
+		expect(out.length).toBeLessThanOrEqual(1600);
+		// rawPrompt 가 길어도 호스트 잠금 지시는 보존되어야 한다
+		expect(out).toContain("Host continuity");
+	});
+
+	it("appearance 가 그 자체로 cap 을 넘어도 1600 을 지킨다", () => {
+		const longHost = sampleHost({ appearance: "y ".repeat(1000) });
+		const out = applyHostToScenePrompt("raw", buildHostIdentity(longHost), {
+			era: "ancient-rome-44ad",
+		});
+		expect(out.length).toBeLessThanOrEqual(1600);
+	});
+
+	it("문서화된 합성(buildPovVisualPrompt→applyHost)에서 POV 필수 suffix 와 호스트 잠금이 모두 살아남는다", () => {
+		// 긴 장면 묘사 → POV 프롬프트가 1400 cap 근처, 필수 지시문은 tail 에 위치
+		const pov = buildPovVisualPrompt(
+			"busy scene ".repeat(300),
+			"ancient-rome-44ad",
+			{ shocked: true },
+		);
+		const out = applyHostToScenePrompt(pov, buildHostIdentity(sampleHost()), {
+			era: "ancient-rome-44ad",
+		});
+		expect(out.length).toBeLessThanOrEqual(1600);
+		// tail 보존 clamp 로 POV 필수 지시문이 호스트 잠금 추가 후에도 유지돼야 한다
+		expect(out).toContain(POV_DIRECTIVE_EN);
+		expect(out).toContain("shocked");
+		expect(out).toContain("Host continuity");
 	});
 });
 
