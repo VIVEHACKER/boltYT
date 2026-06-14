@@ -12,7 +12,7 @@ import { getApiProxyUrl } from "./proxy";
 import { enrichVisualPrompt, type ReferencePreset } from "./reference-bridge";
 import { supabase } from "./supabase";
 
-export type ImageGenProvider = "comfyui" | "a1111" | "dalle" | "none";
+export type ImageGenProvider = "comfyui" | "a1111" | "fal" | "dalle" | "none";
 
 export type ImageAspectRatio = "16:9" | "9:16" | "1:1";
 
@@ -43,6 +43,13 @@ function dalleSize(ratio?: ImageAspectRatio): string {
 	if (ratio === "9:16") return "1024x1792";
 	if (ratio === "1:1") return "1024x1024";
 	return "1792x1024"; // 16:9 기본
+}
+
+/** 종횡비 → fal.ai flux image_size enum. */
+function falImageSize(ratio?: ImageAspectRatio): string {
+	if (ratio === "9:16") return "portrait_16_9";
+	if (ratio === "1:1") return "square_hd";
+	return "landscape_16_9"; // 16:9 기본
 }
 
 interface ImageGenStatus {
@@ -87,6 +94,8 @@ export async function detectImageProviders(): Promise<ImageGenStatus> {
 		});
 		if (res.ok) {
 			const status = await res.json();
+			// FAL 우선(영상과 같은 예산·seed 지원으로 일관성↑), 그다음 DALL-E.
+			if (status.fal) available.push("fal");
 			if (status.openai) available.push("dalle");
 		}
 	} catch {
@@ -363,20 +372,73 @@ async function generateWithDalle(
 			size: dalleSize(options?.aspectRatio),
 			quality: "hd",
 			style,
-			response_format: "b64_json",
+			// response_format 은 2026 OpenAI images API 에서 제거됨 — 보내면 400.
+			// 응답은 b64_json 또는 url 로 올 수 있어 아래에서 양쪽 처리.
 		}),
 	});
 
 	if (!res.ok) throw new Error(`DALL-E error: ${res.status}`);
 
 	const data = await res.json();
-	const b64 = data.data[0].b64_json;
-	const binary = atob(b64);
-	const bytes = new Uint8Array(binary.length);
-	for (let i = 0; i < binary.length; i++) {
-		bytes[i] = binary.charCodeAt(i);
+	return decodeImageResponse(data.data?.[0]);
+}
+
+/**
+ * 이미지 응답 1건 → ArrayBuffer. b64_json 이면 디코드, url 이면 fetch.
+ * (OpenAI/현 API·FAL 등 응답 형태 차이를 흡수.)
+ */
+async function decodeImageResponse(
+	item: { b64_json?: string; url?: string } | undefined,
+): Promise<ArrayBuffer> {
+	if (item?.b64_json) {
+		const binary = atob(item.b64_json);
+		const bytes = new Uint8Array(binary.length);
+		for (let i = 0; i < binary.length; i++) {
+			bytes[i] = binary.charCodeAt(i);
+		}
+		return bytes.buffer;
 	}
-	return bytes.buffer;
+	if (item?.url) {
+		const imgRes = await fetch(item.url);
+		if (!imgRes.ok) throw new Error(`image fetch failed: ${imgRes.status}`);
+		return imgRes.arrayBuffer();
+	}
+	throw new Error("image response has neither b64_json nor url");
+}
+
+// ─── fal.ai (flux) 이미지 생성 — 영상과 같은 예산, seed 지원으로 일관성↑ ───
+
+async function generateWithFal(
+	prompt: string,
+	options?: ImageGenerationOptions,
+): Promise<ArrayBuffer> {
+	const proxy = getApiProxyUrl();
+	const falPrompt =
+		`${prompt}\n\nAvoid: on-screen text, watermark, logo, distorted faces, extra fingers, oversaturation.`.slice(
+			0,
+			3900,
+		);
+	const body: Record<string, unknown> = {
+		prompt: falPrompt,
+		image_size: falImageSize(options?.aspectRatio),
+		num_images: 1,
+		num_inference_steps: 28,
+		guidance_scale: 3.5,
+		enable_safety_checker: true,
+	};
+	if (typeof options?.seed === "number" && Number.isFinite(options.seed)) {
+		// flux 는 seed 를 따른다 → 같은 호스트 시드 + 외형 프롬프트 = 에피소드 간 일관성.
+		body.seed = Math.abs(Math.floor(options.seed)) % 2 ** 31;
+	}
+	const res = await fetch(`${proxy}/api/fal/image-gen`, {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify(body),
+	});
+	if (!res.ok) throw new Error(`FAL image error: ${res.status}`);
+	const data = await res.json();
+	const img = Array.isArray(data.images) ? data.images[0] : data.image;
+	return decodeImageResponse(img);
 }
 
 function isAnimationPrompt(prompt: string): boolean {
@@ -404,15 +466,17 @@ function providerFallbackOrder(
 ): ImageGenProvider[] {
 	const needsReference = Boolean(options?.referenceImagePath);
 	if (needsReference) {
-		if (provider === "comfyui") return ["a1111", "comfyui", "dalle"];
-		if (provider === "a1111") return ["a1111", "dalle"];
-		if (provider === "dalle") return ["a1111", "dalle"];
-		return ["a1111", "dalle"];
+		// img2img(레퍼런스 시트 face-lock)는 로컬 A1111 만 지원 → 우선. 이후 FAL(seed)→DALL-E.
+		if (provider === "comfyui") return ["a1111", "comfyui", "fal", "dalle"];
+		if (provider === "a1111") return ["a1111", "fal", "dalle"];
+		return ["a1111", "fal", "dalle"];
 	}
 	if (provider === "dalle") return ["dalle"];
-	if (provider === "comfyui") return ["comfyui", "dalle"];
-	if (provider === "a1111") return ["a1111", "dalle"];
-	return ["dalle"];
+	if (provider === "fal") return ["fal", "dalle"];
+	if (provider === "comfyui") return ["comfyui", "fal", "dalle"];
+	if (provider === "a1111") return ["a1111", "fal", "dalle"];
+	// 클라우드 기본: FAL 우선(예산·seed), DALL-E 폴백.
+	return ["fal", "dalle"];
 }
 
 // ─── 통합 이미지 생성 ───
@@ -462,6 +526,9 @@ async function generateImageInternal(
 					} else {
 						buffer = await generateWithA1111(promptStyle, options);
 					}
+					break;
+				case "fal":
+					buffer = await generateWithFal(promptStyle, options);
 					break;
 				case "dalle":
 					buffer = await generateWithDalle(promptStyle, options);

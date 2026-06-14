@@ -1215,7 +1215,11 @@ export default function StepMedia({
 							identity.referenceSheetPath,
 							buildHostReferencePrompt(identity),
 							referencePreset,
-							{ seed: identity.styleSeed },
+							{
+								seed: identity.styleSeed,
+								styleMode: "photo",
+								aspectRatio: "1:1",
+							},
 						);
 					}
 					// 시트가 준비된 뒤에만 캐시에 노출.
@@ -1702,6 +1706,8 @@ export default function StepMedia({
 				seed: host.styleSeed,
 				referenceImagePath: host.referenceSheetPath,
 				referenceStrength: 0.4,
+				// 역사 브이로그는 실사 — 2D 렌더 분기 방지(애니가 아님).
+				styleMode: "photo" as const,
 			};
 		}
 		return base;

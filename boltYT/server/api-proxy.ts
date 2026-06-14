@@ -1531,6 +1531,44 @@ const server = createServer(async (req, res) => {
 		return;
 	}
 
+	// ─── FAL 이미지 생성 (flux, 동기 fal.run) ───
+	if (url.pathname === "/api/fal/image-gen" && req.method === "POST") {
+		if (!requireKey(req, res, KEYS.fal, "FAL")) return;
+		const body = await parseBody(req);
+		if (body === null) {
+			json(req, res, 413, { error: "요청 본문이 너무 큽니다 (최대 1MB)" });
+			return;
+		}
+		try {
+			const upstream = await fetchWithRetry(
+				"https://fal.run/fal-ai/flux/dev",
+				{
+					method: "POST",
+					headers: {
+						Authorization: `Key ${KEYS.fal}`,
+						"Content-Type": "application/json",
+					},
+					body: JSON.stringify(body),
+				},
+				{ timeout: 120_000 },
+			);
+			if (!upstream.ok) {
+				const err = await upstream.text();
+				log.error("FAL image error", { status: upstream.status });
+				json(req, res, upstream.status, { error: err });
+				return;
+			}
+			const data = await upstream.json();
+			json(req, res, 200, data);
+		} catch (e) {
+			log.error("FAL image exception", { error: (e as Error).message });
+			json(req, res, 500, {
+				error: e instanceof Error ? e.message : "FAL image proxy error",
+			});
+		}
+		return;
+	}
+
 	// ─── OpenAI TTS ───
 	if (url.pathname === "/api/openai/tts" && req.method === "POST") {
 		if (!requireKey(req, res, KEYS.openai, "OpenAI")) return;
