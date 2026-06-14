@@ -25,6 +25,7 @@
     "reference:deep:retry": "npx tsx scripts/reference-deep-promote.ts --target-per-category 9 --limit 45 --retry-deep --timeout-ms 900000",
     "reference:write": "npx tsx scripts/reference-batch-template.ts --offline",
     "bgm:import": "node scripts/import-bgm-preset.mjs",
+    "set-fal-key": "node scripts/set-fal-key.mjs",
     "vlog:plan": "npx tsx scripts/historical-vlog-plan.ts",
     "quality:loop": "npx tsx scripts/post-generation-improvement-loop.ts",
     "quality:loop:fix": "npx tsx scripts/post-generation-improvement-loop.ts --fix",
