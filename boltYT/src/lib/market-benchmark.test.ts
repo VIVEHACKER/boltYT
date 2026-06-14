@@ -85,6 +85,10 @@ describe("getBuiltinBenchmark", () => {
 			expect(shorts.editing.cutDensitySec).toBeLessThan(
 				longform.editing.cutDensitySec,
 			);
+
+			// 쇼츠 TTS 속도 ≥1.1x(느리면 넘겨짐), 롱폼은 자연 템포(≤1.1 허용)
+			expect(shorts.tts.speed).toBeGreaterThanOrEqual(1.1);
+			expect(longform.tts.speed).toBeLessThanOrEqual(shorts.tts.speed);
 		}
 	});
 });
@@ -165,6 +169,19 @@ describe("learnBenchmarkFromSamples", () => {
 		expect(learned.editing.captionsPerMin).toBe(base.editing.captionsPerMin);
 		expect(learned.tts.speed).toBe(base.tts.speed);
 		expect(learned.bgm.integratedLufs).toBe(base.bgm.integratedLufs);
+	});
+
+	it("느린 샘플을 학습해도 쇼츠 TTS 속도는 1.1x 하한을 지킨다", () => {
+		const learned = learnBenchmarkFromSamples({
+			samples: [
+				shortsSample({ ttsSpeed: 1.0 }),
+				shortsSample({ ttsSpeed: 1.0 }),
+				shortsSample({ ttsSpeed: 1.0 }),
+			],
+			genre: "generic",
+			format: "shorts",
+		});
+		expect(learned.tts.speed).toBeGreaterThanOrEqual(1.1);
 	});
 
 	it("sampleCount<3 이면 confidence<0.5 + 프리셋과 블렌딩된 hybrid 가 된다", () => {

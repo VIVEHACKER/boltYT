@@ -181,20 +181,25 @@ export function scoreScript(
 			: sc.chapterCount >= 2
 				? 1
 				: 0.5;
+	// 도입부 감정 공감(성장 플레이북 최대 레버): 정보 전달 전 "내 얘기 같다" 정서 관련성
+	const empathyFit = clamp01(sc.emotionalEmpathy);
 
 	const findings: string[] = [];
 	if (hookFit < 1) findings.push("hook_after_bar");
+	if (empathyFit < 0.4) findings.push("weak_emotional_hook");
 	if (structureFit < 1) findings.push("structure_roles_missing");
 	if (sc.emptyNarrationCount > 0) findings.push("empty_narration_scenes");
 	if (sc.pacing === "slow") findings.push("pacing_slow");
 	if (chapterFit < 1) findings.push("chapter_count_below_expectation");
 
+	// 가중치: 훅타이밍30 + 감정공감15 + 구조22 + 빈나레15 + 페이싱10 + 챕터8 = 100
 	const score =
-		hookFit * 35 +
-		structureFit * 25 +
-		emptyFit * 20 +
+		hookFit * 30 +
+		empathyFit * 15 +
+		structureFit * 22 +
+		emptyFit * 15 +
 		pacingFit * 10 +
-		chapterFit * 10;
+		chapterFit * 8;
 	return toDimensionVerdict("script", score, marketBarFor(bar), findings);
 }
 

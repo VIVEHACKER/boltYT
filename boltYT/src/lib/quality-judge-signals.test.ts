@@ -332,15 +332,15 @@ describe("collectJudgeSignals — tts", () => {
 
 	it("speedDelta = speed - 벤치마크 speed, 미지정 시 기본 1.0 가정", () => {
 		const scenes = [bscene({})];
-		// generic shorts bar: 1.05
+		// generic shorts bar: 1.1 (쇼츠 TTS 속도 하한 적용)
 		const fast = collectJudgeSignals(
 			makeBundle({ scenes, tts: { coverageRatio: 0, speed: 1.25 } }),
 			GENERIC_SHORTS,
 		);
-		expect(fast.tts.speedDelta).toBe(0.2);
+		expect(fast.tts.speedDelta).toBe(0.15);
 
 		const unknown = collectJudgeSignals(makeBundle({ scenes }), GENERIC_SHORTS);
-		expect(unknown.tts.speedDelta).toBe(-0.05);
+		expect(unknown.tts.speedDelta).toBe(-0.1);
 	});
 
 	it("profileMatched — 정규화 비교, 미지정 시 false", () => {

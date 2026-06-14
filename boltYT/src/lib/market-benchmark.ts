@@ -98,6 +98,9 @@ interface FormatBase {
 	scriptChapterEverySec?: number;
 }
 
+/** 쇼츠 TTS 속도 하한 — 느리면 즉시 넘겨짐(성장 플레이북: 1.1~1.2x 권장). */
+const SHORTS_TTS_SPEED_FLOOR = 1.1;
+
 const FORMAT_BASE: Record<BenchmarkFormat, FormatBase> = {
 	shorts: {
 		editing: {
@@ -256,9 +259,15 @@ export function benchmarkFingerprint(
 function finalizeBenchmark(
 	core: Omit<MarketBenchmark, "fingerprint" | "updatedAt">,
 ): MarketBenchmark {
+	// 쇼츠 TTS 속도 하한을 builtin·learned·hybrid 모든 경로에 적용(느린 샘플 학습 방지).
+	// fingerprint 계산 전에 정규화해야 멱등 캐시 키도 하한값 기준으로 일치.
+	const normalized =
+		core.format === "shorts" && core.tts.speed < SHORTS_TTS_SPEED_FLOOR
+			? { ...core, tts: { ...core.tts, speed: SHORTS_TTS_SPEED_FLOOR } }
+			: core;
 	return {
-		...core,
-		fingerprint: benchmarkFingerprint(core),
+		...normalized,
+		fingerprint: benchmarkFingerprint(normalized),
 		updatedAt: new Date().toISOString(),
 	};
 }
@@ -295,6 +304,7 @@ export function getBuiltinBenchmark(
 			duckingDb: preset.duckingDb,
 			cueEverySec: base.bgmCueEverySec,
 		},
+		// 쇼츠 TTS 속도 하한은 finalizeBenchmark 에서 일괄 적용(builtin·learned 공통).
 		tts: { profile: preset.ttsProfile, speed: preset.ttsSpeed },
 		script: {
 			hookSec: base.scriptHookSec,

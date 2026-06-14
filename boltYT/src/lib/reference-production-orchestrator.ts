@@ -359,6 +359,21 @@ function buildDirectives(input: {
 			directive: `시장 상위 기준 충족: ${summarizeMarketBenchmark(marketBenchmark)}. 이 바에 못 미치는 컷 호흡·훅 길이·챕터 밀도는 저장 전에 보정`,
 		},
 		{
+			// 성장 플레이북(@anna): 같은 소재도 앵글에 따라 다른 콘텐츠
+			id: "narrative-angle",
+			label: "기획 앵글",
+			priority: "high",
+			directive: `"${topicTitle}"를 한 가지 평면적 요약이 아니라 명확한 시점/앵글로 풀 것(예: 당사자 시점 vs 전문가 분석 vs 갈등 구조). "시청자가 이 주제에서 무엇을 더 보고 싶어할까"를 기준으로 앵글을 선택`,
+		},
+		{
+			// 성장 플레이북(주언규): 도입부 감정 공감이 최대 레버
+			id: "viewer-journey",
+			label: "감정 곡선",
+			priority: "high",
+			directive:
+				"도입부 30초는 정보 전달 전에 '내 얘기 같다'는 감정 공감을 먼저 만들 것(2인칭 호명·보편 경험·열망/불안). 이후 공감 → 긴장 → 해결의 감정 곡선을 유지",
+		},
+		{
 			id: "thumbnail",
 			label: "썸네일",
 			priority: "high",

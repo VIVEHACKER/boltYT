@@ -92,6 +92,49 @@ const STORY_PATTERNS = [
 	/겪었/,
 ];
 
+/**
+ * 감정 공감 패턴 — 도입부가 "내 얘기 같다"는 정서적 관련성을 만드는지.
+ * 성장 플레이북(주언규/신사임당): 100만뷰 영상은 정보 전달 *전에* 도입부 30초에
+ * 공감을 유발한다. 2인칭 호명·1인칭 동질감·보편 경험·열망 자극이 신호.
+ */
+const EMPATHY_PATTERNS = [
+	// 2인칭 호명 / 보편 동질감
+	/(당신|여러분|너)도/,
+	/(우리|다들|모두)\s*(는|가)?/,
+	/(나|저)(도|만|는)\s/,
+	/내\s*얘기/,
+	/(혹시|한\s*번쯤)/,
+	/(겪어|느껴|당해|해)\s*(본|봤)/,
+	/공감/,
+	/비슷한\s*(경험|상황|적)/,
+	/솔직히/,
+	/(잖아요|잖아|않나요|않을까요|지\s*않나)/,
+	/그런\s*적\s*(있|없)/,
+	/누구나/,
+	// 열망/두려움 자극(개인화된 미래)
+	/(만약|이대로)\s*(가|라)?면/,
+	/(이러다|이렇게\s*살다)/,
+	/(후회|불안|걱정|막막)/,
+	// English
+	/\byou(r|'ve| have| ever)?\b/i,
+	/\bwe('ve| have| all)?\b/i,
+	/\bever (felt|been|wondered|had)\b/i,
+	/\b(relate|honestly|imagine if|what if you)\b/i,
+];
+
+/**
+ * 도입부 나레이션의 감정 공감 강도(0-1)를 결정론적으로 산출한다.
+ * 신호 1개=0.4, 2개=0.7, 3개+=1.0 (detectHookPattern 과 동일 calibration).
+ */
+export function detectEmpathyHook(narration: string): number {
+	if (!narration || narration.trim().length === 0) return 0;
+	const matches = countMatches(narration.trim(), EMPATHY_PATTERNS);
+	if (matches >= 3) return 1;
+	if (matches === 2) return 0.7;
+	if (matches === 1) return 0.4;
+	return 0;
+}
+
 function countMatches(text: string, patterns: RegExp[]): number {
 	return patterns.filter((p) => p.test(text)).length;
 }

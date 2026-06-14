@@ -193,7 +193,15 @@ export function qualityProfileToPromptContext(p: QualityProfile): string {
 	lines.push(
 		`- BGM: ${p.bgm.mood} 무드, 내레이션 구간 더킹 ${p.bgm.duckingDb}dB, 큐 플랜 ${p.bgm.cuePlan}`,
 		`- 내레이션 톤: ${p.tts.profile} 프로파일, 속도 ${p.tts.speed}x 를 전제로 문장 길이를 조절할 것`,
+		// 성장 플레이북: 도입부 감정 공감 + 미니멀 자막 스타일링 + 쇼츠 전후 비교 구조
+		"- 도입부 30초: 정보 전달 전에 '내 얘기 같다'는 감정 공감을 먼저 만들 것(2인칭 호명·보편 경험·열망/불안)",
+		"- 자막 스타일: 폰트 1개 + 강조 단어만 색 변경, 화면 중간 아래 배치(과한 꾸밈 금지)",
 	);
+	if (b.format === "shorts") {
+		lines.push(
+			"- 쇼츠 장면 구조: 가능하면 문제 → 사용/전개 → 결과(전후 대비)로 — '좋다'고 말하기보다 변화를 보여줄 것",
+		);
+	}
 	return lines.join("\n");
 }
 

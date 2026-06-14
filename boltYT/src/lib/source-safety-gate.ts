@@ -79,7 +79,9 @@ export function analyzeSourceSafety(
 ): SourceSafetyReport {
 	const issues: SourceSafetyIssue[] = [];
 	const requiredActions: string[] = [];
-	const articleCount = sources.filter((source) => source.type === "article").length;
+	const articleCount = sources.filter(
+		(source) => source.type === "article",
+	).length;
 	const videoCount = sources.filter((source) => source.type === "video").length;
 	const imageCount = sources.filter((source) => source.type === "image").length;
 	const scenesWithSource = scenes.filter((scene) => {
@@ -88,17 +90,21 @@ export function analyzeSourceSafety(
 	});
 	let unattributedVideoSceneCount = 0;
 	let syntheticShotCount = 0;
+	let videoSceneCount = 0;
 
 	scenes.forEach((scene, index) => {
 		const sourceIndex = sceneSourceIndex(scene);
 		const source = sourceIndex >= 0 ? sources[sourceIndex] : undefined;
-		const shotSyntheticCount = (scene.shots ?? []).filter(isSyntheticShot).length;
+		const shotSyntheticCount = (scene.shots ?? []).filter(
+			isSyntheticShot,
+		).length;
 		syntheticShotCount += shotSyntheticCount;
 		const hasVideo =
 			sceneType(scene) === "video" ||
 			source?.type === "video" ||
 			isVideoUrl(scene.source_url) ||
 			(scene.shots ?? []).some((shot) => isVideoUrl(shot.source_url));
+		if (hasVideo) videoSceneCount += 1;
 		const hasAttribution = Boolean(
 			scene.news_source || source?.publisher || source?.title,
 		);
@@ -120,7 +126,8 @@ export function analyzeSourceSafety(
 				code: "mixed_real_and_synthetic",
 				severity: "info",
 				sceneIndex: index + 1,
-				message: "실제 영상과 AI 재구성 컷이 섞였습니다. 업로드 설명에 재구성 고지가 필요할 수 있습니다.",
+				message:
+					"실제 영상과 AI 재구성 컷이 섞였습니다. 업로드 설명에 재구성 고지가 필요할 수 있습니다.",
 			});
 			pushAction(
 				requiredActions,
@@ -159,7 +166,8 @@ export function analyzeSourceSafety(
 		issues.push({
 			code: "low_scene_source_ratio",
 			severity: "critical",
-			message: "출처와 직접 연결된 씬 비율이 낮아 아무 자료나 붙인 영상처럼 보일 수 있습니다.",
+			message:
+				"출처와 직접 연결된 씬 비율이 낮아 아무 자료나 붙인 영상처럼 보일 수 있습니다.",
 		});
 		pushAction(
 			requiredActions,
@@ -167,8 +175,35 @@ export function analyzeSourceSafety(
 		);
 	}
 
-	const criticals = issues.filter((issue) => issue.severity === "critical").length;
-	const warnings = issues.filter((issue) => issue.severity === "warning").length;
+	// 성장 플레이북 안티패턴: 불펌 외부 영상 + TTS + 원본 제작/분석 없음 = 순수 재포장.
+	// 외부 영상 씬이 대부분이면서 AI 생성/재구성 컷도 없고, 영상 씬 대다수가 출처 미표시면 차단.
+	// (전역 articleCount 가 아니라 씬 단위 미귀속 신호로 판정 — 무관한 기사 1개로 우회 불가)
+	const videoSceneRatio =
+		scenes.length > 0 ? videoSceneCount / scenes.length : 0;
+	if (
+		scenes.length >= 4 &&
+		videoSceneRatio >= 0.7 &&
+		syntheticShotCount === 0 &&
+		unattributedVideoSceneCount >= Math.ceil(videoSceneCount * 0.6)
+	) {
+		issues.push({
+			code: "pure_repackaging",
+			severity: "critical",
+			message:
+				"외부 영상 재포장 의심 — 원본 제작/분석 없이 불펌 영상에 내레이션만 얹은 구조는 수익창출이 끊깁니다.",
+		});
+		pushAction(
+			requiredActions,
+			"원본 AI 생성/재구성 컷을 추가하거나, 자체 분석·해설·출처를 붙여 단순 재포장에서 벗어나세요.",
+		);
+	}
+
+	const criticals = issues.filter(
+		(issue) => issue.severity === "critical",
+	).length;
+	const warnings = issues.filter(
+		(issue) => issue.severity === "warning",
+	).length;
 	const score = Math.max(0, 100 - criticals * 32 - warnings * 9);
 
 	return {

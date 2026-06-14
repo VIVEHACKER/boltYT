@@ -14,7 +14,7 @@
 
 import type { BundleScene, ContentBundle } from "./content-bundle";
 import { segmentBundleIntoChapters } from "./content-bundle";
-import { detectHookPattern } from "./hook-detector";
+import { detectEmpathyHook, detectHookPattern } from "./hook-detector";
 import type { MarketBenchmark } from "./market-benchmark";
 import { detectPacing } from "./pacing-detect";
 import { analyzeOpeningRetention } from "./youtube-retention";
@@ -32,6 +32,8 @@ export interface EditingSignals {
 export interface ScriptSignals {
 	hookPattern: string;
 	hookSec: number;
+	/** 도입부 감정 공감 강도 0-1 — "내 얘기 같다"는 정서적 관련성(성장 플레이북 최대 레버) */
+	emotionalEmpathy: number;
 	structureRoles: string[];
 	chapterCount: number;
 	pacing: "slow" | "normal" | "fast";
@@ -267,6 +269,11 @@ export function collectJudgeSignals(
 
 	// --- script 신호 ---
 	const hookPattern = detectHookPattern(scenes[0]?.narration ?? "").pattern;
+	// 도입부 3줄(첫 2씬) 감정 공감 — 정보 전달 전 정서적 관련성을 만드는지
+	const emotionalEmpathy = Math.max(
+		detectEmpathyHook(scenes[0]?.narration ?? ""),
+		detectEmpathyHook(scenes[1]?.narration ?? ""),
+	);
 	// 첫 strong hook 씬의 시작 오프셋(초). 훅이 없으면 총 길이(최악값).
 	let hookSec = bundle.durationSec;
 	let offset = 0;
@@ -322,6 +329,7 @@ export function collectJudgeSignals(
 		script: {
 			hookPattern,
 			hookSec: roundTo(hookSec, 2),
+			emotionalEmpathy: roundTo(emotionalEmpathy, 2),
 			structureRoles: [...bundle.scriptStructure],
 			chapterCount,
 			pacing,
