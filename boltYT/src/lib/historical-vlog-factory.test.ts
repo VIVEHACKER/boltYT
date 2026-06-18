@@ -15,7 +15,7 @@ describe("planHistoricalVlogChannel — 기본 동작", () => {
 		const plan = planHistoricalVlogChannel(input());
 		expect(plan.host.channelId).toBe("chan-1");
 		expect(plan.hostIdentity.styleSeed).toBeGreaterThan(0);
-		expect(plan.hostReferencePrompt).toContain("reference sheet");
+		expect(plan.hostReferencePrompt).toContain("headshot");
 	});
 
 	it("시대 미지정 시 큐레이션 풀에서 자동 제안(4개)", () => {

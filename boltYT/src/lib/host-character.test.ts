@@ -89,11 +89,13 @@ describe("hostMediaLock — 미디어 생성 계약", () => {
 });
 
 describe("buildHostReferencePrompt", () => {
-	it("외형 + 다각도/표정 + 깔끔한 배경을 포함, 900자 이내", () => {
+	it("IP-Adapter용 단일 헤드샷 — 외형 + 정면 얼굴 + 깔끔한 배경, 900자 이내", () => {
 		const prompt = buildHostReferencePrompt(buildHostIdentity(sampleHost()));
-		expect(prompt).toContain("reference sheet");
+		expect(prompt).toContain("headshot");
 		expect(prompt).toContain("dark brown hair");
-		expect(prompt).toContain("front view");
+		expect(prompt).toContain("looking straight at the camera");
+		// 멀티뷰 시트가 아니어야 함(IP-Adapter는 단일 얼굴이 최적)
+		expect(prompt).not.toContain("side view");
 		expect(prompt.length).toBeLessThanOrEqual(900);
 	});
 });

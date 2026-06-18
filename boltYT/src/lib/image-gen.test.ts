@@ -263,6 +263,67 @@ describe("fal image provider", () => {
 	});
 });
 
+// ─── ComfyUI IP-Adapter face-lock ─────────────────────────────────────────────
+describe("comfyui IP-Adapter face-lock", () => {
+	it("referenceImagePath 있으면 업로드 + IPAdapterAdvanced 워크플로로 생성", async () => {
+		mockStorage.setItem("image_gen_active", "comfyui");
+		const calls: string[] = [];
+		const fetchMock = vi.fn().mockImplementation((u: string) => {
+			const s = String(u);
+			calls.push(s);
+			if (s.includes("/upload/image"))
+				return Promise.resolve({
+					ok: true,
+					json: () => Promise.resolve({ name: "ipref_x.png" }),
+				});
+			if (s.includes("/prompt"))
+				return Promise.resolve({
+					ok: true,
+					json: () => Promise.resolve({ prompt_id: "pid-ip" }),
+				});
+			if (s.includes("/history/pid-ip"))
+				return Promise.resolve({
+					ok: true,
+					json: () =>
+						Promise.resolve({
+							"pid-ip": {
+								outputs: {
+									"9": {
+										images: [
+											{ filename: "o.png", subfolder: "", type: "output" },
+										],
+									},
+								},
+							},
+						}),
+				});
+			if (s.includes("/view"))
+				return Promise.resolve({
+					ok: true,
+					arrayBuffer: () => Promise.resolve(new Uint8Array([1, 2]).buffer),
+				});
+			return Promise.resolve({ ok: false, status: 404 });
+		});
+		vi.stubGlobal("fetch", fetchMock);
+		const result = await generateImage(
+			"scene-ip",
+			"ancient rome forum",
+			"comfyui",
+			undefined,
+			{
+				referenceImagePath: "channels/c/host/h/reference-sheet.png",
+				aspectRatio: "16:9",
+			},
+		);
+		expect(result.provider).toBe("comfyui");
+		expect(calls.some((c) => c.includes("/upload/image"))).toBe(true);
+		const promptCall = fetchMock.mock.calls.find((c) =>
+			String(c[0]).includes("/prompt"),
+		);
+		expect(String(promptCall?.[1]?.body)).toContain("IPAdapterAdvanced");
+	});
+});
+
 // ─── generateImage / generateImageToPath ─────────────────────────────────────
 describe("generateImage", () => {
 	// 유효한 최소 base64 — atob 테스트용

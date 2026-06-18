@@ -116,18 +116,18 @@ export function hostMediaLock(identity: HostIdentity): HostMediaLock {
 }
 
 /**
- * 호스트 레퍼런스 시트 생성 프롬프트 — 채널당 1회. 이후 모든 에피소드가 이 시트를 참조.
- * 다양한 각도/표정을 한 장에 담아 후속 I2V/이미지 생성의 정체성 앵커로 쓴다.
+ * 호스트 레퍼런스 포트레이트 생성 프롬프트 — 채널당 1회. 이후 모든 에피소드가 이 얼굴을 참조.
+ * IP-Adapter face-lock 최적화: 멀티뷰 시트가 아니라 *단일 정면 헤드샷*(얼굴 중심)으로 만든다.
+ * 의상/배경 신호를 최소화해야 IP-Adapter 가 옷·배경을 끌고 오지 않고 *얼굴만* 고정한다.
  */
 export function buildHostReferencePrompt(identity: HostIdentity): string {
 	const { host } = identity;
 	const parts = [
-		"character reference sheet, same single person shown multiple times",
+		"photorealistic studio headshot portrait of one single person",
 		host.appearance,
-		`wearing ${host.baseWardrobe}`,
-		`${host.name} shown in front view, three-quarter view, and side view; neutral expression, happy expression, shocked expression`,
-		"consistent face, age, hair, and build across all views",
-		"clean neutral studio background, even lighting, photorealistic, no text, no logo, no watermark",
+		"head and shoulders, neutral friendly expression, looking straight at the camera",
+		"plain neutral grey background, soft even lighting, sharp focus, photorealistic",
+		"no text, no logo, no watermark",
 	];
 	return clampWords(parts.filter(Boolean).join(", "), 900);
 }

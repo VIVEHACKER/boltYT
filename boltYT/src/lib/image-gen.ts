@@ -214,28 +214,29 @@ async function generateWithComfyUI(
 	const ckpt = localStorage.getItem("comfyui_ckpt");
 	if (ckpt) workflow["4"].inputs.ckpt_name = ckpt;
 
-	// 프롬프트 제출
+	return runComfyUIWorkflow(workflow);
+}
+
+/** ComfyUI 워크플로 제출 → 완료 폴링 → 이미지 ArrayBuffer. (txt2img·IP-Adapter 공통) */
+async function runComfyUIWorkflow(
+	workflow: Record<string, unknown>,
+): Promise<ArrayBuffer> {
 	const queueRes = await fetch("http://localhost:8188/prompt", {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
 		body: JSON.stringify({ prompt: workflow }),
 	});
-
 	if (!queueRes.ok) throw new Error(`ComfyUI queue failed: ${queueRes.status}`);
 	const { prompt_id } = await queueRes.json();
 
-	// 완료 대기 (폴링)
-	for (let i = 0; i < 120; i++) {
+	// 완료 대기 (폴링) — IP-Adapter 포함 SDXL 은 최대 ~3분.
+	for (let i = 0; i < 180; i++) {
 		await new Promise((r) => setTimeout(r, 1000));
-
 		const histRes = await fetch(`http://localhost:8188/history/${prompt_id}`);
 		if (!histRes.ok) continue;
-
 		const hist = await histRes.json();
 		const result = hist[prompt_id];
 		if (!result?.outputs) continue;
-
-		// 이미지 추출
 		const output = Object.values(result.outputs)[0] as {
 			images?: Array<{ filename: string; subfolder: string; type: string }>;
 		};
@@ -247,8 +248,131 @@ async function generateWithComfyUI(
 			if (imgRes.ok) return imgRes.arrayBuffer();
 		}
 	}
+	throw new Error("ComfyUI generation timed out (180s)");
+}
 
-	throw new Error("ComfyUI generation timed out (120s)");
+// ─── ComfyUI + IP-Adapter face-lock (호스트 얼굴 고정, 무료 로컬) ───
+// 검증된 설정: weight 0.6 / end_at 0.7 / "ease in-out" → 얼굴 고정 + 씬은 프롬프트가 주도.
+
+const IPADAPTER_DEFAULTS = {
+	ipadapterFile: "sdxl_models/ip-adapter-plus_sdxl_vit-h.safetensors",
+	clipVision: "CLIP-ViT-H-14-laion2B-s32B-b79K.safetensors",
+	weight: 0.6,
+	endAt: 0.7,
+	weightType: "ease in-out",
+};
+
+/** IndexedDB 의 레퍼런스 이미지를 ComfyUI input 으로 업로드 → 업로드된 파일명 반환. */
+async function uploadReferenceToComfyUI(
+	referenceImagePath: string,
+): Promise<string> {
+	const bytes = await loadLocalFileData(referenceImagePath);
+	if (!bytes) throw new Error(`reference image not found: ${referenceImagePath}`);
+	const name = `ipref_${referenceImagePath.replace(/[^a-zA-Z0-9]+/g, "_").slice(-80)}.png`;
+	const form = new FormData();
+	form.append("image", new Blob([bytes], { type: "image/png" }), name);
+	form.append("overwrite", "true");
+	const res = await fetch("http://localhost:8188/upload/image", {
+		method: "POST",
+		body: form,
+	});
+	if (!res.ok) throw new Error(`ComfyUI upload failed: ${res.status}`);
+	const data = await res.json();
+	return (data.name as string) ?? name;
+}
+
+async function generateWithComfyUIIPAdapter(
+	prompt: string,
+	options: ImageGenerationOptions,
+): Promise<ArrayBuffer> {
+	if (!options.referenceImagePath) {
+		throw new Error("IP-Adapter requires referenceImagePath");
+	}
+	const imageName = await uploadReferenceToComfyUI(options.referenceImagePath);
+	const dims = imageDims(options.aspectRatio);
+	const ckpt =
+		localStorage.getItem("comfyui_ckpt") ?? "sd_xl_base_1.0.safetensors";
+	const weight = Number(
+		localStorage.getItem("ipadapter_weight") ?? IPADAPTER_DEFAULTS.weight,
+	);
+	const endAt = Number(
+		localStorage.getItem("ipadapter_end_at") ?? IPADAPTER_DEFAULTS.endAt,
+	);
+	const weightType =
+		localStorage.getItem("ipadapter_weight_type") ??
+		IPADAPTER_DEFAULTS.weightType;
+	const negative =
+		options.negativePrompt ??
+		`${DEFAULT_NEGATIVE_PROMPT}, multiple people, different face`;
+
+	const workflow: Record<string, unknown> = {
+		"4": {
+			class_type: "CheckpointLoaderSimple",
+			inputs: { ckpt_name: ckpt },
+		},
+		"10": {
+			class_type: "IPAdapterModelLoader",
+			inputs: {
+				ipadapter_file:
+					localStorage.getItem("ipadapter_file") ??
+					IPADAPTER_DEFAULTS.ipadapterFile,
+			},
+		},
+		"11": {
+			class_type: "CLIPVisionLoader",
+			inputs: {
+				clip_name:
+					localStorage.getItem("comfyui_clip_vision") ??
+					IPADAPTER_DEFAULTS.clipVision,
+			},
+		},
+		"12": { class_type: "LoadImage", inputs: { image: imageName } },
+		"13": {
+			class_type: "IPAdapterAdvanced",
+			inputs: {
+				model: ["4", 0],
+				ipadapter: ["10", 0],
+				image: ["12", 0],
+				clip_vision: ["11", 0],
+				weight,
+				weight_type: weightType,
+				combine_embeds: "concat",
+				start_at: 0.0,
+				end_at: endAt,
+				embeds_scaling: "V only",
+			},
+		},
+		"5": {
+			class_type: "EmptyLatentImage",
+			inputs: { width: dims.width, height: dims.height, batch_size: 1 },
+		},
+		"6": { class_type: "CLIPTextEncode", inputs: { text: prompt, clip: ["4", 1] } },
+		"7": {
+			class_type: "CLIPTextEncode",
+			inputs: { text: negative, clip: ["4", 1] },
+		},
+		"3": {
+			class_type: "KSampler",
+			inputs: {
+				seed: normalizeSeed(options.seed),
+				steps: 40,
+				cfg: 6.5,
+				sampler_name: "dpmpp_2m",
+				scheduler: "karras",
+				denoise: 1,
+				model: ["13", 0],
+				positive: ["6", 0],
+				negative: ["7", 0],
+				latent_image: ["5", 0],
+			},
+		},
+		"8": { class_type: "VAEDecode", inputs: { samples: ["3", 0], vae: ["4", 2] } },
+		"9": {
+			class_type: "SaveImage",
+			inputs: { filename_prefix: "boltyt_host", images: ["8", 0] },
+		},
+	};
+	return runComfyUIWorkflow(workflow);
 }
 
 // ─── Automatic1111 이미지 생성 ───
@@ -466,8 +590,9 @@ function providerFallbackOrder(
 ): ImageGenProvider[] {
 	const needsReference = Boolean(options?.referenceImagePath);
 	if (needsReference) {
-		// img2img(레퍼런스 시트 face-lock)는 로컬 A1111 만 지원 → 우선. 이후 FAL(seed)→DALL-E.
-		if (provider === "comfyui") return ["a1111", "comfyui", "fal", "dalle"];
+		// 레퍼런스 face-lock: ComfyUI(IP-Adapter, 무료·검증됨) 우선 → A1111 img2img → FAL(seed)→DALL-E.
+		// comfyui 가 active 일 때만 선두(아니면 미실행 가능성 → 헛시도 방지).
+		if (provider === "comfyui") return ["comfyui", "a1111", "fal", "dalle"];
 		if (provider === "a1111") return ["a1111", "fal", "dalle"];
 		return ["a1111", "fal", "dalle"];
 	}
@@ -510,7 +635,10 @@ async function generateImageInternal(
 			let buffer: ArrayBuffer;
 			switch (p) {
 				case "comfyui":
-					buffer = await generateWithComfyUI(promptStyle, options);
+					// 레퍼런스(호스트 시트) 있으면 IP-Adapter face-lock, 없으면 일반 txt2img.
+					buffer = options?.referenceImagePath
+						? await generateWithComfyUIIPAdapter(promptStyle, options)
+						: await generateWithComfyUI(promptStyle, options);
 					break;
 				case "a1111":
 					if (options?.referenceImagePath) {
