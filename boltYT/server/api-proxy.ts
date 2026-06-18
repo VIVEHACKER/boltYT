@@ -4,7 +4,7 @@
  * 실행: npx tsx server/api-proxy.ts
  */
 
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
 import { createServer } from "node:http";
 import { join } from "node:path";
@@ -100,6 +100,65 @@ function reloadKeys() {
 	KEYS.naverClientId = process.env.NAVER_CLIENT_ID ?? "";
 	KEYS.naverClientSecret = process.env.NAVER_CLIENT_SECRET ?? "";
 	KEYS.fal = process.env.FAL_KEY ?? "";
+}
+
+// ─── 구독(Claude) LLM 백엔드 ───
+// LLM_BACKEND=claude 면 /api/openai/chat 을 OpenAI API 대신 로컬 `claude` CLI 로 처리.
+// Claude Max 구독으로 대본 생성을 종량제 비용 0원으로 구동(API 키 불필요).
+function llmBackend(): string {
+	return (process.env.LLM_BACKEND ?? "").trim().toLowerCase();
+}
+
+/** ```json ... ``` 펜스 제거 → 순수 JSON 텍스트. */
+function stripJsonFences(text: string): string {
+	const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+	return (fenced ? fenced[1] : text).trim();
+}
+
+/**
+ * 로컬 claude CLI 한 방 질의(print 모드). 프롬프트는 인자로 전달(spawn, no-shell → 인젝션 안전).
+ * 속도: 사용자 전역 훅(SessionStart 등)이 ~120s 행을 유발 → `--setting-sources project` 로 스킵(~3s).
+ *       MCP 서버도 `--strict-mcp-config --mcp-config {}` 로 비활성(불필요한 연결 제거). OAuth 구독 인증은 유지.
+ */
+function runClaudeCli(prompt: string, model: string): Promise<string> {
+	return new Promise((resolve, reject) => {
+		const child = spawn(
+			"claude",
+			[
+				"--setting-sources",
+				"project",
+				"--strict-mcp-config",
+				"--mcp-config",
+				'{"mcpServers":{}}',
+				"--model",
+				model,
+				"-p",
+				prompt,
+			],
+			{ stdio: ["ignore", "pipe", "pipe"] },
+		);
+		let out = "";
+		let err = "";
+		const timer = setTimeout(() => {
+			child.kill("SIGKILL");
+			reject(new Error("claude CLI timeout (180s)"));
+		}, 180_000);
+		child.stdout.on("data", (d) => {
+			out += d.toString();
+		});
+		child.stderr.on("data", (d) => {
+			err += d.toString();
+		});
+		child.on("error", (e) => {
+			clearTimeout(timer);
+			reject(e);
+		});
+		child.on("close", (code) => {
+			clearTimeout(timer);
+			if (code === 0) resolve(out.trim());
+			else reject(new Error(`claude CLI exit ${code}: ${err.slice(0, 300)}`));
+		});
+	});
 }
 
 function publicOpenAiRuntimeHealth() {
@@ -1444,13 +1503,62 @@ const server = createServer(async (req, res) => {
 
 	// ─── OpenAI Chat Completions ───
 	if (url.pathname === "/api/openai/chat" && req.method === "POST") {
-		if (!requireKey(req, res, KEYS.openai, "OpenAI")) return;
-		if (rejectOpenAiCooldown(req, res, "api-proxy:chat")) return;
 		const body = await parseBody(req);
 		if (body === null) {
 			json(req, res, 413, { error: "요청 본문이 너무 큽니다 (최대 1MB)" });
 			return;
 		}
+
+		// 구독(Claude Max) 백엔드 — 종량제 OpenAI API 대신 로컬 claude CLI(비용 0원).
+		if (llmBackend() === "claude") {
+			try {
+				const messages = Array.isArray(body.messages)
+					? (body.messages as Array<{ role?: string; content?: string }>)
+					: [];
+				const system = messages
+					.filter((m) => m.role === "system")
+					.map((m) => m.content ?? "")
+					.join("\n\n");
+				const user = messages
+					.filter((m) => m.role !== "system")
+					.map((m) => m.content ?? "")
+					.join("\n\n");
+				const wantJson =
+					(body.response_format as { type?: string } | undefined)?.type ===
+					"json_object";
+				const prompt = [
+					system,
+					user,
+					wantJson
+						? "Output ONLY valid JSON matching the request. No markdown code fences, no commentary."
+						: "",
+				]
+					.filter((p) => p.trim().length > 0)
+					.join("\n\n");
+				const model = process.env.CLAUDE_MODEL?.trim() || "sonnet";
+				const raw = await runClaudeCli(prompt, model);
+				const content = wantJson ? stripJsonFences(raw) : raw;
+				json(req, res, 200, {
+					model: `claude-${model}`,
+					choices: [
+						{
+							index: 0,
+							message: { role: "assistant", content },
+							finish_reason: "stop",
+						},
+					],
+				});
+			} catch (e) {
+				log.error("claude chat exception", { error: (e as Error).message });
+				json(req, res, 500, {
+					error: e instanceof Error ? e.message : "claude backend error",
+				});
+			}
+			return;
+		}
+
+		if (!requireKey(req, res, KEYS.openai, "OpenAI")) return;
+		if (rejectOpenAiCooldown(req, res, "api-proxy:chat")) return;
 
 		try {
 			const upstream = await fetchWithRetry(
