@@ -262,12 +262,42 @@ const IPADAPTER_DEFAULTS = {
 	weightType: "ease in-out",
 };
 
-/** IndexedDB 의 레퍼런스 이미지를 ComfyUI input 으로 업로드 → 업로드된 파일명 반환. */
+/**
+ * 레퍼런스를 *얼굴 영역*으로 크롭 — IP-Adapter 가 의상/배경까지 전이하는 누수 방지.
+ * (검증: 얼굴 크롭 시 시대 의상[토가 등]이 프롬프트대로 살아나고 얼굴은 그대로 고정.)
+ * 브라우저(OffscreenCanvas) 에서만 크롭, 그 외(테스트/노드)는 원본 그대로 반환(무회귀).
+ */
+async function cropToFace(bytes: ArrayBuffer): Promise<ArrayBuffer> {
+	try {
+		if (
+			typeof createImageBitmap !== "function" ||
+			typeof OffscreenCanvas === "undefined"
+		) {
+			return bytes;
+		}
+		const bmp = await createImageBitmap(new Blob([bytes], { type: "image/png" }));
+		const cw = Math.round(bmp.width * 0.58);
+		const ch = Math.round(bmp.height * 0.58);
+		const cx = Math.round((bmp.width - cw) / 2);
+		const cy = Math.round(bmp.height * 0.06);
+		const canvas = new OffscreenCanvas(cw, ch);
+		const ctx = canvas.getContext("2d");
+		if (!ctx) return bytes;
+		ctx.drawImage(bmp, cx, cy, cw, ch, 0, 0, cw, ch);
+		const blob = await canvas.convertToBlob({ type: "image/png" });
+		return await blob.arrayBuffer();
+	} catch {
+		return bytes; // 크롭 실패 → 원본 업로드
+	}
+}
+
+/** IndexedDB 의 레퍼런스 이미지를 얼굴 크롭 후 ComfyUI input 으로 업로드 → 업로드된 파일명 반환. */
 async function uploadReferenceToComfyUI(
 	referenceImagePath: string,
 ): Promise<string> {
-	const bytes = await loadLocalFileData(referenceImagePath);
-	if (!bytes) throw new Error(`reference image not found: ${referenceImagePath}`);
+	const raw = await loadLocalFileData(referenceImagePath);
+	if (!raw) throw new Error(`reference image not found: ${referenceImagePath}`);
+	const bytes = await cropToFace(raw);
 	const name = `ipref_${referenceImagePath.replace(/[^a-zA-Z0-9]+/g, "_").slice(-80)}.png`;
 	const form = new FormData();
 	form.append("image", new Blob([bytes], { type: "image/png" }), name);
