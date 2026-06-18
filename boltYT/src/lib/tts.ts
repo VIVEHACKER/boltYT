@@ -192,6 +192,36 @@ export const ELEVENLABS_DEFAULT_VOICES: TtsVoice[] = [
 		description: "성숙한 여성, 차분하고 신뢰감",
 		korean: true,
 	},
+	// ── 한국어 네이티브 보이스(ElevenLabs 라이브러리) ──
+	// 무료 티어는 402(유료 필요). Starter($5/mo+) 전환 시 즉시 선택 가능 — 영어 음색이 아닌 진짜 한국어 발음.
+	{
+		id: "YDseIkMzKtO5bK1Ehnev",
+		name: "Hanabad (한국어)",
+		provider: "elevenlabs",
+		description: "한국어 네이티브 여성, 차분·친근 — 브이로그 추천 (유료)",
+		korean: true,
+	},
+	{
+		id: "uD0jH1cfRqteeku18ODi",
+		name: "Jiana (한국어)",
+		provider: "elevenlabs",
+		description: "한국어 네이티브 여성, 또렷한 — 정보전달 (유료)",
+		korean: true,
+	},
+	{
+		id: "abvGngm3lj2e4QONbyCH",
+		name: "Gogh Lee (한국어)",
+		provider: "elevenlabs",
+		description: "한국어 네이티브 남성, 스토리텔링 (유료)",
+		korean: true,
+	},
+	{
+		id: "cuXUjH0CSJkKipo0Hy9i",
+		name: "Hyunsu (한국어)",
+		provider: "elevenlabs",
+		description: "한국어 네이티브 남성, 팟캐스트 톤 (유료)",
+		korean: true,
+	},
 ];
 
 /**
@@ -232,9 +262,11 @@ export function getDefaultVoice(): {
 			? localStorage.getItem("tts_speed")
 			: null;
 	return {
-		voice: storedVoice ?? "sage",
-		provider: (storedProvider as TtsProvider) ?? "openai",
-		speed: Number(storedSpeed ?? "0.97"),
+		// 기본 ElevenLabs(유튜버 표준·고품질). 이 환경에선 OpenAI 가 빌링 한도라 ElevenLabs 가 기본.
+		// 무료 티어는 클래식 보이스(Bella)만 — 한국어 네이티브(Hanabad 등)는 유료 플랜에서 선택.
+		voice: storedVoice ?? "EXAVITQu4vr4xnSDxMaL",
+		provider: (storedProvider as TtsProvider) ?? "elevenlabs",
+		speed: Number(storedSpeed ?? "1.0"),
 	};
 }
 

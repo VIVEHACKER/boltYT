@@ -324,11 +324,11 @@ describe("inferNarrationEndingHoldSeconds", () => {
 // ─── localStorage TTS 설정 ────────────────────────────────────────────────────
 
 describe("getDefaultVoice / setDefaultVoice / hasStoredTtsSettings", () => {
-	it("localStorage 없을 때 → 기본값 반환", () => {
+	it("localStorage 없을 때 → 기본값(ElevenLabs Bella) 반환", () => {
 		expect(getDefaultVoice()).toEqual({
-			voice: "sage",
-			provider: "openai",
-			speed: 0.97,
+			voice: "EXAVITQu4vr4xnSDxMaL",
+			provider: "elevenlabs",
+			speed: 1.0,
 		});
 	});
 
