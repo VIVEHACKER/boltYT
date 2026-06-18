@@ -88,6 +88,8 @@ const KEYS = {
 	naverClientId: "",
 	naverClientSecret: "",
 	fal: "",
+	clovaId: "",
+	clovaSecret: "",
 };
 
 function reloadKeys() {
@@ -100,6 +102,9 @@ function reloadKeys() {
 	KEYS.naverClientId = process.env.NAVER_CLIENT_ID ?? "";
 	KEYS.naverClientSecret = process.env.NAVER_CLIENT_SECRET ?? "";
 	KEYS.fal = process.env.FAL_KEY ?? "";
+	// CLOVA Voice(NCP) — 한국어 네이티브 TTS. NCP API Gateway 키(검색용 NAVER 키와 별개).
+	KEYS.clovaId = process.env.CLOVA_API_KEY_ID ?? "";
+	KEYS.clovaSecret = process.env.CLOVA_API_KEY ?? "";
 }
 
 // ─── 구독(Claude) LLM 백엔드 ───
@@ -187,6 +192,7 @@ function keyStatusPayload() {
 	return {
 		openai: Boolean(KEYS.openai),
 		elevenlabs: Boolean(KEYS.elevenlabs),
+		clova: Boolean(KEYS.clovaId && KEYS.clovaSecret),
 		pexels: Boolean(KEYS.pexels),
 		pixabay: Boolean(KEYS.pixabay),
 		youtube: Boolean(KEYS.youtube),
@@ -1827,6 +1833,66 @@ const server = createServer(async (req, res) => {
 			log.error("ElevenLabs exception", { error: (e as Error).message });
 			json(req, res, 500, {
 				error: e instanceof Error ? e.message : "ElevenLabs proxy error",
+			});
+		}
+		return;
+	}
+
+	// ─── CLOVA Voice (NCP) TTS — 한국어 네이티브 ───
+	if (url.pathname === "/api/clova/tts" && req.method === "POST") {
+		if (!KEYS.clovaId || !KEYS.clovaSecret) {
+			json(req, res, 401, {
+				error:
+					"CLOVA Voice 키 없음 — NCP CLOVA Voice 발급 후 CLOVA_API_KEY_ID / CLOVA_API_KEY 설정 필요",
+			});
+			return;
+		}
+		const body = await parseBody(req);
+		if (body === null) {
+			json(req, res, 413, { error: "요청 본문이 너무 큽니다 (최대 1MB)" });
+			return;
+		}
+		try {
+			const b = body as {
+				speaker?: string;
+				text?: string;
+				speed?: number;
+				volume?: number;
+				pitch?: number;
+				format?: string;
+			};
+			const form = new URLSearchParams({
+				speaker: b.speaker || "nara",
+				text: String(b.text ?? ""),
+				volume: String(b.volume ?? 0),
+				speed: String(b.speed ?? 0),
+				pitch: String(b.pitch ?? 0),
+				format: b.format || "mp3",
+			});
+			const upstream = await fetchWithRetry(
+				"https://naveropenapi.apigw.ntruss.com/tts-premium/v1/tts",
+				{
+					method: "POST",
+					headers: {
+						"X-NCP-APIGW-API-KEY-ID": KEYS.clovaId,
+						"X-NCP-APIGW-API-KEY": KEYS.clovaSecret,
+						"Content-Type": "application/x-www-form-urlencoded",
+					},
+					body: form.toString(),
+				},
+				{ timeout: 60_000 },
+			);
+			if (!upstream.ok) {
+				const err = await upstream.text();
+				log.error("CLOVA TTS error", { status: upstream.status });
+				json(req, res, upstream.status, { error: err });
+				return;
+			}
+			streamUpstreamBody(req, res, upstream, "audio/mpeg");
+		} catch (e) {
+			log.error("CLOVA TTS exception", { error: (e as Error).message });
+			json(req, res, 500, {
+				error: e instanceof Error ? e.message : "CLOVA proxy error",
 			});
 		}
 		return;

@@ -10,7 +10,7 @@ import { supabase } from "./supabase";
 
 // ─── 타입 ───
 
-export type TtsProvider = "openai" | "elevenlabs";
+export type TtsProvider = "openai" | "elevenlabs" | "clova";
 export type OpenAiTtsModel = "tts-1" | "tts-1-hd" | "gpt-4o-mini-tts";
 
 type NarrationProfile = "suspense" | "news" | "warm" | "upbeat" | "neutral";
@@ -225,20 +225,68 @@ export const ELEVENLABS_DEFAULT_VOICES: TtsVoice[] = [
 ];
 
 /**
+ * CLOVA Voice(NCP) 한국어 네이티브 보이스 — 한국 유튜버 다수 사용, 발음 자연스러움.
+ * NCP CLOVA Voice 발급 후 CLOVA_API_KEY_ID/CLOVA_API_KEY 설정 시 사용(유료, 무료 크레딧).
+ */
+export const CLOVA_VOICES: TtsVoice[] = [
+	{
+		id: "nara",
+		name: "나라 (CLOVA)",
+		provider: "clova",
+		description: "한국어 여성, 밝고 또렷 — 기본 추천",
+		korean: true,
+	},
+	{
+		id: "nyejin",
+		name: "예진 (CLOVA)",
+		provider: "clova",
+		description: "한국어 여성, 차분·감성 — 브이로그 추천",
+		korean: true,
+	},
+	{
+		id: "nminyoung",
+		name: "민영 (CLOVA)",
+		provider: "clova",
+		description: "한국어 여성, 차분한 안내",
+		korean: true,
+	},
+	{
+		id: "mijin",
+		name: "미진 (CLOVA)",
+		provider: "clova",
+		description: "한국어 여성, 표준",
+		korean: true,
+	},
+	{
+		id: "jinho",
+		name: "진호 (CLOVA)",
+		provider: "clova",
+		description: "한국어 남성, 표준 나레이션",
+		korean: true,
+	},
+];
+
+/**
  * 사용 가능한 모든 음성 목록
  * — 호출자가 현재 api-proxy의 ElevenLabs 키 활성 여부(useApiKeys)를 넘겨야 함
  */
-export function getAvailableVoices(elevenLabsEnabled = false): TtsVoice[] {
+export function getAvailableVoices(
+	elevenLabsEnabled = false,
+	clovaEnabled = false,
+): TtsVoice[] {
 	const voices = [...OPENAI_VOICES];
 	if (elevenLabsEnabled) {
 		voices.push(...ELEVENLABS_DEFAULT_VOICES);
+	}
+	if (clovaEnabled) {
+		voices.push(...CLOVA_VOICES);
 	}
 	return voices;
 }
 
 /** 특정 음성 찾기 */
 export function findVoice(voiceId: string): TtsVoice | undefined {
-	return [...OPENAI_VOICES, ...ELEVENLABS_DEFAULT_VOICES].find(
+	return [...OPENAI_VOICES, ...ELEVENLABS_DEFAULT_VOICES, ...CLOVA_VOICES].find(
 		(v) => v.id === voiceId,
 	);
 }
@@ -744,6 +792,31 @@ async function callElevenLabsTts(
 	return res.arrayBuffer();
 }
 
+async function callClovaTts(
+	text: string,
+	voice: string,
+	speed: number,
+): Promise<ArrayBuffer> {
+	const proxy = getApiProxyUrl();
+	// CLOVA speed: -5(빠름)~5(느림), 0=기본. 앱 배속(1.0=기본)을 반전 매핑.
+	const clovaSpeed = Math.max(-5, Math.min(5, Math.round((1 - speed) * 10)));
+	const res = await fetch(`${proxy}/api/clova/tts`, {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({
+			speaker: voice,
+			text,
+			speed: clovaSpeed,
+			format: "mp3",
+		}),
+	});
+	if (!res.ok) {
+		const err = await res.text();
+		throw new Error(`CLOVA TTS 오류: ${res.status} ${err}`);
+	}
+	return res.arrayBuffer();
+}
+
 /** 통합 TTS 단일 청크 생성 */
 export async function generateTtsChunk(
 	text: string,
@@ -754,6 +827,9 @@ export async function generateTtsChunk(
 	const voice = options?.voice ?? defaults.voice;
 	const speed = options?.speed ?? defaults.speed;
 
+	if (provider === "clova") {
+		return callClovaTts(text, voice, speed);
+	}
 	if (provider === "elevenlabs") {
 		return callElevenLabsTts(text, voice, speed, options);
 	}
