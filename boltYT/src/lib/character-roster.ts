@@ -158,6 +158,32 @@ export function buildRosterAnchorString(
 }
 
 /**
+ * 다중 캐릭터 '전체 출연진 고정' 지시문 — 등장 캐릭터 전원의 잠긴 외형을 한 줄로.
+ * 씬별 캐릭터 지정 데이터가 없어도(현재 파이프라인은 씬→캐릭터 매핑이 없음) 전체 캐스트를
+ * 프롬프트에 명시해 생성기가 출연진 전원을 일관 유지하게 한다(경쟁사 핵심 기법).
+ * HostCharacter 가 아니라 {name, appearance} 최소 형태를 받아 AnimationBible.characters 등
+ * 다른 소스에도 그대로 쓸 수 있다. 길이를 cap 해 프롬프트 예산을 침범하지 않는다.
+ * 캐릭터가 0~1명이면 "전체 출연진" 개념이 무의미하므로 빈 문자열을 반환한다.
+ */
+export function buildCastDirective(
+	characters: ReadonlyArray<{ name: string; appearance: string }>,
+): string {
+	const entries = characters
+		.map((c) => {
+			const name = nonEmpty(c.name);
+			const appearance = clampWords(nonEmpty(c.appearance), 80);
+			if (name && appearance) return `${name} — ${appearance}`;
+			return name || appearance;
+		})
+		.filter((entry) => entry.length > 0);
+	if (entries.length < 2) return "";
+	return clampWords(
+		`Keep every recurring character visually identical across all shots and episodes: ${entries.join("; ")}.`,
+		500,
+	);
+}
+
+/**
  * 씬 비주얼 프롬프트에 **로스터 잠금**을 적용한다 — 이 모듈의 production 진입점.
  *   1. sceneIndex 로 이번 씬 캐릭터를 결정론 선택
  *   2. 그 캐릭터의 정체성(시드/레퍼런스 시트)으로 host continuity 잠금

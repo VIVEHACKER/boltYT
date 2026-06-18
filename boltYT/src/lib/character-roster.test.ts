@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
 	applyRosterToScenePrompt,
+	buildCastDirective,
 	buildCharacterIdentity,
 	buildCharacterRoster,
 	buildCharacterVisualAnchor,
@@ -228,5 +229,39 @@ describe("applyRosterToScenePrompt", () => {
 		const roster: ChannelCharacterRoster = singleHostRoster(aria);
 		const { prompt } = applyRosterToScenePrompt(RAW, roster, 0);
 		expect(prompt).toContain("sunny meadow");
+	});
+});
+
+describe("buildCastDirective", () => {
+	it("2명 이상이면 전원 외형을 나열한다", () => {
+		const d = buildCastDirective([
+			{ name: "Aria", appearance: "woman, dark hair" },
+			{ name: "Marco", appearance: "man, glasses" },
+		]);
+		expect(d).toContain("Aria — woman, dark hair");
+		expect(d).toContain("Marco — man, glasses");
+		expect(d).toContain("visually identical");
+	});
+
+	it("0~1명이면 빈 문자열(전체 출연진 개념 없음)", () => {
+		expect(buildCastDirective([])).toBe("");
+		expect(buildCastDirective([{ name: "Aria", appearance: "solo" }])).toBe("");
+	});
+
+	it("HostCharacter 아닌 {name, appearance} 최소 형태도 받는다(애니 bible 등)", () => {
+		const d = buildCastDirective([
+			{ name: "루", appearance: "round robot, yellow raincoat" },
+			{ name: "냥", appearance: "black cat, red scarf" },
+		]);
+		expect(d).toContain("루 — round robot, yellow raincoat");
+		expect(d).toContain("냥 — black cat, red scarf");
+	});
+
+	it("길이를 cap(500) 안으로 제한한다", () => {
+		const many = Array.from({ length: 15 }, (_, i) => ({
+			name: `C${i}`,
+			appearance: "a long detailed appearance description ".repeat(4),
+		}));
+		expect(buildCastDirective(many).length).toBeLessThanOrEqual(500);
 	});
 });
