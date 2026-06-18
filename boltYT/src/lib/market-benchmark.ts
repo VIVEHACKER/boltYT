@@ -22,6 +22,15 @@ export type BenchmarkGenre =
 	| "historical_vlog"
 	| "generic";
 
+/**
+ * 고정 호스트(재등장 진행자)가 포맷에 맞는 host-led 장르 — 이 장르만 자동으로
+ * 채널 스코프 호스트를 생성한다. faceless/footage 중심 장르(horror_mystery/news_issue/
+ * drama_recap/docu_story/generic)는 진행자를 강제하면 모든 씬에 인물이 끼어들어 오히려
+ * 품질이 떨어지므로 제외. 다른 장르도 채널이 캐릭터를 명시 정의하면 character-roster
+ * 엔진으로 일관성을 적용할 수 있다(엔진 자체는 장르 무관).
+ */
+export const HOST_LED_GENRES: readonly BenchmarkGenre[] = ["historical_vlog"];
+
 export interface EditingBar {
 	cutDensitySec: number;
 	hookSec: number;

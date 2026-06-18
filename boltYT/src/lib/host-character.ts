@@ -166,15 +166,18 @@ export function buildHostContinuityDirectives(
 export function applyHostToScenePrompt(
 	rawPrompt: string,
 	identity: HostIdentity,
-	opts: { era?: string | HistoricalEra } = {},
+	opts: { era?: string | HistoricalEra; rosterAnchor?: string } = {},
 ): string {
 	const directives = buildHostContinuityDirectives(identity, opts.era);
+	// 로스터 앵커(출연진 명단 + 현재 인물)는 character-roster 가 다중 캐릭터일 때만 넘긴다.
+	// 일관성에 필수라 host continuity 와 함께 보호 구간(truncation 우선순위 head 보다 높음)에 둔다.
+	const anchor = opts.rosterAnchor?.trim();
 	// 호스트 잠금(레퍼런스 시트/시드)은 일관성에 필수라 절대 잘리면 안 된다. clampWords 는
 	// 끝에서 자르므로, rawPrompt 를 먼저 줄여 continuity suffix 공간을 확보한 뒤 붙인다.
 	// continuity 가 그 자체로 cap 을 넘을 수 있으므로(긴 StyleBible appearance) 먼저 cap 으로
 	// clamp — 출력은 항상 1600 이하를 보장하되 head 보다 호스트 잠금을 우선 보존한다.
 	const continuity = clampWords(
-		`Host continuity: ${directives.join(" ")}`,
+		`${anchor ? `Character roster: ${anchor} ` : ""}Host continuity: ${directives.join(" ")}`,
 		1600,
 	);
 	const headBudget = Math.max(0, 1600 - continuity.length - 1);

@@ -36,7 +36,10 @@ import {
 } from "../../lib/animation-production";
 import { autoPickBgm, inferAutoBgmPreset } from "../../lib/bgm";
 import {
-	applyHostToScenePrompt,
+	applyRosterToScenePrompt,
+	singleHostRoster,
+} from "../../lib/character-roster";
+import {
 	buildHostIdentity,
 	buildHostReferencePrompt,
 	type HostCharacter,
@@ -1722,7 +1725,12 @@ export default function StepMedia({
 			typeof scriptContentJsonRef.current.vlog_era === "string"
 				? (scriptContentJsonRef.current.vlog_era as string)
 				: undefined;
-		return applyHostToScenePrompt(prompt, host, { era });
+		// 단일 호스트를 로스터(1명)로 감싸 character-roster 엔진 경로로 통과(단일은 기존과 동일 출력).
+		// 다중 캐릭터 로스터 도입 시: 실제 roster 소스 + sceneIndex 를 연결하면 출연진 앵커 +
+		// 씬별 캐릭터 선택이 자동 적용된다(현재는 single 모드라 sceneIndex 무관 → 0).
+		return applyRosterToScenePrompt(prompt, singleHostRoster(host.host), 0, {
+			...(era !== undefined ? { era } : {}),
+		}).prompt;
 	}
 
 	async function generateFallbackSceneImage(

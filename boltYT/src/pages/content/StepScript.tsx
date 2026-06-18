@@ -40,17 +40,18 @@ import type {
 	ContentPerformanceSample,
 	RankedScriptRecommendation,
 } from "../../lib/content-recommendation-ranker";
-import {
-	buildReferenceKnowledgeProfile,
-	compactKnowledgeProfile,
-} from "../../lib/knowledge-system";
 import { resolveEra } from "../../lib/historical-vlog-format";
 import {
 	createStarterHost,
 	type HostCharacter,
 } from "../../lib/host-character";
 import {
+	buildReferenceKnowledgeProfile,
+	compactKnowledgeProfile,
+} from "../../lib/knowledge-system";
+import {
 	classifyBenchmarkGenre,
+	HOST_LED_GENRES,
 	resolveMarketBenchmark,
 } from "../../lib/market-benchmark";
 import { assignMotionGraphicsForScene } from "../../lib/motion-graphics";
@@ -907,12 +908,21 @@ export default function StepScript({
 		const vlogTopic = qualityProfileRef.current?.topic || initialTopicTitle;
 		const vlogGenre =
 			qualityProfileRef.current?.genre ?? classifyBenchmarkGenre(vlogTopic);
-		// AI 모드(production_type=standard)만 — research(documentary)/animation 은 호스트 제외.
-		const historicalHost: HostCharacter | undefined =
-			mode === "ai" && vlogGenre === "historical_vlog" && channelId
+		// 고정 호스트는 host-led 장르(HOST_LED_GENRES)에만 자동 생성한다 — 채널 스코프 동일
+		// 인물(시드/레퍼런스 시트)로 에피소드 간 캐릭터 일관성 확보(감사 critical "일관성 장치 전무" 해소).
+		// horror/news/drama/docu/generic 같은 faceless·footage 중심 장르는 진행자를 강제하면 모든
+		// 씬에 인물이 끼어들어 오히려 품질이 떨어지므로 제외(Codex 리뷰 반영). animation 은 자체
+		// continuity manifest, research(documentary)는 mode 로 이미 제외. 비-host-led 장르도 채널이
+		// 캐릭터를 명시 정의하면 character-roster 엔진으로 일관성을 적용할 수 있다(엔진은 장르 무관).
+		// 시대 의상(vlogEra)은 historical_vlog 에서만 — 다른 host-led 장르는 호스트 기본 의상 유지.
+		const recurringHost: HostCharacter | undefined =
+			mode === "ai" && channelId && HOST_LED_GENRES.includes(vlogGenre)
 				? createStarterHost(channelId, "ko")
 				: undefined;
-		const vlogEra = historicalHost ? resolveEra(vlogTopic).id : undefined;
+		const vlogEra =
+			recurringHost && vlogGenre === "historical_vlog"
+				? resolveEra(vlogTopic).id
+				: undefined;
 
 		const { data: script, error: scriptError } = await supabase
 			.from("scripts")
@@ -954,8 +964,11 @@ export default function StepScript({
 								playbook: nicheHandoff.playbook,
 							}
 						: null,
-					...(historicalHost
-						? { host_character: historicalHost, vlog_era: vlogEra }
+					...(recurringHost
+						? {
+								host_character: recurringHost,
+								...(vlogEra ? { vlog_era: vlogEra } : {}),
+							}
 						: {}),
 				},
 				status: "approved",
