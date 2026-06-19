@@ -27,6 +27,7 @@
     "bgm:import": "node scripts/import-bgm-preset.mjs",
     "set-fal-key": "node scripts/set-fal-key.mjs",
     "vlog:plan": "npx tsx scripts/historical-vlog-plan.ts",
+    "vlog:make": "npx tsx scripts/make-vlog.ts",
     "quality:loop": "npx tsx scripts/post-generation-improvement-loop.ts",
     "quality:loop:fix": "npx tsx scripts/post-generation-improvement-loop.ts --fix",
     "quality:dead-exports": "node scripts/check-dead-exports.mjs",
