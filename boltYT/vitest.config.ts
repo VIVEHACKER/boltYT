@@ -5,7 +5,11 @@ export default defineConfig({
 		globals: true,
 		environment: "node",
 		setupFiles: ["src/test-setup/web-audio-mock.ts"],
-		include: ["src/**/*.test.ts", "server/**/*.test.ts"],
+		include: [
+			"src/**/*.test.ts",
+			"server/**/*.test.ts",
+			"scripts/**/*.test.ts",
+		],
 		coverage: {
 			provider: "v8",
 			include: ["src/lib/**/*.ts", "server/lib/**/*.ts"],

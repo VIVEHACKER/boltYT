@@ -1,0 +1,99 @@
+import { describe, expect, it } from "vitest";
+import {
+	buildSceneTimeline,
+	getOverlapFrames,
+} from "../src/remotion/timing.ts";
+import { buildVlogRemotionScenes } from "./remotion-vlog-render.ts";
+
+const FPS = 30;
+const MIN_SCENE_FRAMES = 45;
+/** 패딩 전 "오디오 프레임" — buildVlogRemotionScenes 의 베이스 길이와 동일 규칙. */
+const audioFrames = (d: number) =>
+	Math.max(MIN_SCENE_FRAMES, Math.ceil(d * FPS));
+
+/** calculateTotalFrames(Composition) 와 동일: Σdur − Σ(i≥1) 오버랩. */
+const totalFrames = (scenes: ReturnType<typeof buildVlogRemotionScenes>) => {
+	let overlap = 0;
+	for (let i = 1; i < scenes.length; i++)
+		overlap += getOverlapFrames(scenes[i]);
+	return scenes.reduce((s, sc) => s + sc.durationInFrames, 0) - overlap;
+};
+
+describe("buildVlogRemotionScenes", () => {
+	const inputs = [
+		{ imageUrl: "a.png", audioUrl: "a.mp3", narration: "씬1", durationSec: 3 },
+		{
+			imageUrl: "b.png",
+			audioUrl: "b.mp3",
+			narration: "씬2",
+			durationSec: 4.5,
+		},
+		{ imageUrl: "c.png", audioUrl: "c.mp3", narration: "씬3", durationSec: 2 },
+	];
+
+	it("패딩은 오디오 길이를 절대 줄이지 않는다(durationInFrames ≥ 오디오 프레임)", () => {
+		const out = buildVlogRemotionScenes(inputs);
+		out.forEach((s, i) =>
+			expect(s.durationInFrames).toBeGreaterThanOrEqual(
+				audioFrames(inputs[i].durationSec),
+			),
+		);
+	});
+
+	it("최소 씬 프레임 45(1.5s) — 0초·짧은 씬도 클램프", () => {
+		const out = buildVlogRemotionScenes([
+			{ imageUrl: "x.png", audioUrl: "x.mp3", narration: "x", durationSec: 0 },
+		]);
+		// 단일 씬은 오버랩 없음 → 패딩 0 → 정확히 floor
+		expect(out[0].durationInFrames).toBe(MIN_SCENE_FRAMES);
+	});
+
+	it("P2: 단일 짧은 씬도 총 프레임 ≥ 33 (BGM edgeFade inputRange 단조 보장)", () => {
+		const out = buildVlogRemotionScenes([
+			{
+				imageUrl: "x.png",
+				audioUrl: "x.mp3",
+				narration: "x",
+				durationSec: 0.2,
+			},
+		]);
+		expect(totalFrames(out)).toBeGreaterThanOrEqual(33);
+	});
+
+	it("P1-동기: 총 영상 길이 == Σ(오디오 프레임) → .srt(누적초)와 동기", () => {
+		const out = buildVlogRemotionScenes(inputs);
+		const expected = inputs.reduce((s, i) => s + audioFrames(i.durationSec), 0);
+		expect(totalFrames(out)).toBe(expected);
+	});
+
+	it("P1-무클립: 각 씬 오디오 윈도 == 원본 오디오 길이(내레이션 꼬리 안 잘림)", () => {
+		const out = buildVlogRemotionScenes(inputs);
+		const timeline = buildSceneTimeline(out, 0, totalFrames(out));
+		timeline.forEach((seg, i) =>
+			expect(seg.audioTo - seg.audioFrom).toBe(
+				audioFrames(inputs[i].durationSec),
+			),
+		);
+	});
+
+	it("첫 씬은 전환 없음+hookBoost, 이후 씬은 전환 부여", () => {
+		const out = buildVlogRemotionScenes(inputs);
+		expect(out[0].transition).toBe("none");
+		expect(out[0].hookBoost).toBe(true);
+		expect(out[1].transition).not.toBe("none");
+		expect(out[2].transition).not.toBe("none");
+		expect(out[1].hookBoost).toBe(false);
+	});
+
+	it("이미지/오디오/내레이션을 그대로 매핑하고 type=image", () => {
+		const out = buildVlogRemotionScenes(inputs);
+		expect(out[0].imageUrl).toBe("a.png");
+		expect(out[0].audioUrl).toBe("a.mp3");
+		expect(out[0].narration).toBe("씬1");
+		expect(out.every((s) => s.type === "image")).toBe(true);
+	});
+
+	it("빈 입력은 빈 배열", () => {
+		expect(buildVlogRemotionScenes([])).toEqual([]);
+	});
+});
