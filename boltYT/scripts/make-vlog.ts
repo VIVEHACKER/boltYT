@@ -41,6 +41,22 @@ const COMFY_INPUT = process.env.COMFY_INPUT ?? join(homedir(), "ComfyUI/input");
 // ElevenLabs Bella(무료티어). 다른 보이스로 바꾸려면 --voice 또는 TTS_VOICE.
 const TTS_VOICE = process.env.TTS_VOICE ?? "EXAVITQu4vr4xnSDxMaL";
 const CKPT = process.env.COMFY_CKPT ?? "sd_xl_base_1.0.safetensors";
+// 메모리/속도 튜닝(제약 하드웨어용). 기본은 고품질. 메모리 부족 시 낮춰서 SDXL 활성화 메모리·시간 절감.
+// 예: SCENE_W=1024 SCENE_H=576 COMFY_STEPS=20 npm run vlog:make ...
+/** 양의 정수 env 파싱. 잘못된 값(NaN/0/음수/소수)은 기본값 폴백 — ComfyUI 입력은 양의 정수 필수. */
+function posIntEnv(name: string, def: number): number {
+	const raw = process.env[name];
+	if (raw === undefined || raw === "") return def;
+	const n = Number(raw);
+	return Number.isInteger(n) && n > 0 ? n : def;
+}
+/** ComfyUI 잠재 차원 env — 8의 배수로 반올림 + 최소 64(EmptyLatentImage는 8px 증분, 너무 작으면 큐 실패). */
+function latentDimEnv(name: string, def: number): number {
+	return Math.max(64, Math.round(posIntEnv(name, def) / 8) * 8);
+}
+const STEPS = Math.max(8, posIntEnv("COMFY_STEPS", 30));
+const SCENE_W = latentDimEnv("SCENE_W", 1344);
+const SCENE_H = latentDimEnv("SCENE_H", 768);
 const W = 1920,
 	H = 1080;
 const log = (m: string) => process.stdout.write(`${m}\n`);
@@ -105,7 +121,7 @@ function portraitWorkflow(prompt: string, seed: number) {
 			class_type: "KSampler",
 			inputs: {
 				seed,
-				steps: 30,
+				steps: STEPS,
 				cfg: 6.5,
 				sampler_name: "dpmpp_2m",
 				scheduler: "karras",
@@ -174,7 +190,7 @@ function sceneWorkflow(prompt: string, seed: number, ref: string) {
 		},
 		"5": {
 			class_type: "EmptyLatentImage",
-			inputs: { width: 1344, height: 768, batch_size: 1 },
+			inputs: { width: SCENE_W, height: SCENE_H, batch_size: 1 },
 		},
 		"6": {
 			class_type: "CLIPTextEncode",
@@ -191,7 +207,7 @@ function sceneWorkflow(prompt: string, seed: number, ref: string) {
 			class_type: "KSampler",
 			inputs: {
 				seed,
-				steps: 30,
+				steps: STEPS,
 				cfg: 6.5,
 				sampler_name: "dpmpp_2m",
 				scheduler: "karras",
