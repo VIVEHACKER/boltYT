@@ -19,6 +19,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import {
+	buildHistoricalThumbnail,
 	buildPovVisualPrompt,
 	type HistoricalEra,
 	resolveEra,
@@ -38,6 +39,9 @@ const exec = promisify(execFile);
 const COMFY = process.env.COMFY_URL ?? "http://localhost:8188";
 const PROXY = process.env.API_PROXY_URL ?? "http://localhost:3459";
 const COMFY_INPUT = process.env.COMFY_INPUT ?? join(homedir(), "ComfyUI/input");
+// 썸네일 텍스트 오버레이용(ffmpeg drawtext 부재 대비). ComfyUI venv 의 Pillow 사용.
+const COMFY_PYTHON =
+	process.env.COMFY_PYTHON ?? join(homedir(), "ComfyUI/venv/bin/python");
 // ElevenLabs Bella(무료티어). 다른 보이스로 바꾸려면 --voice 또는 TTS_VOICE.
 const TTS_VOICE = process.env.TTS_VOICE ?? "EXAVITQu4vr4xnSDxMaL";
 const CKPT = process.env.COMFY_CKPT ?? "sd_xl_base_1.0.safetensors";
@@ -59,6 +63,10 @@ const SCENE_W = latentDimEnv("SCENE_W", 1344);
 const SCENE_H = latentDimEnv("SCENE_H", 768);
 const W = 1920,
 	H = 1080;
+// 빈 배경 → 살아있는 장면. 레퍼런스(Chloe) 대비 최대 격차였던 "텅 빈 배경" 보정.
+// (sceneWorkflow negative 에서 "multiple people" 제거와 짝 — 안 그러면 군중이 억제됨)
+const CROWD =
+	"bustling background crowd of period-accurate people going about daily life, lively populated scene, sense of depth";
 const log = (m: string) => process.stdout.write(`${m}\n`);
 const photoreal = (p: string) =>
 	`Photorealistic cinematic still frame, 35mm film look, shallow depth of field, professional color grading, natural lighting, sharp focus, high detail, 8K: ${p}`;
@@ -199,7 +207,7 @@ function sceneWorkflow(prompt: string, seed: number, ref: string) {
 		"7": {
 			class_type: "CLIPTextEncode",
 			inputs: {
-				text: "ugly, blurry, low quality, deformed, multiple people, different face, cartoon, text, watermark, extreme close-up, cropped face",
+				text: "ugly, blurry, low quality, deformed, different face, cartoon, text, watermark, cropped face",
 				clip: ["4", 1],
 			},
 		},
@@ -225,6 +233,51 @@ function sceneWorkflow(prompt: string, seed: number, ref: string) {
 		"9": {
 			class_type: "SaveImage",
 			inputs: { filename_prefix: "vlog_scene", images: ["8", 0] },
+		},
+	};
+}
+
+/** 와이드 환경샷 — 호스트 얼굴 없이 "그들이 보는 것"(군중·장소). 셀카 단조로움 깨기. */
+function wideWorkflow(prompt: string, seed: number) {
+	return {
+		"3": {
+			class_type: "KSampler",
+			inputs: {
+				seed,
+				steps: STEPS,
+				cfg: 6.5,
+				sampler_name: "dpmpp_2m",
+				scheduler: "karras",
+				denoise: 1,
+				model: ["4", 0],
+				positive: ["6", 0],
+				negative: ["7", 0],
+				latent_image: ["5", 0],
+			},
+		},
+		"4": { class_type: "CheckpointLoaderSimple", inputs: { ckpt_name: CKPT } },
+		"5": {
+			class_type: "EmptyLatentImage",
+			inputs: { width: SCENE_W, height: SCENE_H, batch_size: 1 },
+		},
+		"6": {
+			class_type: "CLIPTextEncode",
+			inputs: { text: prompt, clip: ["4", 1] },
+		},
+		"7": {
+			class_type: "CLIPTextEncode",
+			inputs: {
+				text: "ugly, blurry, low quality, deformed, cartoon, text, watermark, selfie, close-up face, empty deserted",
+				clip: ["4", 1],
+			},
+		},
+		"8": {
+			class_type: "VAEDecode",
+			inputs: { samples: ["3", 0], vae: ["4", 2] },
+		},
+		"9": {
+			class_type: "SaveImage",
+			inputs: { filename_prefix: "vlog_wide", images: ["8", 0] },
 		},
 	};
 }
@@ -354,13 +407,27 @@ async function main(): Promise<void> {
 	const srt: string[] = [];
 	let cursor = 0;
 	for (let i = 0; i < scenes.length; i++) {
-		log(`3.${i + 1}) 이미지(face-lock) + 내레이션...`);
+		// 셀카(호스트 face-lock) ↔ 와이드(환경+군중) 교차. 0=셀카 훅, 1=와이드, 2=셀카 ...
+		const isWide = i % 2 === 1;
+		log(
+			`3.${i + 1}) ${isWide ? "와이드 환경샷(군중)" : "셀카 face-lock"} + 내레이션...`,
+		);
 		const img = await runComfy(
-			sceneWorkflow(
-				photoreal(buildPovVisualPrompt(scenes[i].visual, era)),
-				1000 + i * 137,
-				ref,
-			),
+			isWide
+				? wideWorkflow(
+						photoreal(
+							`${scenes[i].visual}, ${era.settingKeywords}, wide establishing shot, ${CROWD}`,
+						),
+						1000 + i * 137,
+					)
+				: sceneWorkflow(
+						// medium 셀카(허리 위)로 배경/군중이 보이게 — 풀 클로즈업 빈 배경 완화 시도
+						photoreal(
+							`${buildPovVisualPrompt(scenes[i].visual, era)}, medium selfie shot waist-up, environment and ${CROWD} clearly visible behind`,
+						),
+						1000 + i * 137,
+						ref,
+					),
 			join(work, `scene${i}.png`),
 		);
 		const mp3 = join(work, `scene${i}.mp3`);
@@ -371,6 +438,41 @@ async function main(): Promise<void> {
 			`${i + 1}\n${srtTime(cursor)} --> ${srtTime(cursor + d)}\n${scenes[i].narration}\n`,
 		);
 		cursor += d;
+	}
+
+	// 썸네일 — 공식(놀란 호스트 + 거대 텍스트 + 시대 배경). CTR 자산. 실패해도 영상엔 무영향.
+	const thumbPath = join(outDir, `vlog_${era.id}_${stamp}_thumb.jpg`);
+	try {
+		log("3.t) 썸네일(놀란 호스트 + 거대 텍스트)...");
+		const thumb = buildHistoricalThumbnail(era, "ko");
+		const thumbRaw = await runComfy(
+			sceneWorkflow(photoreal(thumb.composition), 777, ref),
+			join(work, "thumb_raw.png"),
+		);
+		// 텍스트 오버레이 — 이 ffmpeg 빌드엔 drawtext 필터가 없어 Pillow(ComfyUI venv) 사용.
+		// 1280x720 크롭 + 좌상단 거대 텍스트(흰색+검은 외곽선). 한국어 폰트(AppleSDGothicNeo).
+		const overlayPy = join(work, "thumb_overlay.py");
+		writeFileSync(
+			overlayPy,
+			[
+				"import sys",
+				"from PIL import Image, ImageDraw, ImageFont",
+				"src,out,text=sys.argv[1],sys.argv[2],sys.argv[3]",
+				'im=Image.open(src).convert("RGB")',
+				"tw,th=1280,720",
+				"w,h=im.size; s=max(tw/w,th/h)",
+				"im=im.resize((int(w*s),int(h*s))); w,h=im.size",
+				"l,t=(w-tw)//2,(h-th)//2; im=im.crop((l,t,l+tw,t+th))",
+				"d=ImageDraw.Draw(im)",
+				'f=ImageFont.truetype("/System/Library/Fonts/AppleSDGothicNeo.ttc",150,index=0)',
+				'd.text((44,28),text,font=f,fill="white",stroke_width=9,stroke_fill="black")',
+				"im.save(out,quality=90)",
+			].join("\n"),
+		);
+		await exec(COMFY_PYTHON, [overlayPy, thumbRaw, thumbPath, thumb.bigText]);
+		log(`   썸네일: ${thumbPath}`);
+	} catch (e) {
+		log(`   썸네일 생략(${e})`);
 	}
 
 	// .srt 는 어느 렌더 경로든 YouTube 업로드용으로 항상 출력
