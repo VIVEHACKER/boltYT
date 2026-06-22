@@ -167,7 +167,13 @@ function portraitWorkflow(prompt: string, seed: number) {
 	};
 }
 
-function sceneWorkflow(prompt: string, seed: number, ref: string) {
+// weight: IPAdapter 얼굴 영향력. 높을수록 얼굴 고정↑ 배경/표정↓. 셀카/썸네일은 낮춰 배경·표정 살림.
+function sceneWorkflow(
+	prompt: string,
+	seed: number,
+	ref: string,
+	weight = 0.6,
+) {
 	return {
 		"4": { class_type: "CheckpointLoaderSimple", inputs: { ckpt_name: CKPT } },
 		"10": {
@@ -188,7 +194,7 @@ function sceneWorkflow(prompt: string, seed: number, ref: string) {
 				ipadapter: ["10", 0],
 				image: ["12", 0],
 				clip_vision: ["11", 0],
-				weight: 0.6,
+				weight,
 				weight_type: "ease in-out",
 				combine_embeds: "concat",
 				start_at: 0,
@@ -421,12 +427,13 @@ async function main(): Promise<void> {
 						1000 + i * 137,
 					)
 				: sceneWorkflow(
-						// medium 셀카(허리 위)로 배경/군중이 보이게 — 풀 클로즈업 빈 배경 완화 시도
+						// medium 셀카(허리 위) + 낮은 weight(0.5) → 배경/군중 살림(빈 배경 완화)
 						photoreal(
-							`${buildPovVisualPrompt(scenes[i].visual, era)}, medium selfie shot waist-up, environment and ${CROWD} clearly visible behind`,
+							`${buildPovVisualPrompt(scenes[i].visual, era)}, medium selfie shot waist-up, host positioned to one side, expansive detailed background with ${CROWD} clearly visible`,
 						),
 						1000 + i * 137,
 						ref,
+						0.5,
 					),
 			join(work, `scene${i}.png`),
 		);
@@ -446,30 +453,43 @@ async function main(): Promise<void> {
 		log("3.t) 썸네일(놀란 호스트 + 거대 텍스트)...");
 		const thumb = buildHistoricalThumbnail(era, "ko");
 		const thumbRaw = await runComfy(
-			sceneWorkflow(photoreal(thumb.composition), 777, ref),
+			// 낮은 weight(0.45)로 놀란 표정·시대 배경·군중을 살림(neutral 얼굴/빈 배경 방지)
+			sceneWorkflow(
+				photoreal(
+					`${era.settingKeywords}, ${CROWD}, the host with a ${thumb.expression} open-mouth surprised shocked face reacting to camera, medium selfie shot waist-up, dramatic cinematic lighting, vivid high-contrast YouTube thumbnail`,
+				),
+				777,
+				ref,
+				0.45,
+			),
 			join(work, "thumb_raw.png"),
 		);
-		// 텍스트 오버레이 — 이 ffmpeg 빌드엔 drawtext 필터가 없어 Pillow(ComfyUI venv) 사용.
-		// 1280x720 크롭 + 좌상단 거대 텍스트(흰색+검은 외곽선). 한국어 폰트(AppleSDGothicNeo).
-		const overlayPy = join(work, "thumb_overlay.py");
-		writeFileSync(
-			overlayPy,
-			[
-				"import sys",
-				"from PIL import Image, ImageDraw, ImageFont",
-				"src,out,text=sys.argv[1],sys.argv[2],sys.argv[3]",
-				'im=Image.open(src).convert("RGB")',
-				"tw,th=1280,720",
-				"w,h=im.size; s=max(tw/w,th/h)",
-				"im=im.resize((int(w*s),int(h*s))); w,h=im.size",
-				"l,t=(w-tw)//2,(h-th)//2; im=im.crop((l,t,l+tw,t+th))",
-				"d=ImageDraw.Draw(im)",
-				'f=ImageFont.truetype("/System/Library/Fonts/AppleSDGothicNeo.ttc",150,index=0)',
-				'd.text((44,28),text,font=f,fill="white",stroke_width=9,stroke_fill="black")',
-				"im.save(out,quality=90)",
-			].join("\n"),
-		);
-		await exec(COMFY_PYTHON, [overlayPy, thumbRaw, thumbPath, thumb.bigText]);
+		// 텍스트 오버레이 — 이 ffmpeg 빌드엔 drawtext 필터가 없어 Pillow(ComfyUI venv)로 인라인 실행.
+		// python -c 로 직접 실행(디스크에 .py 안 남김). 1280x720 크롭 + 좌상단 거대 텍스트(흰+검은 외곽선).
+		const overlayCode = [
+			"import sys",
+			"from PIL import Image, ImageDraw, ImageFont",
+			"src, out, text = sys.argv[1], sys.argv[2], sys.argv[3]",
+			'im = Image.open(src).convert("RGB")',
+			"tw, th = 1280, 720",
+			"w, h = im.size",
+			"s = max(tw / w, th / h)",
+			"im = im.resize((int(w * s), int(h * s)))",
+			"w, h = im.size",
+			"left, top = (w - tw) // 2, (h - th) // 2",
+			"im = im.crop((left, top, left + tw, top + th))",
+			"d = ImageDraw.Draw(im)",
+			'f = ImageFont.truetype("/System/Library/Fonts/AppleSDGothicNeo.ttc", 150, index=0)',
+			'd.text((44, 28), text, font=f, fill="white", stroke_width=9, stroke_fill="black")',
+			"im.save(out, quality=90)",
+		].join("\n");
+		await exec(COMFY_PYTHON, [
+			"-c",
+			overlayCode,
+			thumbRaw,
+			thumbPath,
+			thumb.bigText,
+		]);
 		log(`   썸네일: ${thumbPath}`);
 	} catch (e) {
 		log(`   썸네일 생략(${e})`);
