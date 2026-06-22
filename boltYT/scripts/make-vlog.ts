@@ -323,27 +323,41 @@ function srtTime(s: number): string {
 	return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")},${String(ms).padStart(3, "0")}`;
 }
 
-/** 채널당 1회 호스트 포트레이트 생성·캐시 → 얼굴 크롭 → ComfyUI input. 재실행 시 재사용. */
+/**
+ * 채널당 1회 호스트 포트레이트 생성·캐시 → 얼굴 크롭 → ComfyUI input. 재실행 시 재사용.
+ * opts.shocked: 동일 styleSeed(동일 인물) + 놀란 표정 변형(썸네일용, 별도 캐시).
+ */
 async function ensureHostReference(
 	host: HostCharacter,
 	dir: string,
+	opts: { shocked?: boolean } = {},
 ): Promise<string> {
 	const id = buildHostIdentity(host);
-	const refName = `vloghost_${host.id}.png`;
+	const suffix = opts.shocked ? "_shocked" : "";
+	// 채널별 전체 styleSeed 를 키에 포함 — 같은 host.id 라도 채널 다르면 캐시 충돌 방지(Codex).
+	// (생성 seed 는 ComfyUI 한도로 mod 하지만, 캐시 키는 절단하면 충돌하므로 전체 seed 사용)
+	const refName = `vloghost_${host.id}_${id.styleSeed}${suffix}.png`;
 	const refInInput = join(COMFY_INPUT, refName);
 	if (existsSync(refInInput)) {
 		log(`   호스트 레퍼런스 재사용: ${refName} (동일 인물 유지)`);
 		return refName;
 	}
-	log("   호스트 레퍼런스 최초 생성(채널당 1회)...");
-	const portrait = await runComfy(
-		portraitWorkflow(
-			photoreal(buildHostReferencePrompt(id)),
-			id.styleSeed % 1_000_000,
-		),
-		join(dir, "host.png"),
+	log(
+		`   호스트 레퍼런스 최초 생성(채널당 1회)${opts.shocked ? " — 놀란 표정" : ""}...`,
 	);
-	const face = join(dir, "host_face.png");
+	// shocked 는 기본 프롬프트의 "neutral friendly expression" 을 치환(append 시 표정 충돌→중립으로 묻힘).
+	const basePrompt = buildHostReferencePrompt(id);
+	const prompt = opts.shocked
+		? basePrompt.replace(
+				"neutral friendly expression",
+				"shocked surprised open-mouth wide-eyed expression",
+			)
+		: basePrompt;
+	const portrait = await runComfy(
+		portraitWorkflow(photoreal(prompt), id.styleSeed % 1_000_000),
+		join(dir, `host${suffix}.png`),
+	);
+	const face = join(dir, `host_face${suffix}.png`);
 	await exec("sips", [
 		"-c",
 		"620",
@@ -452,15 +466,16 @@ async function main(): Promise<void> {
 	try {
 		log("3.t) 썸네일(놀란 호스트 + 거대 텍스트)...");
 		const thumb = buildHistoricalThumbnail(era, "ko");
+		// 놀란 표정 레퍼런스(동일 인물) → 표정은 ref 가 운반하므로 weight 0.6 으로 identity 확보.
+		const shockedRef = await ensureHostReference(host, work, { shocked: true });
 		const thumbRaw = await runComfy(
-			// 낮은 weight(0.45)로 놀란 표정·시대 배경·군중을 살림(neutral 얼굴/빈 배경 방지)
 			sceneWorkflow(
 				photoreal(
-					`${era.settingKeywords}, ${CROWD}, the host with a ${thumb.expression} open-mouth surprised shocked face reacting to camera, medium selfie shot waist-up, dramatic cinematic lighting, vivid high-contrast YouTube thumbnail`,
+					`${era.settingKeywords}, ${CROWD}, the host reacting with a ${thumb.expression} shocked surprised open mouth, medium selfie shot waist-up, dramatic cinematic lighting, vivid high-contrast YouTube thumbnail`,
 				),
 				777,
-				ref,
-				0.45,
+				shockedRef,
+				0.6,
 			),
 			join(work, "thumb_raw.png"),
 		);
