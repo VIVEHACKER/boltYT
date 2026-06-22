@@ -19,6 +19,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import {
+	buildHistoricalChapters,
 	buildHistoricalThumbnail,
 	buildPovVisualPrompt,
 	type HistoricalEra,
@@ -399,6 +400,72 @@ async function ensureHostReference(
 	return refName;
 }
 
+interface VlogScene {
+	narration: string;
+	visual: string;
+}
+
+/** 단일 LLM 호출 → 씬 배열. 숏폼 1회 / 롱폼 챕터별 호출에서 공용. */
+async function genScenes(userPrompt: string): Promise<VlogScene[]> {
+	const cr = await fetch(`${PROXY}/api/openai/chat`, {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({
+			messages: [
+				{
+					role: "system",
+					content: "한국 유튜브 시간여행 역사 브이로그 작가. JSON만 출력.",
+				},
+				{ role: "user", content: userPrompt },
+			],
+			response_format: { type: "json_object" },
+		}),
+	});
+	if (!cr.ok)
+		throw new Error(`대본 ${cr.status} (api-proxy LLM_BACKEND=claude 확인)`);
+	const parsed = JSON.parse((await cr.json()).choices[0].message.content);
+	return (Array.isArray(parsed.scenes) ? parsed.scenes : []) as VlogScene[];
+}
+
+// 6-비트 챕터별 분량 가중치(Chloe Rome 아크 기반: 훅 짧게→클라이맥스 최장→아웃트로 짧게).
+const CHAPTER_WEIGHTS: Record<string, number> = {
+	hook: 0.6,
+	arrival: 1.0,
+	immersion: 1.2,
+	conflict: 1.4,
+	revelation: 1.1,
+	farewell: 0.7,
+};
+
+/** 롱폼 대본 — buildHistoricalChapters 6역할별 개별 호출(truncation 회피 + 챕터 구조 + 페이싱). */
+async function generateLongformScript(
+	era: HistoricalEra,
+	minutes: number,
+): Promise<VlogScene[]> {
+	const chapters = buildHistoricalChapters(era, "ko"); // [{ role, note }]
+	const totalScenes = Math.max(12, Math.round(minutes * 5)); // ~5 씬/분
+	const sumW = chapters.reduce((s, c) => s + (CHAPTER_WEIGHTS[c.role] ?? 1), 0);
+	const all: VlogScene[] = [];
+	for (let i = 0; i < chapters.length; i++) {
+		const ch = chapters[i];
+		const n = Math.max(
+			2,
+			Math.round((totalScenes * (CHAPTER_WEIGHTS[ch.role] ?? 1)) / sumW),
+		);
+		const guide =
+			ch.role === "hook"
+				? " 첫 씬은 0-3초 강력한 패턴 인터럽트 훅(시청자를 멈추게). 느리고 몰입감 있게."
+				: i === chapters.length - 1
+					? " 마지막은 현재로 귀환 + 다음 시대 티저(시리즈 훅)."
+					: " 챕터 끝은 다음으로 이어지는 궁금증(open loop)으로.";
+		const usr = `${era.subjectKo} 시간여행 1인칭 한국어 브이로그의 "${ch.role}" 챕터. 연출 의도: ${ch.note}. 정확히 ${n}개 씬.${guide} 각 씬: narration(한국어 1-2문장, 1인칭·몰입·생생), visual(영어, 그 장면 시각 묘사). 직전 흐름과 자연스럽게 연결. JSON: {"scenes":[{"narration":"...","visual":"..."}]}`;
+		log(`   챕터 ${i + 1}/${chapters.length} (${ch.role}, ${n}씬)...`);
+		// 챕터당 n 으로 캡 — LLM 초과 반환 시 이미지/TTS 비용 폭증 방지(Codex).
+		all.push(...(await genScenes(usr)).slice(0, n));
+	}
+	return all;
+}
+
 async function main(): Promise<void> {
 	const args = parseArgs(process.argv.slice(2));
 	const era: HistoricalEra = resolveEra(args.era ?? "고대 로마");
@@ -410,6 +477,8 @@ async function main(): Promise<void> {
 	);
 	const ipaEndAt = Math.min(1, floatEnv("IPA_END_AT", strongLock ? 0.9 : 0.7));
 	const sceneCount = Math.max(2, Math.min(8, Number(args.scenes ?? "4")));
+	// 롱폼 모드: --minutes N → 6챕터 구조. 미지정 시 숏폼(--scenes).
+	const minutes = args.minutes ? Math.max(1, Number(args.minutes)) : 0;
 	const channel = args.channel ?? "my-history";
 	const stamp =
 		Number(process.env.SOURCE_DATE_EPOCH) || Math.floor(Date.now() / 1000);
@@ -418,36 +487,25 @@ async function main(): Promise<void> {
 	const work = join(outDir, `vlog_${era.id}_${stamp}`);
 	mkdirSync(work, { recursive: true });
 	log(
-		`▶ ${era.subjectKo} 시간여행 브이로그 (${sceneCount}씬) — 채널 ${channel}`,
+		`▶ ${era.subjectKo} 시간여행 브이로그 (${minutes ? `롱폼 ~${minutes}분` : `${sceneCount}씬`}) — 채널 ${channel}`,
 	);
 
 	// 1) 대본 (Claude)
-	log("1) 대본(Claude)...");
-	const usr = `${era.subjectKo}로 시간여행한 1인칭 한국어 브이로그. 정확히 ${sceneCount}개 씬. 각 씬: narration(한국어 1문장, 1인칭·몰입·생생), visual(영어, 그 장면 시각 묘사). JSON: {"scenes":[{"narration":"...","visual":"..."}]}`;
-	const cr = await fetch(`${PROXY}/api/openai/chat`, {
-		method: "POST",
-		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({
-			messages: [
-				{
-					role: "system",
-					content: "한국 유튜브 시간여행 역사 브이로그 작가. JSON만 출력.",
-				},
-				{ role: "user", content: usr },
-			],
-			response_format: { type: "json_object" },
-		}),
-	});
-	if (!cr.ok)
-		throw new Error(`대본 ${cr.status} (api-proxy LLM_BACKEND=claude 확인)`);
-	const scenes = (
-		JSON.parse((await cr.json()).choices[0].message.content).scenes as {
-			narration: string;
-			visual: string;
-		}[]
-	).slice(0, sceneCount);
+	let scenes: VlogScene[];
+	if (minutes) {
+		log(`1) 롱폼 대본 — 6챕터 구조 (목표 ~${minutes}분)...`);
+		scenes = await generateLongformScript(era, minutes);
+	} else {
+		log("1) 대본(Claude)...");
+		const usr = `${era.subjectKo}로 시간여행한 1인칭 한국어 브이로그. 정확히 ${sceneCount}개 씬. 각 씬: narration(한국어 1문장, 1인칭·몰입·생생), visual(영어, 그 장면 시각 묘사). JSON: {"scenes":[{"narration":"...","visual":"..."}]}`;
+		scenes = (await genScenes(usr)).slice(0, sceneCount);
+	}
+	if (scenes.length === 0) throw new Error("대본 생성 실패 (씬 0개)");
 	log(
-		`   ${scenes.length}씬: ${scenes.map((s) => s.narration.slice(0, 16)).join(" / ")}`,
+		`   ${scenes.length}씬 생성${minutes ? " (6챕터)" : ""}: ${scenes
+			.map((s) => s.narration.slice(0, 12))
+			.join(" / ")
+			.slice(0, 110)}`,
 	);
 
 	// 2) 호스트 레퍼런스(채널 캐시)
