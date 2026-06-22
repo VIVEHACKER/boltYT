@@ -61,6 +61,31 @@ function latentDimEnv(name: string, def: number): number {
 const STEPS = Math.max(8, posIntEnv("COMFY_STEPS", 30));
 const SCENE_W = latentDimEnv("SCENE_W", 1344);
 const SCENE_H = latentDimEnv("SCENE_H", 768);
+/** 양의 실수 env(0 초과). 잘못된 값은 기본값. */
+function floatEnv(name: string, def: number): number {
+	const raw = process.env[name];
+	if (raw === undefined || raw === "") return def;
+	const n = Number(raw);
+	return Number.isFinite(n) && n > 0 ? n : def;
+}
+/**
+ * 비유럽 강문화 era 판정 — SDXL 이 강한 문화 프롬프트(조선/이집트 등)에서 호스트 ethnicity 를
+ * 덮어써 드리프트가 나는 era. 이 경우 IPAdapter weight/end_at 를 올려 유럽계 호스트 얼굴을 고정한다.
+ * (서구 era 는 낮은 weight 로 배경/군중을 더 살림.) env(IPA_WEIGHT/IPA_END_AT)가 항상 우선.
+ */
+function needsStrongIdentityLock(era: HistoricalEra): boolean {
+	const t =
+		`${era.settingKeywords} ${era.wardrobeKeywords} ${era.subjectEn}`.toLowerCase();
+	// ASCII 마커: 선행 \b 경계로 부분매칭 차단(예: "looming"→ming, "tuxedo"→edo 오탐 방지).
+	// 모호한 단편(ming/qing/tang/edo)은 제외 — china/japan 이 해당 왕조를 커버. 어미는 base 가 흡수
+	// (korea→korean, japan→japanese, india→indian, africa→african, thai→thailand).
+	const ascii =
+		/\b(korea|joseon|hanok|hanbok|china|chinese|japan|samurai|mughal|india|persia|ottoman|egypt|pharaoh|nubian|aztec|maya|inca|africa|mongol|thai|vietnam)/;
+	// 한글 마커(한글 era 명은 resolveEra 가 Hangul 을 settingKeywords 에 복사 — Codex). 다중자만.
+	const hangul =
+		/조선|한국|고려|신라|백제|고구려|중국|청나라|명나라|일본|사무라이|인도|무굴|페르시아|이집트|파라오|몽골|아즈텍|잉카|아프리카|베트남|태국|오스만/;
+	return ascii.test(t) || hangul.test(t);
+}
 const W = 1920,
 	H = 1080;
 // 빈 배경 → 살아있는 장면. 레퍼런스(Chloe) 대비 최대 격차였던 "텅 빈 배경" 보정.
@@ -173,6 +198,7 @@ function sceneWorkflow(
 	seed: number,
 	ref: string,
 	weight = 0.6,
+	endAt = 0.7,
 ) {
 	return {
 		"4": { class_type: "CheckpointLoaderSimple", inputs: { ckpt_name: CKPT } },
@@ -198,7 +224,7 @@ function sceneWorkflow(
 				weight_type: "ease in-out",
 				combine_embeds: "concat",
 				start_at: 0,
-				end_at: 0.7,
+				end_at: endAt,
 				embeds_scaling: "V only",
 			},
 		},
@@ -376,6 +402,13 @@ async function ensureHostReference(
 async function main(): Promise<void> {
 	const args = parseArgs(process.argv.slice(2));
 	const era: HistoricalEra = resolveEra(args.era ?? "고대 로마");
+	// 비서구 강문화 era 는 IPAdapter 를 강하게(호스트 ethnicity 드리프트 방지). env 가 항상 우선.
+	const strongLock = needsStrongIdentityLock(era);
+	const ipaWeight = Math.min(
+		1,
+		floatEnv("IPA_WEIGHT", strongLock ? 0.85 : 0.5),
+	);
+	const ipaEndAt = Math.min(1, floatEnv("IPA_END_AT", strongLock ? 0.9 : 0.7));
 	const sceneCount = Math.max(2, Math.min(8, Number(args.scenes ?? "4")));
 	const channel = args.channel ?? "my-history";
 	const stamp =
@@ -447,7 +480,8 @@ async function main(): Promise<void> {
 						),
 						1000 + i * 137,
 						ref,
-						0.5,
+						ipaWeight,
+						ipaEndAt,
 					),
 			join(work, `scene${i}.png`),
 		);
@@ -475,7 +509,8 @@ async function main(): Promise<void> {
 				),
 				777,
 				shockedRef,
-				0.6,
+				Math.max(0.6, ipaWeight),
+				ipaEndAt,
 			),
 			join(work, "thumb_raw.png"),
 		);
