@@ -10,6 +10,7 @@ import {
 	useCurrentFrame,
 	useVideoConfig,
 } from "remotion";
+import { TITLE_CARD_FRAMES } from "./card-frames";
 
 export interface TitleCardProps {
 	title: string;
@@ -21,8 +22,8 @@ export interface TitleCardProps {
 	hookMode?: boolean;
 }
 
-/** 타이틀 카드 기본 길이: 90프레임 (3초), hookMode: 45프레임 (1.5초) */
-export const TITLE_CARD_FRAMES = 90;
+/** 타이틀 카드 기본 길이: 90프레임 (3초), hookMode: 45프레임 (1.5초). 값은 card-frames.ts(순수). */
+export { TITLE_CARD_FRAMES };
 export const HOOK_CARD_FRAMES = 45;
 
 export function TitleCard({

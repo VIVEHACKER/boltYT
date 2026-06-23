@@ -9,14 +9,15 @@ import {
 	useCurrentFrame,
 	useVideoConfig,
 } from "remotion";
+import { END_CARD_FRAMES } from "./card-frames";
 
 export interface EndCardProps {
 	channelName?: string;
 	ctaText?: string;
 }
 
-/** 엔드 카드 기본 길이: 150프레임 (5초) */
-export const END_CARD_FRAMES = 150;
+/** 엔드 카드 기본 길이: 150프레임 (5초). 값은 card-frames.ts(순수). */
+export { END_CARD_FRAMES };
 
 export function EndCard({
 	channelName = "",

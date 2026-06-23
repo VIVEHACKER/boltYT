@@ -21,6 +21,7 @@ import { promisify } from "node:util";
 import {
 	buildHistoricalChapters,
 	buildHistoricalThumbnail,
+	buildHistoricalTitle,
 	buildPovVisualPrompt,
 	type HistoricalEra,
 	resolveEra,
@@ -31,6 +32,10 @@ import {
 	createStarterHost,
 	type HostCharacter,
 } from "../src/lib/host-character.ts";
+import {
+	END_CARD_FRAMES,
+	TITLE_CARD_FRAMES,
+} from "../src/remotion/cards/card-frames.ts";
 import { renderVlogRemotion } from "./remotion-vlog-render.ts";
 
 /** boltYT 루트(public/ + src/remotion/index.ts). scripts/ 의 부모. */
@@ -471,9 +476,11 @@ async function main(): Promise<void> {
 	const era: HistoricalEra = resolveEra(args.era ?? "고대 로마");
 	// 비서구 강문화 era 는 IPAdapter 를 강하게(호스트 ethnicity 드리프트 방지). env 가 항상 우선.
 	const strongLock = needsStrongIdentityLock(era);
+	// 서양 셀카 0.72: A/B 검증값(0.5=씬 간 호스트 드리프트, 0.72=신원 고정+배경 유지, 0.85=배경 과압축).
+	// 비서양 0.85: ethnicity 드리프트(강문화 프롬프트가 유럽계 얼굴을 덮어씀) 방어용 — 더 강해야 함.
 	const ipaWeight = Math.min(
 		1,
-		floatEnv("IPA_WEIGHT", strongLock ? 0.85 : 0.5),
+		floatEnv("IPA_WEIGHT", strongLock ? 0.85 : 0.72),
 	);
 	const ipaEndAt = Math.min(1, floatEnv("IPA_END_AT", strongLock ? 0.9 : 0.7));
 	const sceneCount = Math.max(2, Math.min(8, Number(args.scenes ?? "4")));
@@ -516,7 +523,13 @@ async function main(): Promise<void> {
 	// 3) 씬별 이미지 + 내레이션 (메타 수집 — 렌더는 4단계)
 	const made: { img: string; mp3: string; narration: string; d: number }[] = [];
 	const srt: string[] = [];
-	let cursor = 0;
+	// 카드는 롱폼 Remotion(YouTubeVideo) 전용 — Shorts/ffmpeg 경로엔 미적용(Codex P2).
+	const useCards =
+		!!minutes && args.shorts !== "true" && args.ffmpeg !== "true";
+	// 인트로 카드가 씬 블록을 TITLE_CARD_FRAMES(90f@30fps=3s)만큼 뒤로 민다 → .srt 도 동일 오프셋
+	// (Codex P2: 안 그러면 업로드 자막이 3초 빠름). 씬0 전치=none(overlap 0)이라 강체 이동만 보정하면 충분.
+	const introOffsetSec = useCards ? TITLE_CARD_FRAMES / 30 : 0;
+	let cursor = introOffsetSec;
 	for (let i = 0; i < scenes.length; i++) {
 		// 셀카(호스트 face-lock) ↔ 와이드(환경+군중) 교차. 0=셀카 훅, 1=와이드, 2=셀카 ...
 		const isWide = i % 2 === 1;
@@ -532,7 +545,7 @@ async function main(): Promise<void> {
 						1000 + i * 137,
 					)
 				: sceneWorkflow(
-						// medium 셀카(허리 위) + 낮은 weight(0.5) → 배경/군중 살림(빈 배경 완화)
+						// medium 셀카(허리 위) + 중간 weight(서양 0.72/비서양 0.85) → 호스트 신원 고정하며 배경/군중 유지
 						photoreal(
 							`${buildPovVisualPrompt(scenes[i].visual, era)}, medium selfie shot waist-up, host positioned to one side, expansive detailed background with ${CROWD} clearly visible`,
 						),
@@ -700,13 +713,22 @@ async function main(): Promise<void> {
 			projectRoot: PROJECT_ROOT,
 			compositionId: args.shorts === "true" ? "YouTubeShorts" : "YouTubeVideo",
 			runId: `${era.id}_${stamp}`,
+			// 롱폼 Remotion 경로만 인트로/아웃트로 카드(숏폼은 8s 오버헤드 과함 + Shorts 컴포지션 미지원).
+			intro: useCards
+				? { title: buildHistoricalTitle(era, "ko"), channelName: channel }
+				: undefined,
+			outro: useCards
+				? { channelName: channel, ctaText: "다음 시대도 곧 공개!" }
+				: undefined,
 			onProgress: (pct) => process.stdout.write(`\r   렌더: ${pct}%`),
 		});
 		log("");
 	}
 
+	// cursor = 인트로오프셋 + Σ씬오디오. 아웃트로 카드 길이를 더해 실제 영상 총길이 보고.
+	const totalSec = cursor + (useCards ? END_CARD_FRAMES / 30 : 0);
 	log(
-		`\n✅ 완성: ${finalPath} (${Math.round(cursor)}초)\n   자막: ${srtPath} (YouTube 업로드용)`,
+		`\n✅ 완성: ${finalPath} (${Math.round(totalSec)}초)\n   자막: ${srtPath} (YouTube 업로드용)`,
 	);
 }
 

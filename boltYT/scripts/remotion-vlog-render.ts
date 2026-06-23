@@ -13,8 +13,8 @@
  * (render-video.ts 가 Supabase publicUrl 을 쓰는 것과 동일 원리). 렌더 후 정리.
  */
 import {
-	createReadStream,
 	copyFileSync,
+	createReadStream,
 	mkdtempSync,
 	rmSync,
 	statSync,
@@ -159,6 +159,10 @@ export interface RenderVlogOpts {
 	/** 임시 서빙 디렉토리 prefix 식별용 */
 	runId: string;
 	onProgress?: (pct: number) => void;
+	/** 인트로 타이틀 카드(롱폼). backgroundUrl 은 첫 씬 이미지로 자동 설정. */
+	intro?: { title: string; subtitle?: string; channelName?: string };
+	/** 아웃트로 엔드 카드(롱폼). */
+	outro?: { channelName?: string; ctaText?: string };
 }
 
 export async function renderVlogRemotion(
@@ -201,6 +205,14 @@ export async function renderVlogRemotion(
 			subtitleAccentColor: "#FFD700",
 			bgmUrl,
 			bgmLoop: true,
+			// 카드는 롱폼(YouTubeVideo) 전용. Shorts 컴포지션은 calculateTotalFrames(scenes)로
+			// scene-only 총프레임을 잡으므로 카드가 들어가면 길이 불일치로 잘린다(Codex P2) → 무시.
+			// 제공 시 calculateTotalFrames 가 인트로/아웃트로 길이를 자동 가산.
+			intro:
+				compositionId === "YouTubeVideo" && opts.intro
+					? { ...opts.intro, backgroundUrl: served[0]?.imageUrl }
+					: undefined,
+			outro: compositionId === "YouTubeVideo" ? opts.outro : undefined,
 		};
 
 		// 2) 번들 + 컴포지션 선택(calculateMetadata 가 총 프레임 계산)
