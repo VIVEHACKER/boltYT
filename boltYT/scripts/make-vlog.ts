@@ -348,10 +348,12 @@ async function dur(file: string): Promise<number> {
 }
 
 function srtTime(s: number): string {
-	const h = Math.floor(s / 3600),
-		m = Math.floor((s % 3600) / 60),
-		sec = Math.floor(s % 60),
-		ms = Math.round((s % 1) * 1000);
+	// 전체 ms 로 반올림 후 분해 → 1.9996 같은 경계에서 ms 1000 오버플로("01,1000") 방지(Codex P2).
+	const total = Math.max(0, Math.round(s * 1000));
+	const ms = total % 1000;
+	const sec = Math.floor(total / 1000) % 60;
+	const m = Math.floor(total / 60000) % 60;
+	const h = Math.floor(total / 3600000);
 	return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")},${String(ms).padStart(3, "0")}`;
 }
 

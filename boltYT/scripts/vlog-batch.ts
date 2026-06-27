@@ -246,7 +246,7 @@ export function mergeTopupTopics(
 export function jobToArgs(job: JobSpec, outDir: string): string[] {
 	if (job.genre !== "history")
 		throw new Error(
-			`'${job.genre}' 장르는 아직 make-vlog 미지원 — 후속 플러그인 예정. 현재는 history(시대 기반)만.`,
+			`'${job.genre}' 장르는 vlog:batch(시대=영구 dedup) 대상 아님. economy 는 기사 단위 dedup 이라 별도 CLI: npm run vlog:economy (cron: economy-cron.sh).`,
 		);
 	const a = ["--era", job.era];
 	if (job.minutes !== undefined && job.minutes > 0)
