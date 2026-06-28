@@ -10,6 +10,8 @@ import {
 	resolveTtsProvider,
 	SCENE_H,
 	SCENE_W,
+	SDXL_FAST_SAMPLER,
+	SDXL_FAST_SCHEDULER,
 	SDXL_FAST_STEPS,
 	type SourceRef,
 	STEPS,
@@ -172,12 +174,13 @@ describe("sdxlSamplerSettings", () => {
 		expect(s.scheduler).toBe("karras");
 		expect(s.steps).toBe(STEPS); // export 상수에 단언(env COMFY_STEPS 비결합, Codex)
 	});
-	it("fast=on — Lightning 저스텝/cfg2/dpmpp_sde/sgm_uniform (cfg 인자 무시)", () => {
+	it("fast=on — 저스텝/cfg2 + env 샘플러·스케줄러(cfg 인자 무시)", () => {
 		const s = sdxlSamplerSettings(true, 7);
 		expect(s.cfg).toBe(2);
-		expect(s.sampler_name).toBe("dpmpp_sde");
-		expect(s.scheduler).toBe("sgm_uniform");
-		expect(s.steps).toBe(SDXL_FAST_STEPS); // export 상수에 단언(env COMFY_FAST_STEPS 비결합, Codex)
+		// 샘플러/스케줄러/스텝은 export 상수에 단언 — env(COMFY_FAST_*) 비결합(Codex 패턴).
+		expect(s.sampler_name).toBe(SDXL_FAST_SAMPLER);
+		expect(s.scheduler).toBe(SDXL_FAST_SCHEDULER);
+		expect(s.steps).toBe(SDXL_FAST_STEPS);
 	});
 });
 

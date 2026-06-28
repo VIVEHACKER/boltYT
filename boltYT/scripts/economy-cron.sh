@@ -24,6 +24,10 @@ MINUTES="${ECONOMY_MINUTES:-10}"
 CHANNEL="${ECONOMY_CHANNEL:-경제 한입}"
 COMFY_URL="${COMFY_URL:-http://localhost:8188}"
 PROXY_URL="${API_PROXY_URL:-http://localhost:3459}"
+# 화질/속도 기본값 — 라이브 검증: DreamShaper XL Turbo + fast 프리셋(euler 8스텝 ≈ 27s/장).
+# base SDXL 30스텝보다 빠르고 화질↑. 모델 미설치 머신이면 COMFY_CKPT 를 설치된 체크포인트로 덮어쓸 것.
+export COMFY_CKPT="${COMFY_CKPT:-DreamShaperXL_Turbo_V2-SFW.safetensors}"
+export COMFY_PRESET="${COMFY_PRESET:-fast}"
 
 echo "[$(date '+%F %T')] economy-cron 시작 (minutes=$MINUTES)"
 

@@ -64,16 +64,21 @@ export const FLUX_STEPS = Math.max(1, posIntEnv("FLUX_STEPS", 4));
 export const FLUX_GUIDANCE = floatEnv("FLUX_GUIDANCE", 3.5); // dev 전용. schnell 은 무시.
 
 // 속도-품질 프리셋: COMFY_PRESET=fast(=lightning/turbo) → SDXL Lightning/Turbo 체크포인트용 저스텝 설정.
-// DreamShaperXL Lightning 등 6~8스텝 파인튠 + cfg2/dpmpp_sde/sgm_uniform = base SDXL 30스텝보다
-// "더 빠르고 더 좋다"(품질은 파인튠이, 속도는 저스텝이 책임). 미설정 시 기존 고품질 기본 보존.
-// FLUX(느림·Mac 부담)를 안 켜고 화질을 올리는 권장 경로.
+// DreamShaperXL Turbo/Lightning 등 6~8스텝 파인튠 + cfg2 = base SDXL 30스텝보다 "더 빠르고 더 좋다"
+// (품질은 파인튠이, 속도는 저스텝이 책임). 미설정 시 기존 고품질 기본 보존. FLUX(느림·Mac 부담) 안 켜고 화질↑.
 export const SDXL_FAST = ["fast", "lightning", "turbo"].includes(
 	(process.env.COMFY_PRESET ?? "").toLowerCase(),
 );
 export const SDXL_FAST_STEPS = Math.max(1, posIntEnv("COMFY_FAST_STEPS", 8));
+// fast 샘플러/스케줄러는 체크포인트마다 권장값이 달라 env 오버라이드 허용:
+//   기본 euler+karras = DreamShaper Turbo 등에 빠르고 화질 좋음(라이브 검증: 8스텝 1344x768 ≈ 27s/장).
+//   dpmpp_sde 는 SDE라 스텝당 모델 2회 호출 → ~2배 느림(Mac MPS에서 손해). 품질차 미미해 euler 기본.
+//   ByteDance SDXL-Lightning 쓰면 COMFY_FAST_SCHEDULER=sgm_uniform 로 전환.
+export const SDXL_FAST_SAMPLER = process.env.COMFY_FAST_SAMPLER ?? "euler";
+export const SDXL_FAST_SCHEDULER = process.env.COMFY_FAST_SCHEDULER ?? "karras";
 
 /**
- * SDXL KSampler 설정 — fast 면 Lightning/Turbo 저스텝(cfg2/dpmpp_sde/sgm_uniform), 아니면 고품질 기본.
+ * SDXL KSampler 설정 — fast 면 Lightning/Turbo 저스텝(cfg2 + env 샘플러/스케줄러), 아니면 고품질 기본.
  * 순수 함수로 분리해 프리셋 분기를 env 비결합으로 테스트(IMAGE_MODEL 동형, Codex 패턴).
  */
 export function sdxlSamplerSettings(
@@ -89,8 +94,8 @@ export function sdxlSamplerSettings(
 		? {
 				steps: SDXL_FAST_STEPS,
 				cfg: 2,
-				sampler_name: "dpmpp_sde",
-				scheduler: "sgm_uniform",
+				sampler_name: SDXL_FAST_SAMPLER,
+				scheduler: SDXL_FAST_SCHEDULER,
 			}
 		: { steps: STEPS, cfg, sampler_name: "dpmpp_2m", scheduler: "karras" };
 }
