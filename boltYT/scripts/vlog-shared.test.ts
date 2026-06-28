@@ -148,6 +148,12 @@ describe("resolveTtsProvider", () => {
 		expect(resolveTtsProvider("CLOVA")).toBe("clova");
 		expect(resolveTtsProvider("  Clova ")).toBe("clova");
 	});
+	it("edge/free/local → edge(무료 뉴럴 TTS)", () => {
+		expect(resolveTtsProvider("edge")).toBe("edge");
+		expect(resolveTtsProvider("EDGE")).toBe("edge");
+		expect(resolveTtsProvider("free")).toBe("edge");
+		expect(resolveTtsProvider("local")).toBe("edge");
+	});
 	it("빈값/미지원 값 → elevenlabs 폴백(기존 동작 보존)", () => {
 		expect(resolveTtsProvider("")).toBe("elevenlabs");
 		expect(resolveTtsProvider("elevenlabs")).toBe("elevenlabs");

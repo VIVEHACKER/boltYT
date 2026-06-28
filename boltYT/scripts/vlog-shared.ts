@@ -4,8 +4,8 @@
  * 장르별 워크플로(IPAdapter vs 카툰)·대본·썸네일 구도는 각 CLI 가 별도로 정의한다.
  */
 import { execFile } from "node:child_process";
-import { rmSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
+import { readFileSync, rmSync, writeFileSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 
@@ -218,11 +218,41 @@ export async function runComfyChecked(
 // .srt·챕터·measure-and-extend 가 자동 동기. TTS_SPEED env 로 조정, [0.5,2.0] 클램프.
 export const TTS_SPEED = Math.min(2, Math.max(0.5, floatEnv("TTS_SPEED", 1.1)));
 
-/** TTS_PROVIDER 정규화 → "clova" | "elevenlabs". 빈값/미지원 값은 elevenlabs 로 폴백(기존 동작 보존). */
+/** TTS_PROVIDER 정규화 → "clova" | "elevenlabs" | "edge". 빈값/미지원 값은 elevenlabs(기존 동작 보존).
+ *  edge = Microsoft Edge 무료 뉴럴 TTS(키/쿼터 없음). free/local 도 edge 로 본다. */
 export function resolveTtsProvider(
 	raw = process.env.TTS_PROVIDER,
-): "clova" | "elevenlabs" {
-	return (raw ?? "").trim().toLowerCase() === "clova" ? "clova" : "elevenlabs";
+): "clova" | "elevenlabs" | "edge" {
+	const v = (raw ?? "").trim().toLowerCase();
+	if (v === "clova") return "clova";
+	if (v === "edge" || v === "free" || v === "local") return "edge";
+	return "elevenlabs";
+}
+
+// edge-tts(Microsoft Edge 무료 뉴럴 TTS) — API 키·쿼터 없음. 로컬 CLI 호출.
+// 한국어 뉴럴: ko-KR-SunHiNeural(여)/ko-KR-InJoonNeural(남). EDGE_TTS_BIN/EDGE_VOICE env 로 조정.
+export const EDGE_TTS_BIN =
+	process.env.EDGE_TTS_BIN ??
+	join(homedir(), "Library/Python/3.9/bin/edge-tts");
+export const EDGE_VOICE = process.env.EDGE_VOICE ?? "ko-KR-SunHiNeural";
+let edgeSeq = 0;
+/** edge-tts CLI → mp3 버퍼. CLI 는 파일 출력만 → tmp 에 쓰고 읽어 반환(타 provider 와 동일 인터페이스).
+ *  속도(TTS_SPEED)는 공용 atempo 경로에서 일괄 적용하므로 여기선 정속 mp3 만 만든다. */
+async function ttsEdge(text: string): Promise<Buffer> {
+	const tmp = join(tmpdir(), `edge_${process.pid}_${++edgeSeq}.mp3`);
+	try {
+		await exec(EDGE_TTS_BIN, [
+			"--voice",
+			EDGE_VOICE,
+			"--text",
+			text,
+			"--write-media",
+			tmp,
+		]);
+		return readFileSync(tmp);
+	} finally {
+		rmSync(tmp, { force: true });
+	}
 }
 
 /** CLOVA Voice(NCP) 합성 → mp3 버퍼. speaker 미지정 시 CLOVA_SPEAKER env / nara.
@@ -254,17 +284,31 @@ async function ttsElevenLabs(text: string, voice: string): Promise<Buffer> {
 	return Buffer.from(await res.arrayBuffer());
 }
 
-/** TTS → mp3 파일. TTS_PROVIDER 로 provider 선택(clova|elevenlabs), TTS_SPEED 는 공용 atempo 로 일괄 적용.
- *  voice 인자는 ElevenLabs 전용(CLOVA 는 CLOVA_SPEAKER 사용). */
+/** provider 선택 + 합성. 유료(elevenlabs/clova) 실패(쿼터 소진·401 등) 시 무료 edge-tts 로 자동 폴백
+ *  → 무인 양산이 계정 한도로 죽지 않는다. TTS_FALLBACK=off 로 폴백 비활성(원에러 전파). */
+async function synthTts(text: string, voice: string): Promise<Buffer> {
+	const provider = resolveTtsProvider();
+	if (provider === "edge") return ttsEdge(text);
+	try {
+		return provider === "clova"
+			? await ttsClova(text)
+			: await ttsElevenLabs(text, voice);
+	} catch (e) {
+		if ((process.env.TTS_FALLBACK ?? "edge").toLowerCase() === "off") throw e;
+		const msg = e instanceof Error ? e.message.slice(0, 90) : String(e);
+		log(`   ⚠ ${provider} TTS 실패(${msg}) → 무료 edge-tts 폴백`);
+		return ttsEdge(text);
+	}
+}
+
+/** TTS → mp3 파일. TTS_PROVIDER 로 provider 선택(clova|elevenlabs|edge), 유료 실패 시 edge 자동 폴백.
+ *  TTS_SPEED 는 공용 atempo 로 일괄 적용. voice 인자는 ElevenLabs 전용(CLOVA=CLOVA_SPEAKER, edge=EDGE_VOICE). */
 export async function tts(
 	text: string,
 	out: string,
 	voice = process.env.TTS_VOICE ?? "EXAVITQu4vr4xnSDxMaL",
 ): Promise<void> {
-	const buf =
-		resolveTtsProvider() === "clova"
-			? await ttsClova(text)
-			: await ttsElevenLabs(text, voice);
+	const buf = await synthTts(text, voice);
 	if (TTS_SPEED === 1) {
 		writeFileSync(out, buf);
 		return;
