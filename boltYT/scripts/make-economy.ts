@@ -305,9 +305,10 @@ export const ECON_BEATS: { key: string; note: string }[] = [
 const ECON_SYSTEM =
 	"한국 경제 뉴스 해설 유튜브 작가. 제공된 기사의 '사실에만' 근거해 쉽게 설명한다. 투자 조언·종목 추천·매수매도 권유·가격 예측 절대 금지(YMYL). 기사에 없는 수치/사실 창작 금지. JSON만 출력.";
 
-// 길이 보정 상수: 내레이션 1~2문장 ≈ 20초/씬(실측 기반 — "2~3문장" 요청은 ~24초로 오버슛해 축소).
-// minutes 를 이 기준으로 초기 씬수 환산. 언더슛은 measure-and-extend 가, 오버슛은 watch-time 이득이라 허용.
-export const SEC_PER_SCENE = 20;
+// 길이 보정 상수: 내레이션 1~2문장 ≈ 16초/씬(실측 — SEC=20 은 초기 씬수를 과소추정해 +12% 오버슛 유발,
+// 실측 평균 ~15.7초에 맞춰 16 으로 타이트닝). minutes 를 이 기준으로 초기 씬수 환산 → 보강 라운드 최소화.
+// 언더슛은 measure-and-extend 가 보강, 오버슛은 watch-time 이득이라 허용.
+export const SEC_PER_SCENE = 16;
 export const SCENE_CAP = 60; // 로컬 SDXL 비용 상한(잡당 이미지 수)
 
 /** 목표 분량 → 초기 씬수. ~SEC_PER_SCENE/씬 가정, 최소 8 · 상한 SCENE_CAP. */

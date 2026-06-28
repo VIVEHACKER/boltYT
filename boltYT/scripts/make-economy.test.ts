@@ -125,12 +125,12 @@ describe("beatSceneCounts", () => {
 });
 
 describe("estimateSceneCount (길이 보정)", () => {
-	it("~20초/씬 기준 환산", () => {
-		expect(estimateSceneCount(3)).toBe(9); // round(180/20)
-		expect(estimateSceneCount(15)).toBe(45); // round(900/20)
+	it("~16초/씬 기준 환산", () => {
+		expect(estimateSceneCount(3)).toBe(11); // round(180/16)
+		expect(estimateSceneCount(15)).toBe(56); // round(900/16)
 	});
 	it("최소 8씬 floor", () => {
-		expect(estimateSceneCount(1)).toBe(8); // round(60/20)=3 → 8
+		expect(estimateSceneCount(1)).toBe(8); // round(60/16)=4 → 8
 	});
 	it("SCENE_CAP 상한", () => {
 		expect(estimateSceneCount(60)).toBe(SCENE_CAP); // round(3600/18)=200 → cap

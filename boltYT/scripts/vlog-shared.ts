@@ -145,7 +145,14 @@ export async function runComfyChecked(
 		log(
 			`   ⚠ 씬 이미지 단색/공백 의심(stddev ${sd.toFixed(1)}) → 재생성 ${r + 1}/${retries}`,
 		);
-		path = await runComfy(makeWorkflow(baseSeed + (r + 1) * 9973), outPath);
+		// 재생성 실패(타임아웃/큐 오류)는 렌더 전체를 죽이지 말고 직전(최선) 이미지 유지(Codex P2).
+		// 첫 생성 실패는 폴백 이미지가 없어 위에서 그대로 throw.
+		try {
+			path = await runComfy(makeWorkflow(baseSeed + (r + 1) * 9973), outPath);
+		} catch (e) {
+			log(`   ⚠ 재생성 실패(${e}) → 직전 이미지 유지`);
+			break;
+		}
 	}
 	return path;
 }
