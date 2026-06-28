@@ -5,10 +5,25 @@ import {
 	buildSourceListLines,
 	buildTextbookIllustrationPrompt,
 	formatTimestamp,
+	illustrationWorkflow,
 	isDegenerateImageStats,
+	resolveTtsProvider,
+	SCENE_H,
+	SCENE_W,
 	type SourceRef,
 	srtTime,
+	textToImageWorkflow,
 } from "./vlog-shared.ts";
+
+// ComfyUI 노드 그래프(Record<id,{class_type,inputs}>)에서 class_type 으로 노드 찾기.
+type WfNode = { class_type: string; inputs: Record<string, unknown> };
+const node = (wf: Record<string, WfNode>, type: string): WfNode | undefined =>
+	Object.values(wf).find((n) => n.class_type === type);
+// 모델 무관 latent 노드(SDXL=EmptyLatentImage / FLUX=EmptySD3LatentImage).
+// illustrationWorkflow 는 model 인자를 안 받아 IMAGE_MODEL(env COMFY_MODEL)을 따르므로,
+// 차원 검증은 노드 타입을 가정하지 않고 둘 중 존재하는 latent 노드에서 읽어야 env 비결합(Codex).
+const latentNode = (wf: Record<string, WfNode>): WfNode | undefined =>
+	node(wf, "EmptyLatentImage") ?? node(wf, "EmptySD3LatentImage");
 
 describe("isDegenerateImageStats", () => {
 	it("낮은 stddev(빈/솔리드) → degenerate", () => {
@@ -119,5 +134,107 @@ describe("srtTime", () => {
 	});
 	it("음수 방어", () => {
 		expect(srtTime(-1)).toBe("00:00:00,000");
+	});
+});
+
+describe("resolveTtsProvider", () => {
+	it("clova(대소문자/공백 무관) → clova", () => {
+		expect(resolveTtsProvider("clova")).toBe("clova");
+		expect(resolveTtsProvider("CLOVA")).toBe("clova");
+		expect(resolveTtsProvider("  Clova ")).toBe("clova");
+	});
+	it("빈값/미지원 값 → elevenlabs 폴백(기존 동작 보존)", () => {
+		expect(resolveTtsProvider("")).toBe("elevenlabs");
+		expect(resolveTtsProvider("elevenlabs")).toBe("elevenlabs");
+		expect(resolveTtsProvider("openai")).toBe("elevenlabs");
+	});
+	it("env 미설정 시 elevenlabs 기본(env 격리 — 셸 TTS_PROVIDER 비결합, Codex P2)", () => {
+		// 기본인자 = process.env.TTS_PROVIDER 이므로 셸에 clova 가 떠 있어도 폴백을 보장해야 함.
+		const prev = process.env.TTS_PROVIDER;
+		delete process.env.TTS_PROVIDER;
+		try {
+			expect(resolveTtsProvider()).toBe("elevenlabs");
+		} finally {
+			if (prev === undefined) delete process.env.TTS_PROVIDER;
+			else process.env.TTS_PROVIDER = prev;
+		}
+	});
+});
+
+describe("textToImageWorkflow", () => {
+	const params = {
+		positive: "a forum",
+		negative: "ugly",
+		seed: 42,
+		filenamePrefix: "test_pref",
+	};
+
+	it("sdxl(기본) — CheckpointLoaderSimple + EmptyLatentImage + cfg + 음성 프롬프트", () => {
+		const wf = textToImageWorkflow(params, "sdxl");
+		expect(node(wf, "CheckpointLoaderSimple")).toBeDefined();
+		expect(node(wf, "UNETLoader")).toBeUndefined();
+		const latent = node(wf, "EmptyLatentImage");
+		expect(latent?.inputs.width).toBe(SCENE_W);
+		expect(latent?.inputs.height).toBe(SCENE_H);
+		const k = node(wf, "KSampler");
+		expect(k?.inputs.cfg).toBe(7);
+		expect(k?.inputs.seed).toBe(42);
+		// 음성 프롬프트는 두 번째 CLIPTextEncode 로 전달
+		const negText = Object.values(wf).some(
+			(n) => n.class_type === "CLIPTextEncode" && n.inputs.text === "ugly",
+		);
+		expect(negText).toBe(true);
+		expect(node(wf, "SaveImage")?.inputs.filename_prefix).toBe("test_pref");
+	});
+
+	it("flux — UNETLoader/DualCLIPLoader/VAELoader + EmptySD3LatentImage + cfg 1/euler + FluxGuidance", () => {
+		const wf = textToImageWorkflow(params, "flux");
+		expect(node(wf, "UNETLoader")).toBeDefined();
+		expect(node(wf, "DualCLIPLoader")?.inputs.type).toBe("flux");
+		expect(node(wf, "VAELoader")).toBeDefined();
+		expect(node(wf, "CheckpointLoaderSimple")).toBeUndefined();
+		expect(node(wf, "EmptySD3LatentImage")).toBeDefined();
+		expect(node(wf, "FluxGuidance")).toBeDefined();
+		const k = node(wf, "KSampler");
+		expect(k?.inputs.cfg).toBe(1); // distilled — CFG 비활성
+		expect(k?.inputs.sampler_name).toBe("euler");
+		expect(node(wf, "SaveImage")?.inputs.filename_prefix).toBe("test_pref");
+	});
+
+	it("width/height 오버라이드 반영(숏폼 세로) — sdxl/flux 공통", () => {
+		const sdxl = textToImageWorkflow(
+			{ ...params, width: 768, height: 1344 },
+			"sdxl",
+		);
+		expect(node(sdxl, "EmptyLatentImage")?.inputs.width).toBe(768);
+		expect(node(sdxl, "EmptyLatentImage")?.inputs.height).toBe(1344);
+		const flux = textToImageWorkflow(
+			{ ...params, width: 1080, height: 1920 },
+			"flux",
+		);
+		expect(node(flux, "EmptySD3LatentImage")?.inputs.width).toBe(1080);
+		expect(node(flux, "EmptySD3LatentImage")?.inputs.height).toBe(1920);
+	});
+});
+
+describe("illustrationWorkflow", () => {
+	it("기본 차원 = SCENE_W/H, 양성 프롬프트에 교과서 일러스트 스타일 포함", () => {
+		const wf = illustrationWorkflow("a roman forum", 7);
+		const latent = latentNode(wf); // 모델 무관(env COMFY_MODEL 따름)
+		expect(latent?.inputs.width).toBe(SCENE_W);
+		expect(latent?.inputs.height).toBe(SCENE_H);
+		const pos = Object.values(wf).find(
+			(n) =>
+				n.class_type === "CLIPTextEncode" &&
+				String(n.inputs.text).includes("a roman forum"),
+		);
+		expect(String(pos?.inputs.text)).toContain("colored pencil");
+		expect(node(wf, "SaveImage")?.inputs.filename_prefix).toBe("vlog_illus");
+	});
+
+	it("width/height 인자 → 숏폼 세로 차원 적용", () => {
+		const wf = illustrationWorkflow("x", 1, 768, 1344);
+		expect(latentNode(wf)?.inputs.width).toBe(768);
+		expect(latentNode(wf)?.inputs.height).toBe(1344);
 	});
 });

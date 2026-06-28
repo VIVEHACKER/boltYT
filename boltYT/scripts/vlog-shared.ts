@@ -39,10 +39,29 @@ export function floatEnv(name: string, def: number): number {
 }
 
 export const STEPS = Math.max(8, posIntEnv("COMFY_STEPS", 30));
+// 기본 1344x768(SDXL 1MP 16:9 스위트스폿). FLUX(COMFY_MODEL=flux)로 가면 고해상도가 안전하므로
+// SCENE_W=1920 SCENE_H=1080 으로 올려 업스케일 블러를 없앨 수 있다(롱폼 화질 레버 B).
 export const SCENE_W = latentDimEnv("SCENE_W", 1344);
 export const SCENE_H = latentDimEnv("SCENE_H", 768);
 export const W = 1920;
 export const H = 1080;
+
+// ── 이미지 모델 선택(SDXL 기본 / FLUX 옵트인) ─────────────────────────────────
+// COMFY_MODEL=flux 로 FLUX 경로 활성화. 기본 sdxl 이라 기존 동작 100% 보존.
+// FLUX 는 IPAdapter 미사용 경로(일러스트/카툰)에만 적용 — 포토리얼 IPAdapter 얼굴락은 SDXL 전용 유지.
+export type ImageModel = "sdxl" | "flux";
+export const IMAGE_MODEL: ImageModel =
+	(process.env.COMFY_MODEL ?? "sdxl").toLowerCase() === "flux"
+		? "flux"
+		: "sdxl";
+// FLUX 가중치 파일명(표준 ComfyUI 설치 기본값). 설치 위치 다르면 env 로 덮어쓴다.
+export const FLUX_UNET = process.env.FLUX_UNET ?? "flux1-schnell.safetensors";
+export const FLUX_CLIP_L = process.env.FLUX_CLIP_L ?? "clip_l.safetensors";
+export const FLUX_T5 = process.env.FLUX_T5 ?? "t5xxl_fp8_e4m3fn.safetensors";
+export const FLUX_VAE = process.env.FLUX_VAE ?? "ae.safetensors";
+// schnell=4스텝/cfg1(빠름·무료·Mac 적합), dev=20+스텝+guidance. 기본 schnell.
+export const FLUX_STEPS = Math.max(1, posIntEnv("FLUX_STEPS", 4));
+export const FLUX_GUIDANCE = floatEnv("FLUX_GUIDANCE", 3.5); // dev 전용. schnell 은 무시.
 
 export const log = (m: string) => process.stdout.write(`${m}\n`);
 
@@ -162,12 +181,29 @@ export async function runComfyChecked(
 // .srt·챕터·measure-and-extend 가 자동 동기. TTS_SPEED env 로 조정, [0.5,2.0] 클램프.
 export const TTS_SPEED = Math.min(2, Math.max(0.5, floatEnv("TTS_SPEED", 1.1)));
 
-/** ElevenLabs(기본 Bella) TTS → mp3 파일. voice 미지정 시 TTS_VOICE env / Bella. TTS_SPEED 적용. */
-export async function tts(
-	text: string,
-	out: string,
-	voice = process.env.TTS_VOICE ?? "EXAVITQu4vr4xnSDxMaL",
-): Promise<void> {
+/** TTS_PROVIDER 정규화 → "clova" | "elevenlabs". 빈값/미지원 값은 elevenlabs 로 폴백(기존 동작 보존). */
+export function resolveTtsProvider(
+	raw = process.env.TTS_PROVIDER,
+): "clova" | "elevenlabs" {
+	return (raw ?? "").trim().toLowerCase() === "clova" ? "clova" : "elevenlabs";
+}
+
+/** CLOVA Voice(NCP) 합성 → mp3 버퍼. speaker 미지정 시 CLOVA_SPEAKER env / nara.
+ *  speed=0(정속)으로 받고 가속은 공용 atempo 경로에서 일괄 적용 → provider 간 TTS_SPEED 의미 동일.
+ *  NOTE: CLOVA 1요청 텍스트 상한이 있으므로(씬 내레이션 1~2문장은 안전) 긴 단일 텍스트는 호출부에서 분할 전제. */
+async function ttsClova(text: string): Promise<Buffer> {
+	const speaker = process.env.CLOVA_SPEAKER ?? "nara";
+	const res = await fetch(`${PROXY}/api/clova/tts`, {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({ speaker, text, format: "mp3", speed: 0 }),
+	});
+	if (!res.ok) throw new Error(`CLOVA TTS ${res.status} ${await res.text()}`);
+	return Buffer.from(await res.arrayBuffer());
+}
+
+/** ElevenLabs(기본 Bella) 합성 → mp3 버퍼. */
+async function ttsElevenLabs(text: string, voice: string): Promise<Buffer> {
 	const res = await fetch(`${PROXY}/api/elevenlabs/tts/${voice}`, {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
@@ -178,7 +214,20 @@ export async function tts(
 		}),
 	});
 	if (!res.ok) throw new Error(`TTS ${res.status} ${await res.text()}`);
-	const buf = Buffer.from(await res.arrayBuffer());
+	return Buffer.from(await res.arrayBuffer());
+}
+
+/** TTS → mp3 파일. TTS_PROVIDER 로 provider 선택(clova|elevenlabs), TTS_SPEED 는 공용 atempo 로 일괄 적용.
+ *  voice 인자는 ElevenLabs 전용(CLOVA 는 CLOVA_SPEAKER 사용). */
+export async function tts(
+	text: string,
+	out: string,
+	voice = process.env.TTS_VOICE ?? "EXAVITQu4vr4xnSDxMaL",
+): Promise<void> {
+	const buf =
+		resolveTtsProvider() === "clova"
+			? await ttsClova(text)
+			: await ttsElevenLabs(text, voice);
 	if (TTS_SPEED === 1) {
 		writeFileSync(out, buf);
 		return;
@@ -334,34 +383,46 @@ export function buildTextbookIllustrationPrompt(visual: string): string {
 	return `hand-drawn colored pencil and soft watercolor textbook illustration, warm muted palette, clean confident linework, educational explainer diorama, consistent storybook art direction, gentle paper texture, no text no letters no words: ${visual}`;
 }
 
-/**
- * 일러스트 SDXL 워크플로 — IPAdapter/호스트 레퍼런스 없음(스타일이 일관성을 운반).
- * make-vlog(--style illustration)·확장 장르 공용. cfg 7 로 스타일 충실도↑.
- */
-export function illustrationWorkflow(prompt: string, seed: number) {
+// ── 공유 text-to-image 워크플로(SDXL/FLUX) ───────────────────────────────────
+// 일러스트(make-vlog)·카툰(make-economy) 모두 동일한 비-IPAdapter t2i 그래프를 쓴다.
+// 한 곳에서 SDXL↔FLUX 를 분기 → 모델 교체가 호출부 수정 없이 IMAGE_MODEL 한 곳으로 끝난다.
+export interface T2IParams {
+	/** 양성 프롬프트(스타일 빌더가 이미 적용된 최종 텍스트). */
+	positive: string;
+	/** SDXL 음성 프롬프트. FLUX 는 cfg=1 이라 무시(빈 conditioning 으로 전달). */
+	negative: string;
+	seed: number;
+	/** 결과 파일 접두사(ComfyUI SaveImage). */
+	filenamePrefix: string;
+	/** 생성 해상도. 미지정 시 SCENE_W/H(가로). 숏폼은 세로 차원을 넘긴다. */
+	width?: number;
+	height?: number;
+	/** SDXL classifier-free guidance(기본 7, 스타일 충실도). FLUX 는 항상 1. */
+	cfg?: number;
+}
+
+/** SDXL t2i 그래프(CheckpointLoaderSimple → EmptyLatentImage → CLIP×2 → KSampler → VAE → Save). */
+function sdxlT2IWorkflow(p: T2IParams, width: number, height: number) {
 	return {
 		"4": { class_type: "CheckpointLoaderSimple", inputs: { ckpt_name: CKPT } },
 		"5": {
 			class_type: "EmptyLatentImage",
-			inputs: { width: SCENE_W, height: SCENE_H, batch_size: 1 },
+			inputs: { width, height, batch_size: 1 },
 		},
 		"6": {
 			class_type: "CLIPTextEncode",
-			inputs: { text: buildTextbookIllustrationPrompt(prompt), clip: ["4", 1] },
+			inputs: { text: p.positive, clip: ["4", 1] },
 		},
 		"7": {
 			class_type: "CLIPTextEncode",
-			inputs: {
-				text: "photorealistic, realistic, 3d render, photograph, text, letters, words, watermark, signature, ugly, blurry, jpeg artifacts, deformed, extra fingers",
-				clip: ["4", 1],
-			},
+			inputs: { text: p.negative, clip: ["4", 1] },
 		},
 		"3": {
 			class_type: "KSampler",
 			inputs: {
-				seed,
+				seed: p.seed,
 				steps: STEPS,
-				cfg: 7,
+				cfg: p.cfg ?? 7,
 				sampler_name: "dpmpp_2m",
 				scheduler: "karras",
 				denoise: 1,
@@ -377,9 +438,109 @@ export function illustrationWorkflow(prompt: string, seed: number) {
 		},
 		"9": {
 			class_type: "SaveImage",
-			inputs: { filename_prefix: "vlog_illus", images: ["8", 0] },
+			inputs: { filename_prefix: p.filenamePrefix, images: ["8", 0] },
 		},
 	};
+}
+
+/**
+ * FLUX t2i 그래프(표준 ComfyUI 템플릿): UNETLoader + DualCLIPLoader + VAELoader,
+ * cfg=1(distilled), EmptySD3LatentImage(16ch), FluxGuidance(dev용·schnell 무시), euler/simple.
+ * 음성 프롬프트는 cfg=1 에서 무시되지만 KSampler 입력 슬롯이 필요해 빈 conditioning 으로 연결.
+ */
+function fluxWorkflow(p: T2IParams, width: number, height: number) {
+	return {
+		"10": {
+			class_type: "UNETLoader",
+			inputs: { unet_name: FLUX_UNET, weight_dtype: "default" },
+		},
+		"11": {
+			class_type: "DualCLIPLoader",
+			inputs: {
+				clip_name1: FLUX_CLIP_L,
+				clip_name2: FLUX_T5,
+				type: "flux",
+			},
+		},
+		"12": { class_type: "VAELoader", inputs: { vae_name: FLUX_VAE } },
+		"5": {
+			class_type: "EmptySD3LatentImage",
+			inputs: { width, height, batch_size: 1 },
+		},
+		"6": {
+			class_type: "CLIPTextEncode",
+			inputs: { text: p.positive, clip: ["11", 0] },
+		},
+		"13": {
+			class_type: "FluxGuidance",
+			inputs: { conditioning: ["6", 0], guidance: FLUX_GUIDANCE },
+		},
+		"14": {
+			class_type: "CLIPTextEncode",
+			inputs: { text: "", clip: ["11", 0] },
+		},
+		"3": {
+			class_type: "KSampler",
+			inputs: {
+				seed: p.seed,
+				steps: FLUX_STEPS,
+				cfg: 1,
+				sampler_name: "euler",
+				scheduler: "simple",
+				denoise: 1,
+				model: ["10", 0],
+				positive: ["13", 0],
+				negative: ["14", 0],
+				latent_image: ["5", 0],
+			},
+		},
+		"8": {
+			class_type: "VAEDecode",
+			inputs: { samples: ["3", 0], vae: ["12", 0] },
+		},
+		"9": {
+			class_type: "SaveImage",
+			inputs: { filename_prefix: p.filenamePrefix, images: ["8", 0] },
+		},
+	};
+}
+
+/**
+ * SDXL/FLUX 분기 디스패처. 기본은 IMAGE_MODEL(env COMFY_MODEL).
+ * model 인자는 테스트/특수 호출에서 분기를 명시할 때만 사용(런타임 호출부는 생략 → env 따름).
+ */
+export function textToImageWorkflow(
+	p: T2IParams,
+	model: ImageModel = IMAGE_MODEL,
+): Record<string, { class_type: string; inputs: Record<string, unknown> }> {
+	const width = p.width ?? SCENE_W;
+	const height = p.height ?? SCENE_H;
+	return model === "flux"
+		? fluxWorkflow(p, width, height)
+		: sdxlT2IWorkflow(p, width, height);
+}
+
+/**
+ * 일러스트 워크플로(SDXL/FLUX 공용) — IPAdapter/호스트 레퍼런스 없음(스타일이 일관성을 운반).
+ * make-vlog(--style illustration)·확장 장르 공용. cfg 7 로 스타일 충실도↑.
+ * width/height 미지정 시 가로(SCENE_W/H). 숏폼은 세로 차원을 넘겨 크롭/업스케일 블러를 없앤다.
+ */
+export function illustrationWorkflow(
+	prompt: string,
+	seed: number,
+	width: number = SCENE_W,
+	height: number = SCENE_H,
+) {
+	return textToImageWorkflow({
+		positive: buildTextbookIllustrationPrompt(prompt),
+		negative:
+			"photorealistic, realistic, 3d render, photograph, text, letters, words, watermark, signature, ugly, blurry, jpeg artifacts, deformed, extra fingers",
+		seed,
+		filenamePrefix: "vlog_illus",
+		width,
+		height,
+		cfg: 7,
+	});
 }
 
 // ── 출처 리스트(YouTube 재사용 콘텐츠 비수익화 회피) ──────────────────────────
