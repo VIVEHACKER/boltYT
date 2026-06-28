@@ -3,10 +3,20 @@ import {
 	beatSceneCounts,
 	buildCartoonPrompt,
 	decodeXml,
+	estimateSceneCount,
+	extractKeywords,
+	groundingContext,
 	isUsableArticle,
 	parseRssItems,
+	parseTrendTerms,
 	pickArticle,
+	publisherFromUrl,
 	type RssItem,
+	relatedArticles,
+	SCENE_CAP,
+	scenesNeeded,
+	scoreEmotionalAngle,
+	scoreTrend,
 	slugify,
 	stripCdata,
 } from "./make-economy.ts";
@@ -114,11 +124,211 @@ describe("beatSceneCounts", () => {
 	});
 });
 
+describe("estimateSceneCount (길이 보정)", () => {
+	it("~20초/씬 기준 환산", () => {
+		expect(estimateSceneCount(3)).toBe(9); // round(180/20)
+		expect(estimateSceneCount(15)).toBe(45); // round(900/20)
+	});
+	it("최소 8씬 floor", () => {
+		expect(estimateSceneCount(1)).toBe(8); // round(60/20)=3 → 8
+	});
+	it("SCENE_CAP 상한", () => {
+		expect(estimateSceneCount(60)).toBe(SCENE_CAP); // round(3600/18)=200 → cap
+	});
+});
+
+describe("scenesNeeded (measure-and-extend)", () => {
+	it("목표 충족/초과 → 0", () => {
+		expect(scenesNeeded(180, 180, 18, 40)).toBe(0);
+		expect(scenesNeeded(180, 200, 18, 40)).toBe(0);
+	});
+	it("부족분 / 평균 → 추가 씬수", () => {
+		expect(scenesNeeded(180, 90, 18, 40)).toBe(5); // ceil(90/18)
+	});
+	it("남은 캡으로 제한", () => {
+		expect(scenesNeeded(180, 90, 18, 3)).toBe(3);
+	});
+	it("avg 0 방어(최소 6초/씬)", () => {
+		expect(scenesNeeded(180, 90, 0, 40)).toBe(15); // ceil(90/6)
+	});
+	it("작은 부족분도 최소 2씬", () => {
+		expect(scenesNeeded(180, 178, 18, 40)).toBe(2);
+	});
+});
+
 describe("buildCartoonPrompt", () => {
 	it("카툰 스타일 prefix + 텍스트 억제 + visual 포함", () => {
 		const p = buildCartoonPrompt("a bank vault overflowing with money");
 		expect(p).toContain("flat 2D vector cartoon");
 		expect(p).toContain("no text");
 		expect(p).toContain("a bank vault overflowing with money");
+	});
+});
+
+describe("parseTrendTerms", () => {
+	const TRENDS = `<?xml version="1.0"?><rss><channel><title>Daily Search Trends</title>
+<item><title>SK하이닉스</title><link>https://t/a</link></item>
+<item><title><![CDATA[삼성전자]]></title></item>
+</channel></rss>`;
+	it("item title(검색어)만 추출, 채널 title 제외", () => {
+		const terms = parseTrendTerms(TRENDS);
+		expect(terms).toEqual(["SK하이닉스", "삼성전자"]);
+	});
+	it("빈/깨진 XML → 빈 배열", () => {
+		expect(parseTrendTerms("")).toEqual([]);
+	});
+});
+
+describe("scoreTrend", () => {
+	const mkD = (title: string, description = ""): RssItem => ({
+		title,
+		link: "x",
+		description,
+		pubDate: "",
+	});
+	it("제목 매치 가중 2, 요약 매치 가중 1", () => {
+		expect(scoreTrend(mkD("SK하이닉스 유상증자"), ["SK하이닉스"])).toBe(2);
+		expect(
+			scoreTrend(mkD("증자 소식", "SK하이닉스 관련"), ["SK하이닉스"]),
+		).toBe(1);
+	});
+	it("1글자 검색어 무시, 무매치 0", () => {
+		expect(scoreTrend(mkD("삼성전자"), ["A"])).toBe(0);
+		expect(scoreTrend(mkD("삼성전자"), ["없는키워드"])).toBe(0);
+	});
+});
+
+describe("pickArticle 트렌드 정렬", () => {
+	const items = [
+		mk("일반 경제 기사입니다", "a"),
+		mk("SK하이닉스 45조 유상증자 결정", "b"),
+	];
+	it("트렌드 매치 기사를 최신보다 우선", () => {
+		expect(pickArticle(items, new Set(), undefined, ["SK하이닉스"])?.link).toBe(
+			"b",
+		);
+	});
+	it("트렌드 0점이면 최신순(선두) 유지", () => {
+		expect(pickArticle(items, new Set(), undefined, ["없는것"])?.link).toBe(
+			"a",
+		);
+	});
+	it("빈 terms 면 현행 최신순", () => {
+		expect(pickArticle(items, new Set(), undefined, [])?.link).toBe("a");
+	});
+});
+
+describe("scoreEmotionalAngle", () => {
+	const mkD = (title: string, description = ""): RssItem => ({
+		title,
+		link: "x",
+		description,
+		pubDate: "",
+	});
+	it("제목 감정마커 가중 2, 요약 가중 1", () => {
+		expect(scoreEmotionalAngle(mkD("삼성, 사상 최대 실적"))).toBe(2);
+		expect(scoreEmotionalAngle(mkD("실적 발표", "코스피 폭락"))).toBe(1);
+		expect(scoreEmotionalAngle(mkD("역대급 돌파", "위기 충격"))).toBe(3);
+	});
+	it("감정 마커 없으면 0", () => {
+		expect(scoreEmotionalAngle(mkD("환율 소폭 변동", "보합세"))).toBe(0);
+	});
+});
+
+describe("pickArticle 감정 앵글", () => {
+	const items = [
+		mk("환율 보합세 마감", "a"),
+		mk("삼성전자 사상 최대 실적 충격", "b"),
+	];
+	it("emotional on → 감정 강도 높은 기사 우선", () => {
+		expect(
+			pickArticle(items, new Set(), undefined, undefined, true)?.link,
+		).toBe("b");
+	});
+	it("emotional off(기본) → 최신순 유지", () => {
+		expect(pickArticle(items, new Set())?.link).toBe("a");
+	});
+});
+
+describe("publisherFromUrl", () => {
+	it("등록 도메인 → 한글 매체명", () => {
+		expect(publisherFromUrl("https://www.yna.co.kr/view/AKR1")).toBe(
+			"연합뉴스",
+		);
+		expect(publisherFromUrl("https://hankyung.com/x")).toBe("한국경제");
+	});
+	it("미등록 도메인 → 호스트명", () => {
+		expect(publisherFromUrl("https://example.com/x")).toBe("example.com");
+	});
+	it("잘못된 URL → 빈 문자열", () => {
+		expect(publisherFromUrl("not a url")).toBe("");
+	});
+});
+
+describe("extractKeywords", () => {
+	it("길이≥2 토큰, 중복 제거, 소문자", () => {
+		expect(extractKeywords("SK하이닉스 45조 SK 유상증자")).toEqual([
+			"sk하이닉스",
+			"45조",
+			"유상증자",
+		]);
+	});
+});
+
+describe("relatedArticles", () => {
+	const mkF = (title: string, link: string, description = ""): RssItem => ({
+		title,
+		link,
+		description,
+		pubDate: "",
+	});
+	const primary = mkF("SK하이닉스 45조 유상증자 결정", "p");
+	const items = [
+		primary,
+		mkF("SK하이닉스 HBM 증설", "a", "유상증자 자금 활용"),
+		mkF("삼성전자 실적 발표", "b"),
+		mkF("코스피 마감 시황", "c"),
+	];
+	it("키워드 겹치는 기사만 점수순으로", () => {
+		const r = relatedArticles(items, primary, new Set());
+		expect(r.map((x) => x.link)).toEqual(["a"]);
+	});
+	it("primary/used 제외", () => {
+		expect(
+			relatedArticles(items, primary, new Set(["a"])).map((x) => x.link),
+		).toEqual([]);
+	});
+	it("max 로 상한", () => {
+		const many = [
+			primary,
+			mkF("SK하이닉스 유상증자 분석", "x"),
+			mkF("SK하이닉스 유상증자 영향", "y"),
+		];
+		expect(relatedArticles(many, primary, new Set(), 1)).toHaveLength(1);
+	});
+});
+
+describe("groundingContext", () => {
+	const primary: RssItem = {
+		title: "제목A",
+		link: "p",
+		description: "요약A",
+		pubDate: "",
+	};
+	it("본문/관련보도 있으면 포함", () => {
+		const c = groundingContext({
+			primary,
+			body: "본문발췌",
+			related: [{ title: "관련B", link: "b", description: "", pubDate: "" }],
+		});
+		expect(c).toContain("제목A");
+		expect(c).toContain("기사 본문(발췌): 본문발췌");
+		expect(c).toContain("- 관련B");
+	});
+	it("본문/관련보도 없으면 제목+요약만", () => {
+		const c = groundingContext({ primary, body: "", related: [] });
+		expect(c).toContain("제목A");
+		expect(c).not.toContain("기사 본문");
+		expect(c).not.toContain("관련 보도");
 	});
 });

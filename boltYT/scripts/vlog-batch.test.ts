@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+	canonicalRenderKey,
 	computePlan,
 	type JobSpec,
 	jobId,
@@ -103,6 +104,21 @@ describe("jobId", () => {
 			jobId(hist("로마", { scenes: 8 })),
 		);
 	});
+	it("style: 미지정=illustration(새 기본) ≠ photoreal(레거시 키 보존)", () => {
+		const illus = jobId(hist("로마", { minutes: 10 }));
+		expect(jobId(hist("로마", { minutes: 10, style: "illustration" }))).toBe(
+			illus,
+		);
+		expect(jobId(hist("로마", { minutes: 10, style: "photoreal" }))).not.toBe(
+			illus,
+		);
+	});
+	it("photoreal 키는 style 필드 미추가(레거시 ledger 호환)", () => {
+		// 과거(style 도입 전) 키 = genre|era|minutes|scenes|channel|ffmpeg, 끝에 style 없음.
+		expect(
+			canonicalRenderKey(hist("로마", { minutes: 10, style: "photoreal" })),
+		).toBe("history|ancient-rome-44ad|10||my-history|0");
+	});
 });
 
 describe("computePlan", () => {
@@ -197,5 +213,18 @@ describe("jobToArgs", () => {
 	});
 	it("미지원 장르 → throw", () => {
 		expect(() => jobToArgs({ era: "x", genre: "economy" }, "/o")).toThrow();
+	});
+	it("style 전달 시 --style 포함", () => {
+		const a = jobToArgs(
+			hist("로마", { minutes: 10, style: "photoreal" }),
+			"/o",
+		);
+		expect(a).toContain("--style");
+		expect(a[a.indexOf("--style") + 1]).toBe("photoreal");
+	});
+	it("style 미지정 시 --style 미포함(make-vlog 기본 illustration)", () => {
+		expect(jobToArgs(hist("로마", { minutes: 10 }), "/o")).not.toContain(
+			"--style",
+		);
 	});
 });

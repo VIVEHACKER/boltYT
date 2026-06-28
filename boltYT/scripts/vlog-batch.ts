@@ -49,6 +49,8 @@ export interface JobSpec {
 	scenes?: number;
 	channel?: string;
 	ffmpeg?: boolean;
+	/** 아트 스타일: "illustration"(기본) | "photoreal". make-vlog --style 로 전달. */
+	style?: string;
 }
 
 export interface LedgerEntry {
@@ -127,10 +129,12 @@ export function normalizeJob(
 	const scenes = numOrUndef(pick(o.scenes, defaults.scenes));
 	const channel = strOrUndef(pick(o.channel, defaults.channel));
 	const ffmpeg = boolOrUndef(pick(o.ffmpeg, defaults.ffmpeg));
+	const style = strOrUndef(pick(o.style, defaults.style));
 	if (minutes !== undefined) job.minutes = minutes;
 	if (scenes !== undefined) job.scenes = scenes;
 	if (channel !== undefined) job.channel = channel;
 	if (ffmpeg !== undefined) job.ffmpeg = ffmpeg;
+	if (style !== undefined) job.style = style;
 	return job;
 }
 
@@ -166,14 +170,19 @@ export function canonicalRenderKey(job: JobSpec): string {
 			: job.era.trim().toLowerCase();
 	const minutes = useMinutes ? Math.max(1, job.minutes as number) : "";
 	const scenes = useMinutes ? "" : clampScenes(job.scenes ?? MV_DEFAULT_SCENES);
-	return [
+	const parts: (string | number)[] = [
 		job.genre,
 		era,
 		minutes,
 		scenes,
 		job.channel ?? MV_DEFAULT_CHANNEL,
 		job.ffmpeg ? 1 : 0,
-	].join("|");
+	];
+	// style 은 렌더 산출물을 바꾸므로 dedup 키에 반영(Codex P2). 단 레거시 키 보존:
+	// photoreal(과거 유일 기본)은 필드 미추가 → 기존 ledger 키와 동일(불필요 재렌더 방지).
+	// illustration(새 기본, 미지정 포함)만 필드 추가 → 새 키로 신규 렌더(의도된 일러스트 전환).
+	if (job.style !== "photoreal") parts.push("illustration");
+	return parts.join("|");
 }
 
 /** 잡의 안정적 ID — 정규화 렌더 식별자(canonicalRenderKey)의 sha1. 동일 산출물이면 동일 ID. */
@@ -255,6 +264,7 @@ export function jobToArgs(job: JobSpec, outDir: string): string[] {
 		a.push("--scenes", String(job.scenes));
 	if (job.channel) a.push("--channel", job.channel);
 	if (job.ffmpeg) a.push("--ffmpeg", "true");
+	if (job.style) a.push("--style", job.style);
 	a.push("--out", outDir);
 	return a;
 }
@@ -381,6 +391,7 @@ async function main(): Promise<void> {
 	if (ds !== undefined) defaults.scenes = ds;
 	if (args.channel) defaults.channel = args.channel;
 	if (args.ffmpeg === "true") defaults.ffmpeg = true;
+	if (args.style) defaults.style = args.style;
 
 	const max = numOrUndef(args.max) ?? 3;
 	const target = numOrUndef(args.target);
