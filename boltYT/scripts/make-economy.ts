@@ -31,7 +31,6 @@ import {
 	buildChapterMarkers,
 	buildSourceDescription,
 	buildSourceListLines,
-	CKPT,
 	dur,
 	log,
 	overlayThumbnailText,
@@ -40,11 +39,9 @@ import {
 	renderSourceListSlide,
 	runComfy,
 	runComfyChecked,
-	SCENE_H,
-	SCENE_W,
 	type SourceRef,
-	STEPS,
 	srtTime,
+	textToImageWorkflow,
 	tts,
 } from "./vlog-shared.ts";
 
@@ -344,49 +341,19 @@ export function buildCartoonPrompt(visual: string): string {
 
 // ── IO / 워크플로 ────────────────────────────────────────────────────────────
 
-/** 플랫 카툰 SDXL 워크플로 — IPAdapter/호스트 없음(경제는 일관 캐릭터 불필요). */
+/**
+ * 플랫 카툰 워크플로(SDXL/FLUX 공용) — IPAdapter/호스트 없음(경제는 일관 캐릭터 불필요).
+ * 모델 분기는 공유 textToImageWorkflow(IMAGE_MODEL)가 담당. 경제는 롱폼 전용이라 가로(SCENE_W/H).
+ */
 function cartoonWorkflow(prompt: string, seed: number) {
-	return {
-		"4": { class_type: "CheckpointLoaderSimple", inputs: { ckpt_name: CKPT } },
-		"5": {
-			class_type: "EmptyLatentImage",
-			inputs: { width: SCENE_W, height: SCENE_H, batch_size: 1 },
-		},
-		"6": {
-			class_type: "CLIPTextEncode",
-			inputs: { text: buildCartoonPrompt(prompt), clip: ["4", 1] },
-		},
-		"7": {
-			class_type: "CLIPTextEncode",
-			inputs: {
-				text: "photorealistic, realistic, 3d render, photograph, text, letters, words, watermark, signature, ugly, blurry, jpeg artifacts, cluttered, deformed",
-				clip: ["4", 1],
-			},
-		},
-		"3": {
-			class_type: "KSampler",
-			inputs: {
-				seed,
-				steps: STEPS,
-				cfg: 7,
-				sampler_name: "dpmpp_2m",
-				scheduler: "karras",
-				denoise: 1,
-				model: ["4", 0],
-				positive: ["6", 0],
-				negative: ["7", 0],
-				latent_image: ["5", 0],
-			},
-		},
-		"8": {
-			class_type: "VAEDecode",
-			inputs: { samples: ["3", 0], vae: ["4", 2] },
-		},
-		"9": {
-			class_type: "SaveImage",
-			inputs: { filename_prefix: "econ_scene", images: ["8", 0] },
-		},
-	};
+	return textToImageWorkflow({
+		positive: buildCartoonPrompt(prompt),
+		negative:
+			"photorealistic, realistic, 3d render, photograph, text, letters, words, watermark, signature, ugly, blurry, jpeg artifacts, cluttered, deformed",
+		seed,
+		filenamePrefix: "econ_scene",
+		cfg: 7,
+	});
 }
 
 /**

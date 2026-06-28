@@ -63,6 +63,38 @@ export const FLUX_VAE = process.env.FLUX_VAE ?? "ae.safetensors";
 export const FLUX_STEPS = Math.max(1, posIntEnv("FLUX_STEPS", 4));
 export const FLUX_GUIDANCE = floatEnv("FLUX_GUIDANCE", 3.5); // dev 전용. schnell 은 무시.
 
+// 속도-품질 프리셋: COMFY_PRESET=fast(=lightning/turbo) → SDXL Lightning/Turbo 체크포인트용 저스텝 설정.
+// DreamShaperXL Lightning 등 6~8스텝 파인튠 + cfg2/dpmpp_sde/sgm_uniform = base SDXL 30스텝보다
+// "더 빠르고 더 좋다"(품질은 파인튠이, 속도는 저스텝이 책임). 미설정 시 기존 고품질 기본 보존.
+// FLUX(느림·Mac 부담)를 안 켜고 화질을 올리는 권장 경로.
+export const SDXL_FAST = ["fast", "lightning", "turbo"].includes(
+	(process.env.COMFY_PRESET ?? "").toLowerCase(),
+);
+export const SDXL_FAST_STEPS = Math.max(1, posIntEnv("COMFY_FAST_STEPS", 8));
+
+/**
+ * SDXL KSampler 설정 — fast 면 Lightning/Turbo 저스텝(cfg2/dpmpp_sde/sgm_uniform), 아니면 고품질 기본.
+ * 순수 함수로 분리해 프리셋 분기를 env 비결합으로 테스트(IMAGE_MODEL 동형, Codex 패턴).
+ */
+export function sdxlSamplerSettings(
+	fast: boolean,
+	cfg = 7,
+): {
+	steps: number;
+	cfg: number;
+	sampler_name: string;
+	scheduler: string;
+} {
+	return fast
+		? {
+				steps: SDXL_FAST_STEPS,
+				cfg: 2,
+				sampler_name: "dpmpp_sde",
+				scheduler: "sgm_uniform",
+			}
+		: { steps: STEPS, cfg, sampler_name: "dpmpp_2m", scheduler: "karras" };
+}
+
 export const log = (m: string) => process.stdout.write(`${m}\n`);
 
 export function parseArgs(argv: string[]): Record<string, string> {
@@ -403,6 +435,7 @@ export interface T2IParams {
 
 /** SDXL t2i 그래프(CheckpointLoaderSimple → EmptyLatentImage → CLIP×2 → KSampler → VAE → Save). */
 function sdxlT2IWorkflow(p: T2IParams, width: number, height: number) {
+	const sampler = sdxlSamplerSettings(SDXL_FAST, p.cfg ?? 7);
 	return {
 		"4": { class_type: "CheckpointLoaderSimple", inputs: { ckpt_name: CKPT } },
 		"5": {
@@ -421,10 +454,10 @@ function sdxlT2IWorkflow(p: T2IParams, width: number, height: number) {
 			class_type: "KSampler",
 			inputs: {
 				seed: p.seed,
-				steps: STEPS,
-				cfg: p.cfg ?? 7,
-				sampler_name: "dpmpp_2m",
-				scheduler: "karras",
+				steps: sampler.steps,
+				cfg: sampler.cfg,
+				sampler_name: sampler.sampler_name,
+				scheduler: sampler.scheduler,
 				denoise: 1,
 				model: ["4", 0],
 				positive: ["6", 0],

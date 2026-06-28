@@ -68,6 +68,10 @@ function latentDimEnv(name: string, def: number): number {
 const STEPS = Math.max(8, posIntEnv("COMFY_STEPS", 30));
 const SCENE_W = latentDimEnv("SCENE_W", 1344);
 const SCENE_H = latentDimEnv("SCENE_H", 768);
+// 숏폼(--shorts true)은 세로 9:16 로 생성 → Remotion YouTubeShorts(1080x1920)가 가로 이미지를
+// 크롭/업스케일하던 화질 붕괴를 제거(레버 A). 기본 768x1344 = SDXL 1MP 9:16 버킷. FLUX 면 1080x1920 권장.
+const SHORTS_W = latentDimEnv("SHORTS_W", 768);
+const SHORTS_H = latentDimEnv("SHORTS_H", 1344);
 /** 양의 실수 env(0 초과). 잘못된 값은 기본값. */
 function floatEnv(name: string, def: number): number {
 	const raw = process.env[name];
@@ -206,6 +210,8 @@ function sceneWorkflow(
 	ref: string,
 	weight = 0.6,
 	endAt = 0.7,
+	width = SCENE_W,
+	height = SCENE_H,
 ) {
 	return {
 		"4": { class_type: "CheckpointLoaderSimple", inputs: { ckpt_name: CKPT } },
@@ -237,7 +243,7 @@ function sceneWorkflow(
 		},
 		"5": {
 			class_type: "EmptyLatentImage",
-			inputs: { width: SCENE_W, height: SCENE_H, batch_size: 1 },
+			inputs: { width, height, batch_size: 1 },
 		},
 		"6": {
 			class_type: "CLIPTextEncode",
@@ -277,7 +283,12 @@ function sceneWorkflow(
 }
 
 /** 와이드 환경샷 — 호스트 얼굴 없이 "그들이 보는 것"(군중·장소). 셀카 단조로움 깨기. */
-function wideWorkflow(prompt: string, seed: number) {
+function wideWorkflow(
+	prompt: string,
+	seed: number,
+	width = SCENE_W,
+	height = SCENE_H,
+) {
 	return {
 		"3": {
 			class_type: "KSampler",
@@ -297,7 +308,7 @@ function wideWorkflow(prompt: string, seed: number) {
 		"4": { class_type: "CheckpointLoaderSimple", inputs: { ckpt_name: CKPT } },
 		"5": {
 			class_type: "EmptyLatentImage",
-			inputs: { width: SCENE_W, height: SCENE_H, batch_size: 1 },
+			inputs: { width, height, batch_size: 1 },
 		},
 		"6": {
 			class_type: "CLIPTextEncode",
@@ -485,6 +496,15 @@ async function main(): Promise<void> {
 	// 아트 스타일: illustration(기본, 케이스 스터디 검증 — 단일 일관 일러스트체로 일관성/언캐니밸리/오리지널 동시 해결)
 	// vs photoreal(레거시 — IPAdapter 호스트 face-lock). --style photoreal 로 옛 경로 유지.
 	const illustration = args.style !== "photoreal";
+	// 숏폼이면 씬 이미지를 세로(9:16)로 생성 → YouTubeShorts 컴포지션의 크롭/업스케일 블러 제거(레버 A).
+	// 썸네일은 16:9 유지(YouTube 썸네일 규격)라 이 차원을 안 쓴다.
+	const isShorts = args.shorts === "true";
+	const imgW = isShorts ? SHORTS_W : SCENE_W;
+	const imgH = isShorts ? SHORTS_H : SCENE_H;
+	// ffmpeg 폴백 렌더 차원 — 숏폼이면 세로(1080x1920)로 렌더해야 9:16 소스가 안 잘림(Codex P2).
+	// (Remotion 경로는 YouTubeShorts 컴포지션이 알아서 세로. ffmpeg 폴백은 여기서 명시.)
+	const renderW = isShorts ? H : W;
+	const renderH = isShorts ? W : H;
 	const channel = args.channel ?? "my-history";
 	const stamp =
 		Number(process.env.SOURCE_DATE_EPOCH) || Math.floor(Date.now() / 1000);
@@ -557,13 +577,15 @@ async function main(): Promise<void> {
 				);
 		const img = await runComfy(
 			illustration
-				? illustrationWorkflow(illusPrompt, 1000 + i * 137)
+				? illustrationWorkflow(illusPrompt, 1000 + i * 137, imgW, imgH)
 				: isWide
 					? wideWorkflow(
 							photoreal(
 								`${scenes[i].visual}, ${era.settingKeywords}, wide establishing shot, ${CROWD}`,
 							),
 							1000 + i * 137,
+							imgW,
+							imgH,
 						)
 					: sceneWorkflow(
 							// medium 셀카(허리 위) + 중간 weight(서양 0.72/비서양 0.85) → 호스트 신원 고정하며 배경/군중 유지
@@ -574,6 +596,8 @@ async function main(): Promise<void> {
 							ref,
 							ipaWeight,
 							ipaEndAt,
+							imgW,
+							imgH,
 						),
 			join(work, `scene${i}.png`),
 		);
@@ -642,7 +666,7 @@ async function main(): Promise<void> {
 				"-i",
 				mp3,
 				"-filter_complex",
-				`[0:v]scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},zoompan=z='min(zoom+0.0004,1.07)':d=${Math.round(d * 30)}:s=${W}x${H}:fps=30,setsar=1[v]`,
+				`[0:v]scale=${renderW}:${renderH}:force_original_aspect_ratio=increase,crop=${renderW}:${renderH},zoompan=z='min(zoom+0.0004,1.07)':d=${Math.round(d * 30)}:s=${renderW}x${renderH}:fps=30,setsar=1[v]`,
 				"-map",
 				"[v]",
 				"-map",

@@ -26,8 +26,14 @@ import { bundle } from "@remotion/bundler";
 import { renderMedia, selectComposition } from "@remotion/renderer";
 import { getOverlapFrames } from "../src/remotion/timing.ts";
 import type { RemotionScene, TransitionType } from "../src/remotion/types.ts";
+import { floatEnv, posIntEnv } from "./vlog-shared.ts";
 
 const FPS = 30;
+// 중간 프레임 JPEG 품질(기본 100). Remotion 기본 80 은 h264 인코딩 전 이중 압축이라
+// 그라데이션/텍스트 디테일이 손실된다(레버 C). 100 은 속도 거의 그대로 손실만 제거.
+const JPEG_QUALITY = Math.min(100, posIntEnv("JPEG_QUALITY", 100));
+// 렌더 배율(기본 1). RENDER_SCALE=2 → 1920x1080 컴포지션을 4K 로 업샘플 렌더(레버 D, 렌더 시간↑).
+const RENDER_SCALE = Math.min(4, floatEnv("RENDER_SCALE", 1));
 /**
  * 씬 최소 프레임(1.5s). 두 가지를 동시에 보장한다:
  *  1) make-vlog 의 ffprobe dur() 하한(1.5s)과 일치 → 자연스러운 내레이션 최소 길이.
@@ -232,6 +238,8 @@ export async function renderVlogRemotion(
 			serveUrl: bundled,
 			codec: "h264",
 			crf: 18,
+			jpegQuality: JPEG_QUALITY,
+			scale: RENDER_SCALE,
 			outputLocation: outPath,
 			inputProps,
 			onProgress: ({ progress }) =>

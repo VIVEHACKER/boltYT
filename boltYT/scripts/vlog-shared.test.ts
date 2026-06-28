@@ -10,7 +10,10 @@ import {
 	resolveTtsProvider,
 	SCENE_H,
 	SCENE_W,
+	SDXL_FAST_STEPS,
 	type SourceRef,
+	STEPS,
+	sdxlSamplerSettings,
 	srtTime,
 	textToImageWorkflow,
 } from "./vlog-shared.ts";
@@ -161,6 +164,23 @@ describe("resolveTtsProvider", () => {
 	});
 });
 
+describe("sdxlSamplerSettings", () => {
+	it("기본(fast=off) — 고품질 STEPS/cfg per-call/dpmpp_2m/karras", () => {
+		const s = sdxlSamplerSettings(false, 7);
+		expect(s.cfg).toBe(7);
+		expect(s.sampler_name).toBe("dpmpp_2m");
+		expect(s.scheduler).toBe("karras");
+		expect(s.steps).toBe(STEPS); // export 상수에 단언(env COMFY_STEPS 비결합, Codex)
+	});
+	it("fast=on — Lightning 저스텝/cfg2/dpmpp_sde/sgm_uniform (cfg 인자 무시)", () => {
+		const s = sdxlSamplerSettings(true, 7);
+		expect(s.cfg).toBe(2);
+		expect(s.sampler_name).toBe("dpmpp_sde");
+		expect(s.scheduler).toBe("sgm_uniform");
+		expect(s.steps).toBe(SDXL_FAST_STEPS); // export 상수에 단언(env COMFY_FAST_STEPS 비결합, Codex)
+	});
+});
+
 describe("textToImageWorkflow", () => {
 	const params = {
 		positive: "a forum",
@@ -177,7 +197,8 @@ describe("textToImageWorkflow", () => {
 		expect(latent?.inputs.width).toBe(SCENE_W);
 		expect(latent?.inputs.height).toBe(SCENE_H);
 		const k = node(wf, "KSampler");
-		expect(k?.inputs.cfg).toBe(7);
+		// cfg/sampler 는 COMFY_PRESET(SDXL_FAST)에 따라 달라지므로 여기서 값 고정 단언 금지(env 비결합).
+		// 분기 값은 sdxlSamplerSettings 테스트가 커버. 여기선 env 무관한 seed 전달만 확인.
 		expect(k?.inputs.seed).toBe(42);
 		// 음성 프롬프트는 두 번째 CLIPTextEncode 로 전달
 		const negText = Object.values(wf).some(
