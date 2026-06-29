@@ -154,6 +154,11 @@ describe("resolveTtsProvider", () => {
 		expect(resolveTtsProvider("free")).toBe("edge");
 		expect(resolveTtsProvider("local")).toBe("edge");
 	});
+	it("melo → melo(완전 로컬 MeloTTS 한국어 서버)", () => {
+		expect(resolveTtsProvider("melo")).toBe("melo");
+		expect(resolveTtsProvider("MELO")).toBe("melo");
+		expect(resolveTtsProvider(" melo ")).toBe("melo");
+	});
 	it("빈값/미지원 값 → elevenlabs 폴백(기존 동작 보존)", () => {
 		expect(resolveTtsProvider("")).toBe("elevenlabs");
 		expect(resolveTtsProvider("elevenlabs")).toBe("elevenlabs");

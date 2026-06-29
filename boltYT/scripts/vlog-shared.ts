@@ -218,15 +218,31 @@ export async function runComfyChecked(
 // .srt·챕터·measure-and-extend 가 자동 동기. TTS_SPEED env 로 조정, [0.5,2.0] 클램프.
 export const TTS_SPEED = Math.min(2, Math.max(0.5, floatEnv("TTS_SPEED", 1.1)));
 
-/** TTS_PROVIDER 정규화 → "clova" | "elevenlabs" | "edge". 빈값/미지원 값은 elevenlabs(기존 동작 보존).
- *  edge = Microsoft Edge 무료 뉴럴 TTS(키/쿼터 없음). free/local 도 edge 로 본다. */
+/** TTS_PROVIDER 정규화 → "clova" | "elevenlabs" | "edge" | "melo". 빈값/미지원 값은 elevenlabs(기존 동작 보존).
+ *  melo = 완전 로컬 MeloTTS 한국어 서버(키·쿼터·온라인 의존 없음, setup-melo.sh + melo_server.py).
+ *  edge = Microsoft Edge 무료 뉴럴 TTS(키/쿼터 없지만 온라인). free/local 도 edge 로 본다. */
 export function resolveTtsProvider(
 	raw = process.env.TTS_PROVIDER,
-): "clova" | "elevenlabs" | "edge" {
+): "clova" | "elevenlabs" | "edge" | "melo" {
 	const v = (raw ?? "").trim().toLowerCase();
 	if (v === "clova") return "clova";
+	if (v === "melo") return "melo";
 	if (v === "edge" || v === "free" || v === "local") return "edge";
 	return "elevenlabs";
+}
+
+// MeloTTS 로컬 서버(scripts/melo_server.py, ~/melo-venv) — 완전 로컬·무료·MIT 한국어 TTS.
+// 모델 1회 로드 후 POST /tts. edge 의 온라인 의존을 제거하는 완전 로컬 경로. MELO_URL env 로 조정.
+export const MELO_URL = process.env.MELO_URL ?? "http://127.0.0.1:3461";
+/** MeloTTS 서버 합성 → mp3 버퍼. 속도(TTS_SPEED)는 공용 atempo 경로에서 일괄 적용(여기선 정속). */
+async function ttsMelo(text: string): Promise<Buffer> {
+	const res = await fetch(`${MELO_URL}/tts`, {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({ text, speed: 1.0 }),
+	});
+	if (!res.ok) throw new Error(`MeloTTS ${res.status} ${await res.text()}`);
+	return Buffer.from(await res.arrayBuffer());
 }
 
 // edge-tts(Microsoft Edge 무료 뉴럴 TTS) — API 키·쿼터 없음. 로컬 CLI 호출.
@@ -290,6 +306,7 @@ async function synthTts(text: string, voice: string): Promise<Buffer> {
 	const provider = resolveTtsProvider();
 	if (provider === "edge") return ttsEdge(text);
 	try {
+		if (provider === "melo") return await ttsMelo(text);
 		return provider === "clova"
 			? await ttsClova(text)
 			: await ttsElevenLabs(text, voice);

@@ -41,6 +41,22 @@ if ! curl -sf -m 5 "$PROXY_URL/health" >/dev/null 2>&1; then
   nohup npx tsx server/api-proxy.ts >/tmp/economy-proxy.log 2>&1 &
   for _ in $(seq 1 20); do curl -sf -m 3 "$PROXY_URL/health" >/dev/null 2>&1 && break; sleep 1; done
 fi
+# TTS_PROVIDER=melo(완전 로컬 한국어 TTS)면 MeloTTS 서버 자동 기동(모델 1회 로드). venv: setup-melo.sh.
+# resolveTtsProvider 와 동일하게 정규화(소문자+공백제거) — "MELO"/" melo " 도 인식해야 Node 와 불일치 없음(Codex).
+MELO_URL="${MELO_URL:-http://127.0.0.1:3461}"
+TTS_PROVIDER_NORM="$(printf '%s' "${TTS_PROVIDER:-}" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
+if [ "$TTS_PROVIDER_NORM" = "melo" ] && ! curl -sf -m 5 "$MELO_URL/health" >/dev/null 2>&1; then
+  MELO_PY="${MELO_PY:-$HOME/melo-venv/bin/python}"
+  if [ -x "$MELO_PY" ]; then
+    echo "ℹ MeloTTS 서버 미가동 → 백그라운드 기동(모델 로드 ~15s)"
+    # MELO_URL 의 포트로 서버를 띄운다(melo_server.py 는 MELO_PORT 만 읽음 — 커스텀 포트 동기화, Codex).
+    MELO_PORT="${MELO_PORT:-${MELO_URL##*:}}"
+    TOKENIZERS_PARALLELISM=false MELO_PORT="$MELO_PORT" nohup "$MELO_PY" "$ROOT/scripts/melo_server.py" >/tmp/melo-server.log 2>&1 &
+    for _ in $(seq 1 40); do curl -sf -m 3 "$MELO_URL/health" >/dev/null 2>&1 && break; sleep 1; done
+  else
+    echo "⚠ MeloTTS venv 없음($MELO_PY) — setup-melo.sh 먼저 실행. edge-tts 폴백으로 진행."
+  fi
+fi
 
 npm run vlog:economy -- --minutes "$MINUTES" --channel "$CHANNEL" "$@"
 echo "[$(date '+%F %T')] economy-cron 종료"
