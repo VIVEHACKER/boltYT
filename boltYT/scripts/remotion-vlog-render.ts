@@ -64,6 +64,9 @@ const MIME: Record<string, string> = {
 export interface VlogSceneInput {
 	/** 로컬 절대 파일 경로 또는 http URL */
 	imageUrl: string;
+	/** i2v 모션 클립(mp4) 로컬 경로/URL. 있으면 정지컷 대신 이 클립을 씬에 렌더(Scene.tsx hasVideo 분기).
+	 *  생성원은 자유(fal.ai i2v / 로컬 AnimateDiff·Wan). 미지정 씬은 기존 정지컷 그대로 — 혼용 자동. */
+	videoUrl?: string;
 	audioUrl: string;
 	narration: string;
 	durationSec: number;
@@ -86,13 +89,17 @@ export function buildVlogRemotionScenes(
 	// 1) 베이스 씬 — durationInFrames 는 우선 오디오 길이(패딩 전). 오버랩 계산에 transition 필요.
 	const scenes: RemotionScene[] = inputs.map((s, i) => ({
 		imageUrl: s.imageUrl,
+		// i2v 클립 있으면 통과 + type="video" → SceneView 가 VideoSceneView(scene.videoUrl)로 렌더.
+		// (type 안 바꾸면 DefaultSceneView 가 정지컷만 그려 클립이 무시됨 — Codex.) durationInFrames 는
+		// 오디오 길이 그대로라 .srt/오버랩 동기 무변경(클립이 짧으면 Remotion 이 루프/홀드).
+		videoUrl: s.videoUrl,
 		audioUrl: s.audioUrl,
 		narration: s.narration,
 		durationInFrames: Math.max(
 			MIN_SCENE_FRAMES,
 			Math.ceil(s.durationSec * FPS),
 		),
-		type: "image" as const,
+		type: (s.videoUrl ? "video" : "image") as "video" | "image",
 		transition: (i === 0
 			? "none"
 			: TRANSITION_ROTATION[i % TRANSITION_ROTATION.length]) as TransitionType,
@@ -186,10 +193,23 @@ export async function renderVlogRemotion(
 		const served: VlogSceneInput[] = scenes.map((s, i) => {
 			copyFileSync(s.imageUrl, join(serveDir, `scene${i}.png`));
 			copyFileSync(s.audioUrl, join(serveDir, `scene${i}.mp3`));
+			// i2v 클립: 원격 URL(fal.ai 등 http/https)은 그대로 통과(Remotion 이 직접 로드),
+			// 로컬 파일만 임시 HTTP 경로로 서빙(publicDir 404 회피, MIME .mp4 존재). copyFileSync 를
+			// 원격 URL 에 쓰면 throw 하므로 분기(Codex).
+			let videoUrl: string | undefined;
+			if (s.videoUrl) {
+				if (/^https?:\/\//i.test(s.videoUrl)) {
+					videoUrl = s.videoUrl;
+				} else {
+					copyFileSync(s.videoUrl, join(serveDir, `scene${i}.mp4`));
+					videoUrl = `${server.origin}/scene${i}.mp4`;
+				}
+			}
 			return {
 				...s,
 				imageUrl: `${server.origin}/scene${i}.png`,
 				audioUrl: `${server.origin}/scene${i}.mp3`,
+				videoUrl,
 			};
 		});
 

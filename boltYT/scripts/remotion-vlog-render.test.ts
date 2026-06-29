@@ -33,11 +33,35 @@ describe("buildVlogRemotionScenes", () => {
 
 	it("패딩은 오디오 길이를 절대 줄이지 않는다(durationInFrames ≥ 오디오 프레임)", () => {
 		const out = buildVlogRemotionScenes(inputs);
-		out.forEach((s, i) =>
+		out.forEach((s, i) => {
 			expect(s.durationInFrames).toBeGreaterThanOrEqual(
 				audioFrames(inputs[i].durationSec),
-			),
-		);
+			);
+		});
+	});
+
+	it("i2v videoUrl 통과 — 모션 씬만 videoUrl, 정지컷 씬은 undefined(혼용)", () => {
+		const out = buildVlogRemotionScenes([
+			{
+				imageUrl: "a.png",
+				audioUrl: "a.mp3",
+				narration: "씬1",
+				durationSec: 3,
+				videoUrl: "a.mp4",
+			},
+			{
+				imageUrl: "b.png",
+				audioUrl: "b.mp3",
+				narration: "씬2",
+				durationSec: 2,
+			},
+		]);
+		expect(out[0].videoUrl).toBe("a.mp4"); // 모션 씬
+		expect(out[0].type).toBe("video"); // → VideoSceneView 렌더(type 안 바꾸면 정지컷만, Codex)
+		expect(out[1].videoUrl).toBeUndefined(); // 정지컷 씬 무영향
+		expect(out[1].type).toBe("image");
+		// videoUrl 이 durationInFrames(오디오 동기)에 영향 주지 않음
+		expect(out[0].durationInFrames).toBeGreaterThanOrEqual(audioFrames(3));
 	});
 
 	it("최소 씬 프레임 45(1.5s) — 0초·짧은 씬도 클램프", () => {
