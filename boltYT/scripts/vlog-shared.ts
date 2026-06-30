@@ -49,11 +49,14 @@ export const H = 1080;
 // ── 이미지 모델 선택(SDXL 기본 / FLUX 옵트인) ─────────────────────────────────
 // COMFY_MODEL=flux 로 FLUX 경로 활성화. 기본 sdxl 이라 기존 동작 100% 보존.
 // FLUX 는 IPAdapter 미사용 경로(일러스트/카툰)에만 적용 — 포토리얼 IPAdapter 얼굴락은 SDXL 전용 유지.
-export type ImageModel = "sdxl" | "flux";
-export const IMAGE_MODEL: ImageModel =
-	(process.env.COMFY_MODEL ?? "sdxl").toLowerCase() === "flux"
-		? "flux"
-		: "sdxl";
+export type ImageModel = "sdxl" | "flux" | "zimage";
+function resolveImageModel(raw = process.env.COMFY_MODEL): ImageModel {
+	const v = (raw ?? "sdxl").toLowerCase();
+	if (v === "flux") return "flux";
+	if (v === "zimage" || v === "z-image" || v === "z_image") return "zimage";
+	return "sdxl";
+}
+export const IMAGE_MODEL: ImageModel = resolveImageModel();
 // FLUX 가중치 파일명(표준 ComfyUI 설치 기본값). 설치 위치 다르면 env 로 덮어쓴다.
 export const FLUX_UNET = process.env.FLUX_UNET ?? "flux1-schnell.safetensors";
 export const FLUX_CLIP_L = process.env.FLUX_CLIP_L ?? "clip_l.safetensors";
@@ -62,6 +65,16 @@ export const FLUX_VAE = process.env.FLUX_VAE ?? "ae.safetensors";
 // schnell=4스텝/cfg1(빠름·무료·Mac 적합), dev=20+스텝+guidance. 기본 schnell.
 export const FLUX_STEPS = Math.max(1, posIntEnv("FLUX_STEPS", 4));
 export const FLUX_GUIDANCE = floatEnv("FLUX_GUIDANCE", 3.5); // dev 전용. schnell 은 무시.
+// Z-Image Turbo(6B, Apache) — Comfy-Org 분할 파일. 라이브 검증: 플랫 벡터 카툰 품질 우수하나
+// Mac 워밍 ~95s/장(DreamShaper 27s 대비 ~3.5배 느림) → 빠른 양산 기본 아님, 품질 우선 컷용 옵트인.
+// 그래프(공식 ComfyUI 템플릿): UNETLoader→ModelSamplingAuraFlow(shift)→KSampler(res_multistep/simple/cfg1),
+// CLIPLoader(lumina2 타입)→CLIPTextEncode→ConditioningZeroOut(neg), EmptySD3LatentImage.
+export const ZIMAGE_UNET =
+	process.env.ZIMAGE_UNET ?? "z_image_turbo_bf16.safetensors";
+export const ZIMAGE_CLIP = process.env.ZIMAGE_CLIP ?? "qwen_3_4b.safetensors";
+export const ZIMAGE_VAE = process.env.ZIMAGE_VAE ?? "z_image_ae.safetensors";
+export const ZIMAGE_STEPS = Math.max(1, posIntEnv("ZIMAGE_STEPS", 8));
+export const ZIMAGE_SHIFT = floatEnv("ZIMAGE_SHIFT", 3);
 
 // 속도-품질 프리셋: COMFY_PRESET=fast(=lightning/turbo) → SDXL Lightning/Turbo 체크포인트용 저스텝 설정.
 // DreamShaperXL Turbo/Lightning 등 6~8스텝 파인튠 + cfg2 = base SDXL 30스텝보다 "더 빠르고 더 좋다"
@@ -605,8 +618,67 @@ function fluxWorkflow(p: T2IParams, width: number, height: number) {
 }
 
 /**
- * SDXL/FLUX 분기 디스패처. 기본은 IMAGE_MODEL(env COMFY_MODEL).
+ * Z-Image Turbo 그래프(공식 ComfyUI 템플릿, 라이브 검증). cfg=1(distilled) — 음성 프롬프트는
+ * ConditioningZeroOut 으로 처리(양성 conditioning 제로화)라 p.negative 미사용. res_multistep/simple/8스텝.
+ * Qwen 텍스트인코더(CLIPLoader type="lumina2"), EmptySD3LatentImage, ModelSamplingAuraFlow(shift).
+ */
+function zimageWorkflow(p: T2IParams, width: number, height: number) {
+	return {
+		"1": {
+			class_type: "UNETLoader",
+			inputs: { unet_name: ZIMAGE_UNET, weight_dtype: "default" },
+		},
+		"2": {
+			class_type: "ModelSamplingAuraFlow",
+			inputs: { model: ["1", 0], shift: ZIMAGE_SHIFT },
+		},
+		"3": {
+			class_type: "CLIPLoader",
+			inputs: { clip_name: ZIMAGE_CLIP, type: "lumina2", device: "default" },
+		},
+		"4": { class_type: "VAELoader", inputs: { vae_name: ZIMAGE_VAE } },
+		"5": {
+			class_type: "EmptySD3LatentImage",
+			inputs: { width, height, batch_size: 1 },
+		},
+		"6": {
+			class_type: "CLIPTextEncode",
+			inputs: { text: p.positive, clip: ["3", 0] },
+		},
+		"8": {
+			class_type: "ConditioningZeroOut",
+			inputs: { conditioning: ["6", 0] },
+		},
+		"9": {
+			class_type: "KSampler",
+			inputs: {
+				seed: p.seed,
+				steps: ZIMAGE_STEPS,
+				cfg: 1,
+				sampler_name: "res_multistep",
+				scheduler: "simple",
+				denoise: 1,
+				model: ["2", 0],
+				positive: ["6", 0],
+				negative: ["8", 0],
+				latent_image: ["5", 0],
+			},
+		},
+		"10": {
+			class_type: "VAEDecode",
+			inputs: { samples: ["9", 0], vae: ["4", 0] },
+		},
+		"11": {
+			class_type: "SaveImage",
+			inputs: { filename_prefix: p.filenamePrefix, images: ["10", 0] },
+		},
+	};
+}
+
+/**
+ * SDXL/FLUX/Z-Image 분기 디스패처. 기본은 IMAGE_MODEL(env COMFY_MODEL).
  * model 인자는 테스트/특수 호출에서 분기를 명시할 때만 사용(런타임 호출부는 생략 → env 따름).
+ * sdxl=빠른 양산 기본(27s), flux/zimage=품질 옵트인(Mac 느림). zimage 는 라이브 검증됨(~95s, 플랫벡터 우수).
  */
 export function textToImageWorkflow(
 	p: T2IParams,
@@ -614,9 +686,9 @@ export function textToImageWorkflow(
 ): Record<string, { class_type: string; inputs: Record<string, unknown> }> {
 	const width = p.width ?? SCENE_W;
 	const height = p.height ?? SCENE_H;
-	return model === "flux"
-		? fluxWorkflow(p, width, height)
-		: sdxlT2IWorkflow(p, width, height);
+	if (model === "flux") return fluxWorkflow(p, width, height);
+	if (model === "zimage") return zimageWorkflow(p, width, height);
+	return sdxlT2IWorkflow(p, width, height);
 }
 
 /**

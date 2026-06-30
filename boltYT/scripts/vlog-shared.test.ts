@@ -236,6 +236,20 @@ describe("textToImageWorkflow", () => {
 		expect(node(wf, "SaveImage")?.inputs.filename_prefix).toBe("test_pref");
 	});
 
+	it("zimage — UNETLoader/CLIPLoader(lumina2)/ModelSamplingAuraFlow + cfg1/res_multistep + ConditioningZeroOut(neg)", () => {
+		const wf = textToImageWorkflow(params, "zimage");
+		expect(node(wf, "UNETLoader")).toBeDefined();
+		expect(node(wf, "CLIPLoader")?.inputs.type).toBe("lumina2");
+		expect(node(wf, "ModelSamplingAuraFlow")).toBeDefined();
+		expect(node(wf, "ConditioningZeroOut")).toBeDefined(); // 음성 = 양성 제로화(p.negative 미사용)
+		expect(node(wf, "CheckpointLoaderSimple")).toBeUndefined();
+		expect(node(wf, "EmptySD3LatentImage")).toBeDefined();
+		const k = node(wf, "KSampler");
+		expect(k?.inputs.cfg).toBe(1);
+		expect(k?.inputs.sampler_name).toBe("res_multistep");
+		expect(node(wf, "SaveImage")?.inputs.filename_prefix).toBe("test_pref");
+	});
+
 	it("width/height 오버라이드 반영(숏폼 세로) — sdxl/flux 공통", () => {
 		const sdxl = textToImageWorkflow(
 			{ ...params, width: 768, height: 1344 },
