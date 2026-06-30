@@ -3,6 +3,7 @@ import {
 	aceSectionTag,
 	aceStepWorkflow,
 	buildAceLyrics,
+	buildAceNegativeTags,
 	buildAceTags,
 	estimateCostUsd,
 	type GospelTrack,
@@ -114,6 +115,21 @@ describe("aceStepWorkflow", () => {
 		expect(k.negative).toEqual(["4", 0]);
 		expect(k.latent_image).toEqual(["2", 0]);
 		expect(k.seed).toBe(42);
+	});
+	it("negative 조건(노드4) — 미지정 시 빈 tags, 지정 시 금지 스타일 주입 (Codex P2)", () => {
+		expect(node(wf, "4").inputs.tags).toBe(""); // 기본값
+		const wfNeg = aceStepWorkflow("t", "l", 120, 42, 60, "edm, distorted");
+		expect(node(wfNeg, "4").inputs.tags).toBe("edm, distorted");
+		expect(node(wfNeg, "4").inputs.lyrics).toBe(""); // negative 는 가사 없음
+	});
+});
+
+describe("buildAceNegativeTags", () => {
+	it("negativeStyles 를 쉼표로 결합", () => {
+		expect(buildAceNegativeTags(PSALM23)).toBe(
+			PSALM23.negativeStyles.join(", "),
+		);
+		expect(buildAceNegativeTags(PSALM23)).toContain("edm");
 	});
 });
 
