@@ -75,11 +75,20 @@ describe("validateTrack", () => {
 		};
 		expect(validateTrack(bad).some((e) => e.includes(">200"))).toBe(true);
 	});
-	it("총 길이 3초 미만을 잡아냄", () => {
+	it("총 길이 5초 미만을 잡아냄(ACE-Step 하한)", () => {
 		const bad: GospelTrack = {
 			...PSALM23,
 			sections: [
 				{ name: "verse", styles: [], lines: ["짧다"], durationMs: 1000 },
+			],
+		};
+		expect(validateTrack(bad).some((e) => e.includes("총 길이"))).toBe(true);
+	});
+	it("총 길이 240초 초과를 잡아냄(ACE-Step 상한 — 422 사전차단, Codex)", () => {
+		const bad: GospelTrack = {
+			...PSALM23,
+			sections: [
+				{ name: "verse", styles: [], lines: ["길다"], durationMs: 241000 },
 			],
 		};
 		expect(validateTrack(bad).some((e) => e.includes("총 길이"))).toBe(true);

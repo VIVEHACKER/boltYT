@@ -17,7 +17,6 @@
  */
 import { execFile } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 
@@ -69,6 +68,11 @@ export function buildAceTags(t: GospelTrack): string {
 	return t.globalStyles.join(", ");
 }
 
+/** GospelTrack → ACE-Step negative tags(금지 스타일). KSampler negative 조건에 주입 → 회피. */
+export function buildAceNegativeTags(t: GospelTrack): string {
+	return t.negativeStyles.join(", ");
+}
+
 /** 총 길이(ms). */
 export function totalDurationMs(t: GospelTrack): number {
 	return t.sections.reduce((a, s) => a + s.durationMs, 0);
@@ -79,12 +83,14 @@ export function estimateCostUsd(t: GospelTrack): number {
 	return (totalDurationMs(t) / 1000) * ACE_PRICE_PER_SEC;
 }
 
-/** 기본 검증: 총 3000~600000ms, 줄≤200자. 위반 메시지 배열. */
+/** 기본 검증: 총 5000~240000ms(ACE-Step 길이 한계 5~240s), 줄≤200자. 위반 메시지 배열.
+ *  composeMusic 이 totalDurationMs/1000 초를 ACE-Step 에 그대로 보내므로 범위를 제공자 한계에 맞춘다 —
+ *  안 그러면 5초 미만/240초 초과 트랙이 preflight 통과 후 생성 단계서 422 로 죽는다(Codex). */
 export function validateTrack(t: GospelTrack): string[] {
 	const errs: string[] = [];
 	const total = totalDurationMs(t);
-	if (total < 3000 || total > 600000)
-		errs.push(`총 길이 ${total}ms (3000~600000 벗어남)`);
+	if (total < 5000 || total > 240000)
+		errs.push(`총 길이 ${total}ms (ACE-Step 한계 5000~240000ms 벗어남)`);
 	for (const s of t.sections)
 		for (const ln of s.lines)
 			if (ln.length > 200)
@@ -102,6 +108,7 @@ export function aceStepWorkflow(
 	seconds: number,
 	seed: number,
 	steps = 60,
+	negativeTags = "",
 ): Record<string, unknown> {
 	return {
 		"1": {
@@ -118,7 +125,12 @@ export function aceStepWorkflow(
 		},
 		"4": {
 			class_type: "TextEncodeAceStepAudio",
-			inputs: { clip: ["1", 1], tags: "", lyrics: "", lyrics_strength: 1 },
+			inputs: {
+				clip: ["1", 1],
+				tags: negativeTags,
+				lyrics: "",
+				lyrics_strength: 1,
+			},
 		},
 		"5": {
 			class_type: "KSampler",
@@ -261,6 +273,8 @@ async function composeMusic(t: GospelTrack, outPath: string): Promise<string> {
 		buildAceLyrics(t),
 		Math.round(totalDurationMs(t) / 1000),
 		seedFor(t.id),
+		undefined,
+		buildAceNegativeTags(t),
 	);
 	const ref = await runComfyGetFile(wf, "audio");
 	const ext = ref.filename.split(".").pop() ?? "flac";
@@ -413,7 +427,9 @@ async function main(): Promise<void> {
 	);
 }
 
-if ((process.argv[1] ?? "").includes("make-gospeljazz")) {
+// 정확한 엔트리포인트 일치만(make-economy 컨벤션). .includes 면 make-gospeljazz.test.ts 를
+// tsx 로 직접 실행 시에도 매치돼 import 만으로 유료 FAL 호출 main()이 돌 수 있음(Codex).
+if (process.argv[1]?.endsWith("make-gospeljazz.ts")) {
 	main().catch((e) => {
 		console.error("❌", e?.message ?? e);
 		process.exit(1);

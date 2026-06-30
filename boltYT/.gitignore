@@ -41,6 +41,7 @@ server/.tmp/
 
 # Render output
 renders/
+output/
 public/generated/
 coverage
 
