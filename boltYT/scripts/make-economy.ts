@@ -80,9 +80,13 @@ import {
 
 const PROJECT_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
+// 경제 피드 — 전부 HTTPS 라이브 검증(2026-07-08). YMYL 해설 근거라 http 소스는 기본값에서 제외
+//   (변조 벡터 차단; edaily 는 https 미지원이라 뺐고, 필요 시 --feed 로 옵트인). fetchFeed 가 죽은 피드는 skip.
 const DEFAULT_FEEDS = [
-	"https://www.yna.co.kr/rss/economy.xml",
-	"https://www.hankyung.com/feed/economy",
+	"https://www.yna.co.kr/rss/economy.xml", // 연합뉴스 경제
+	"https://www.yna.co.kr/rss/market.xml", // 연합뉴스 시장
+	"https://www.hankyung.com/feed/economy", // 한국경제 경제
+	"https://www.hankyung.com/feed/finance", // 한국경제 금융
 ];
 
 // Google Trends 일일 인기검색어(KR) — 최신순 RSS 위에 "지금 도는 주제" 신호를 얹는다(케이스 스터디 핵심).
@@ -202,6 +206,16 @@ export function scoreEmotionalAngle(item: RssItem): number {
 	if (EMOTIONAL_MARKERS.test(item.title)) score += 2;
 	if (EMOTIONAL_MARKERS.test(item.description)) score += 1;
 	return score;
+}
+
+// YMYL 금칙: 매수/매도 권유·가격 예측·수익 보장·특정 종목 투자 추천 어투. LLM 논지 출력의 사후 게이트용.
+//   앵글 논지(thesis)는 이후 모든 챕터에 재주입되므로 여기서 걸러 조언성 문구가 대본으로 증폭되는 걸 차단.
+const INVESTMENT_ADVICE =
+	/매수|매도|사세요|파세요|사야|팔아야|담아|손절|익절|비중\s*확대|비중\s*축소|목표\s*가|목표주가|저점\s*매수|고점\s*매도|불타기|물타기|추천\s*종목|유망\s*종목|수익\s*보장|오를\s*것|내릴\s*것|급등할|폭등할|반드시\s*오른|사면\s*(된|돼)|지금\s*(사|들어)/;
+
+/** 텍스트에 투자 조언/가격 예측성 문구가 있는지(YMYL 게이트). true=금칙 포함. */
+export function containsInvestmentAdvice(text: string): boolean {
+	return INVESTMENT_ADVICE.test(text ?? "");
 }
 
 /**
@@ -334,6 +348,74 @@ export const ECON_BEATS: { key: string; note: string }[] = [
 
 const ECON_SYSTEM =
 	"한국 경제 뉴스 해설 유튜브 작가. 제공된 기사의 '사실에만' 근거해 쉽게 설명한다. 투자 조언·종목 추천·매수매도 권유·가격 예측 절대 금지(YMYL). 기사에 없는 수치/사실 창작 금지. JSON만 출력.";
+
+/**
+ * 해설 앵글(관점) — 중립 요약의 획일성 차단. 매일 다른 앵글로 로테이션해 "실제 해설"의 색을 낸다.
+ * 사용자 확정(2026-07-08): "맥락 해설형" — 관점은 있되 투자 조언/예측은 없음(YMYL 안전).
+ */
+export interface EconAngle {
+	key: string;
+	label: string;
+	guide: string;
+}
+export const ECON_ANGLES: EconAngle[] = [
+	{
+		key: "hidden-cause",
+		label: "숨은 원인",
+		guide:
+			"표면 뉴스 뒤의 진짜 원인·구조적 배경을 짚는다. '겉으로는 X지만 실제로는 Y' 관점 — 단, 기사 사실 범위 안에서만.",
+	},
+	{
+		key: "historical-parallel",
+		label: "역사 비교",
+		guide:
+			"기사가 직접 언급한 과거 사례가 있으면 그것과 비교한다. 기사에 없는 구체적 연도·사건·수치를 새로 지어내지 말고, 비교는 '비슷한 흐름이 반복된다'는 개념 수준으로만. 억지 비교 금지.",
+	},
+	{
+		key: "personal-impact",
+		label: "일반인 영향",
+		guide:
+			"이 뉴스가 평범한 시청자의 지갑·생활(물가·금리·환율 체감 등)에 뭘 바꾸는지 구체적으로 설명한다.",
+	},
+	{
+		key: "contrarian",
+		label: "반대 시각",
+		guide:
+			"통념/다수 해석과 다른 각도를 제시한다. 기사 사실에 근거하고 단정적 예측·투자 판단은 피한다.",
+	},
+];
+
+/** 문자열 → 32bit 부호없는 해시(FNV-1a). 앵글 로테이션의 결정적 시드용(Math.random/Date 금지). */
+export function hashStr(s: string): number {
+	let h = 0x811c9dc5;
+	for (let i = 0; i < s.length; i++) {
+		h ^= s.charCodeAt(i);
+		h = Math.imul(h, 0x01000193);
+	}
+	return h >>> 0;
+}
+
+/**
+ * 기사별 결정적 앵글 선택 — seed(기사 링크/제목) 해시로 로테이션(매일 다른 앵글 + 재현성).
+ * override(--angle <key|label>)로 강제 지정 가능. 미매칭 override 는 무시하고 로테이션 유지.
+ */
+export function pickAngle(seed: string, override?: string): EconAngle {
+	if (override) {
+		const o = override.trim().toLowerCase();
+		const hit = ECON_ANGLES.find(
+			(a) => a.key === o || a.label.toLowerCase() === o,
+		);
+		if (hit) return hit;
+	}
+	return ECON_ANGLES[hashStr(seed) % ECON_ANGLES.length];
+}
+
+/** 앵글 논지(thesis) — grounding 사실에서 도출한 한 문장 관점 + 뒷받침 근거. */
+export interface AngleThesis {
+	angle: string;
+	thesis: string;
+	points: string[];
+}
 
 // 길이 보정 상수: 내레이션 1~2문장 ≈ 16초/씬(실측 — SEC=20 은 초기 씬수를 과소추정해 +12% 오버슛 유발,
 // 실측 평균 ~15.7초에 맞춰 16 으로 타이트닝). minutes 를 이 기준으로 초기 씬수 환산 → 보강 라운드 최소화.
@@ -469,6 +551,32 @@ function saveUsed(path: string, used: Set<string>): void {
 	renameSync(tmp, path);
 }
 
+/**
+ * trend-topics.json(유튜브 경제 카테고리 실조회수 랭킹) 제목 → 키워드 목록.
+ * pickArticle 의 트렌드 신호로 합류시켜 "실제로 조회수 나오는 주제"에 가까운 기사를 우선.
+ * 파일 없음/손상/비경제 → 빈 배열(비파괴, 기존 최신순/구글트렌드 폴백 유지).
+ */
+export function loadYoutubeTrendTerms(
+	path = join(PROJECT_ROOT, "output", "trend_topics.json"),
+	category = "경제",
+): string[] {
+	if (!existsSync(path)) return [];
+	try {
+		const data = JSON.parse(readFileSync(path, "utf8")) as {
+			categories?: Record<string, { topics?: { title?: string }[] }>;
+		};
+		const topics = data.categories?.[category]?.topics;
+		if (!Array.isArray(topics)) return [];
+		const terms = new Set<string>();
+		for (const t of topics)
+			if (typeof t?.title === "string")
+				for (const kw of extractKeywords(t.title)) terms.add(kw);
+		return [...terms];
+	} catch {
+		return [];
+	}
+}
+
 /** 대본 grounding 입력 — 주 기사 + (Jina) 본문 + 관련 보도. 다중 소스 사실 근거. */
 export interface Grounding {
 	primary: RssItem;
@@ -486,23 +594,67 @@ export function groundingContext(g: Grounding): string {
 }
 
 /**
+ * 해설 앵글 논지 도출 — grounding 사실에서 '이 영상의 관점' 한 문장 + 근거 2~4개.
+ * 실패/빈 응답 시 null(비파괴 — 호출부가 중립 요약으로 폴백해 기존 동작 유지).
+ * YMYL: 관점은 되지만 투자 조언/예측은 시스템 프롬프트+지시로 이중 차단.
+ */
+async function deriveAngleThesis(
+	g: Grounding,
+	angle: EconAngle,
+): Promise<AngleThesis | null> {
+	try {
+		const usr = `${groundingContext(g)}\n\n위 기사 '사실에만' 근거해 '${angle.label}' 관점의 해설 논지를 잡아라. ${angle.guide}\n반드시 지킬 것: 관점은 제시하되 투자 조언·종목 추천·매수매도·가격 예측은 절대 금지. 기사에 없는 수치/사실 창작 금지.\nJSON: {"thesis":"한 문장 핵심 논지(한국어)","points":["뒷받침 근거 2~4개(각 기사 사실 기반, 한국어)"]}`;
+		const parsed = await proxyChatJSON(ECON_SYSTEM, usr);
+		const thesis =
+			typeof parsed.thesis === "string" ? parsed.thesis.trim() : "";
+		const points = (
+			Array.isArray(parsed.points)
+				? parsed.points.filter(
+						(p): p is string => typeof p === "string" && !!p.trim(),
+					)
+				: []
+		).slice(0, 4); // 근거는 최대 4개(프롬프트 증폭·컨텍스트 폭주 방지)
+		if (!thesis) return null;
+		// YMYL 사후 게이트 — 논지/근거에 투자 조언·가격 예측이 섞이면 채택 거부(중립 요약 폴백).
+		//   이후 모든 챕터에 재주입되는 값이라 한 번 새면 대본 전체로 증폭됨.
+		if (
+			containsInvestmentAdvice(thesis) ||
+			points.some((p) => containsInvestmentAdvice(p))
+		) {
+			log("   앵글 논지에 투자 조언성 문구 감지 — 폐기하고 중립 요약으로 진행");
+			return null;
+		}
+		return { angle: angle.label, thesis, points };
+	} catch (e) {
+		log(`   앵글 논지 도출 실패(${e}) — 중립 요약으로 진행`);
+		return null;
+	}
+}
+
+/**
  * grounding(주기사+본문+관련보도) → 4비트 챕터 대본. 비트별 개별 호출(truncation 회피 + 사실 집중).
  * beatStarts[i] = scenes 배열에서 비트 i 가 시작하는 인덱스(YouTube 챕터 타임스탬프 계산용).
+ * thesis 제공 시 각 비트를 그 관점으로 전개(해설 앵글) — 없으면 기존 중립 요약(하위호환).
  */
 async function generateEconomyScript(
 	g: Grounding,
 	minutes: number,
+	thesis?: AngleThesis | null,
 ): Promise<{ scenes: Scene[]; beatStarts: number[] }> {
 	const totalScenes = estimateSceneCount(minutes);
 	const counts = beatSceneCounts(totalScenes);
 	const context = groundingContext(g);
+	// 관점 라인 — 모든 비트에 관통시켜 중립 요약이 아닌 '해설'로 만든다. 사실 기반·투자조언 금지 재강조.
+	const angleLine = thesis
+		? `\n\n[이 영상의 해설 관점: ${thesis.angle}] ${thesis.thesis}${thesis.points.length ? `\n관점 근거(기사 사실): ${thesis.points.join(" / ")}` : ""}\n각 씬은 이 관점을 기사 사실로 전개하되, 투자 조언·예측은 하지 마라.`
+		: "";
 	const all: Scene[] = [];
 	const beatStarts: number[] = [];
 	for (let i = 0; i < ECON_BEATS.length; i++) {
 		beatStarts.push(all.length);
 		const beat = ECON_BEATS[i];
 		const n = counts[i];
-		const usr = `${context}\n\n위 자료의 '사실에만' 근거해 이 뉴스 해설 영상의 '${beat.key}' 챕터를 쓴다. ${beat.note}\n정확히 ${n}개 씬. 각 씬: narration(한국어 1~2문장, 쉽고 명확한 구어체), visual(English, a flat cartoon illustration describing the economic concept of this scene). JSON: {"scenes":[{"narration":"...","visual":"..."}]}`;
+		const usr = `${context}${angleLine}\n\n위 자료의 '사실에만' 근거해 이 뉴스 해설 영상의 '${beat.key}' 챕터를 쓴다. ${beat.note}\n정확히 ${n}개 씬. 각 씬: narration(한국어 1~2문장, 쉽고 명확한 구어체), visual(English, a flat cartoon illustration describing the economic concept of this scene). JSON: {"scenes":[{"narration":"...","visual":"..."}]}`;
 		const parsed = await proxyChatJSON(ECON_SYSTEM, usr);
 		const scenes = Array.isArray(parsed.scenes)
 			? (parsed.scenes as Scene[])
@@ -518,13 +670,18 @@ async function generateExtensionScenes(
 	g: Grounding,
 	n: number,
 	existing: string[],
+	thesis?: AngleThesis | null,
 ): Promise<Scene[]> {
 	if (n <= 0) return [];
 	const covered = existing
 		.slice(-14)
 		.map((s) => `- ${s}`)
 		.join("\n");
-	const usr = `${groundingContext(g)}\n\n위 자료에 근거해, 아래 "이미 다룬 내용"과 중복되지 않는 심화 해설 ${n}개 씬을 추가로 쓴다(추가 배경·세부 수치·파급효과·과거 비교 등 새 정보만). 투자 조언/예측 금지.\n이미 다룬 내용:\n${covered}\n각 씬: narration(한국어 1~2문장, 쉽고 명확한 구어체), visual(English, flat cartoon illustration). JSON: {"scenes":[{"narration":"...","visual":"..."}]}`;
+	// 확장(언더슛 꼬리) 씬도 같은 해설 관점을 유지 — 안 그러면 뒷부분만 중립 요약으로 톤이 튄다.
+	const angleLine = thesis
+		? `\n[이 영상의 해설 관점: ${thesis.angle}] ${thesis.thesis} — 추가 씬도 이 관점을 사실 기반으로 이어가라.`
+		: "";
+	const usr = `${groundingContext(g)}${angleLine}\n\n위 자료에 근거해, 아래 "이미 다룬 내용"과 중복되지 않는 심화 해설 ${n}개 씬을 추가로 쓴다(추가 배경·세부 수치·파급효과·과거 비교 등 새 정보만). 투자 조언/예측 금지.\n이미 다룬 내용:\n${covered}\n각 씬: narration(한국어 1~2문장, 쉽고 명확한 구어체), visual(English, flat cartoon illustration). JSON: {"scenes":[{"narration":"...","visual":"..."}]}`;
 	const parsed = await proxyChatJSON(ECON_SYSTEM, usr);
 	const scenes = Array.isArray(parsed.scenes) ? (parsed.scenes as Scene[]) : [];
 	return scenes.slice(0, n);
@@ -619,9 +776,17 @@ async function main(): Promise<void> {
 	const items = await fetchFeed(feeds);
 	if (items.length === 0) throw new Error("RSS 수집 실패 (네트워크/피드 확인)");
 	// 트렌드 신호로 "지금 도는" 기사를 우선 — 실패하거나 --trend false 면 최신순 폴백(현행 동작).
+	//   신호 = 구글 일일 인기검색어 + 유튜브 경제 카테고리 실조회수 랭킹(trend-topics.json) 키워드.
 	const useTrend = args.trend !== "false";
-	const terms = useTrend ? await fetchTrends() : [];
-	if (terms.length) log(`   트렌딩 ${terms.length}개 → 기사 트렌드 정렬`);
+	const ytTerms = useTrend ? loadYoutubeTrendTerms() : [];
+	// 두 소스 병합 후 dedup — 같은 키워드가 겹치면 scoreTrend 가 같은 매치를 이중 가산해 선정이 흔들림.
+	const terms = [
+		...new Set([...(useTrend ? await fetchTrends() : []), ...ytTerms]),
+	];
+	if (terms.length)
+		log(
+			`   트렌드 신호 ${terms.length}개(유튜브 ${ytTerms.length}) → 기사 정렬`,
+		);
 	// --angle emotional: 사실 기사 중 감정 강도 높은 것 우선(기본 off — 보수적 YMYL 선택 유지).
 	const emotional = args.angle === "emotional";
 	if (emotional) log("   감정 앵글 가중 on");
@@ -643,11 +808,20 @@ async function main(): Promise<void> {
 	];
 	log(`   본문 ${body.length}자 · 관련 보도 ${related.length}건`);
 
-	// 2) 사실 기반 대본(Claude) — 다중 소스 grounded
+	// 1.c) 해설 앵글 — 기사별 결정적 로테이션(매일 다른 관점 + 재현성). --angle <key|label> 로 강제.
+	//      "emotional" 은 앵글 키가 아니라 기사선정 가중이므로 로테이션으로 폴백(위 emotional 과 무충돌).
+	const angle = pickAngle(article.link || article.title, args.angle);
+	log(`   해설 앵글: ${angle.label}`);
+	const grounding: Grounding = { primary: article, body, related };
+	const thesis = await deriveAngleThesis(grounding, angle);
+	if (thesis) log(`   논지: ${thesis.thesis}`);
+
+	// 2) 사실 기반 대본(Claude) — 다중 소스 grounded + 해설 앵글 관통
 	log("2) 뉴스 해설 대본(grounded)...");
 	const { scenes, beatStarts } = await generateEconomyScript(
-		{ primary: article, body, related },
+		grounding,
 		minutes,
+		thesis,
 	);
 	if (scenes.length === 0) throw new Error("대본 생성 실패 (씬 0개)");
 
@@ -735,9 +909,10 @@ async function main(): Promise<void> {
 			`3.x) 길이 ${Math.round(bodySec)}s/${targetSec}s → 심화 ${need}씬 추가 (라운드 ${round + 1})`,
 		);
 		const extra = await generateExtensionScenes(
-			{ primary: article, body, related },
+			grounding,
 			need,
 			made.map((m) => m.narration),
+			thesis,
 		);
 		if (extra.length === 0) break;
 		for (const sc of extra) {

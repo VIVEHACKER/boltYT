@@ -1,14 +1,22 @@
-import { describe, expect, it } from "vitest";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
 import {
 	beatSceneCounts,
 	buildCartoonPrompt,
+	containsInvestmentAdvice,
 	decodeXml,
+	ECON_ANGLES,
 	estimateSceneCount,
 	extractKeywords,
 	groundingContext,
+	hashStr,
 	isUsableArticle,
+	loadYoutubeTrendTerms,
 	parseRssItems,
 	parseTrendTerms,
+	pickAngle,
 	pickArticle,
 	publisherFromUrl,
 	type RssItem,
@@ -330,5 +338,97 @@ describe("groundingContext", () => {
 		expect(c).toContain("제목A");
 		expect(c).not.toContain("기사 본문");
 		expect(c).not.toContain("관련 보도");
+	});
+});
+
+describe("hashStr", () => {
+	it("결정적 — 같은 입력 같은 해시", () => {
+		expect(hashStr("삼성전자")).toBe(hashStr("삼성전자"));
+	});
+	it("다른 입력 다른 해시(충돌 낮음) + 32bit 부호없음", () => {
+		expect(hashStr("a")).not.toBe(hashStr("b"));
+		expect(hashStr("긴 문자열 시드 test")).toBeGreaterThanOrEqual(0);
+		expect(hashStr("긴 문자열 시드 test")).toBeLessThanOrEqual(0xffffffff);
+	});
+});
+
+describe("pickAngle — 해설 앵글 로테이션", () => {
+	it("결정적 — 같은 seed 같은 앵글", () => {
+		expect(pickAngle("seed-x").key).toBe(pickAngle("seed-x").key);
+	});
+	it("seed 로 로테이션 — 여러 seed 가 4앵글 전부 커버", () => {
+		const keys = new Set(
+			Array.from({ length: 60 }, (_, i) => pickAngle(`article-${i}`).key),
+		);
+		expect(keys.size).toBe(ECON_ANGLES.length); // 4종 전부 등장
+	});
+	it("override(key/label) 강제", () => {
+		expect(pickAngle("any", "contrarian").key).toBe("contrarian");
+		expect(pickAngle("any", "숨은 원인").key).toBe("hidden-cause");
+	});
+	it("미매칭 override 는 무시하고 로테이션 유지", () => {
+		expect(pickAngle("seed-x", "emotional").key).toBe(pickAngle("seed-x").key);
+		expect(pickAngle("seed-x", "없는앵글").key).toBe(pickAngle("seed-x").key);
+	});
+	it("항상 유효 앵글 반환", () => {
+		const a = pickAngle("무엇이든");
+		expect(ECON_ANGLES.some((x) => x.key === a.key)).toBe(true);
+	});
+});
+
+describe("containsInvestmentAdvice (YMYL 게이트)", () => {
+	it("투자 조언/가격 예측 어투 감지", () => {
+		expect(containsInvestmentAdvice("지금 삼성전자 매수 타이밍")).toBe(true);
+		expect(containsInvestmentAdvice("목표주가 10만원, 반드시 오른다")).toBe(
+			true,
+		);
+		expect(containsInvestmentAdvice("이 종목 담아야 합니다")).toBe(true);
+		expect(containsInvestmentAdvice("고점 매도 후 저점 매수")).toBe(true);
+	});
+	it("사실 해설/맥락 문구는 통과(오탐 아님)", () => {
+		expect(
+			containsInvestmentAdvice("삼성전자 실적이 시장 예상을 밑돌았다"),
+		).toBe(false);
+		expect(
+			containsInvestmentAdvice("반도체 업황이 왜 중요한지 맥락을 짚는다"),
+		).toBe(false);
+		expect(containsInvestmentAdvice("")).toBe(false);
+	});
+});
+
+describe("loadYoutubeTrendTerms", () => {
+	let dir: string;
+	afterEach(() => {
+		if (dir) rmSync(dir, { recursive: true, force: true });
+	});
+	it("경제 카테고리 제목 → 키워드 추출·dedup", () => {
+		dir = mkdtempSync(join(tmpdir(), "econ-trend-"));
+		const p = join(dir, "trend_topics.json");
+		writeFileSync(
+			p,
+			JSON.stringify({
+				categories: {
+					경제: {
+						topics: [
+							{ title: "삼성전자 실적 급락" },
+							{ title: "삼성전자 반도체 전망" },
+						],
+					},
+					역사: { topics: [{ title: "신라 역사" }] },
+				},
+			}),
+		);
+		const terms = loadYoutubeTrendTerms(p);
+		expect(terms).toContain("삼성전자");
+		expect(terms).toContain("반도체");
+		expect(terms.filter((t) => t === "삼성전자")).toHaveLength(1); // dedup
+		expect(terms).not.toContain("신라"); // 다른 카테고리 제외
+	});
+	it("파일 없음/손상 → 빈 배열(비파괴)", () => {
+		expect(loadYoutubeTrendTerms("/tmp/__no_such_trend__.json")).toEqual([]);
+		dir = mkdtempSync(join(tmpdir(), "econ-trend-"));
+		const bad = join(dir, "bad.json");
+		writeFileSync(bad, "{ not json");
+		expect(loadYoutubeTrendTerms(bad)).toEqual([]);
 	});
 });
