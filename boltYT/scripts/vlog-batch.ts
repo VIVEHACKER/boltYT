@@ -8,7 +8,9 @@
  * 기능(확정 스펙):
  *  - 배치 실행: topics(매니페스트) → 한 번에 N편 순차 생성(메모리 제약상 병렬 안 함)
  *  - 이어하기·중복스킵: crash-safe 레저(잡마다 즉시 저장) → 완료 스킵, 실패는 재시도(maxAttempts 한도)
- *  - AI 토픽 보충: 백로그가 --target 미만이면 LLM 으로 토픽 아이디어 보충(topics.generated.json 에 영속)
+ *  - 토픽 보충: 백로그가 --target 미만이면 ① 트렌드 소비(output/trend_topics.json, 생산자
+ *    trend-topics.ts — 인기 영상 제목→LLM 1콜 시대 변환→resolveEra 검증→dedup 병합)
+ *    → ② 부족분만 기존 AI 아이디어 보충. 둘 다 topics.generated.json 에 영속.
  *  - 스케줄링: 멱등 재실행(cron 이 같은 명령을 반복 호출해도 완료분은 건너뜀). 래퍼: vlog-batch-cron.sh
  *
  * 장르무관: 현재 make-vlog 는 history(시대 기반)만 지원. JobSpec.genre 는 미래(경제 등) 플러그인용
@@ -251,6 +253,52 @@ export function mergeTopupTopics(
 	return out;
 }
 
+// ── 트렌드 토픽 소비(생산자: scripts/trend-topics.ts) ───────────────────────
+// 계약: output/trend_topics.json
+//   { fetchedAt, categories: { <카테고리>: { query, topics: [{rank,title,channel,views,url}] } } }
+export const TREND_CATEGORY = "역사"; // history 장르가 소비하는 카테고리(계약 기본셋 중 하나)
+export const DEFAULT_TREND_PATH = join(
+	PROJECT_ROOT,
+	"output",
+	"trend_topics.json",
+);
+/** 문장형 토픽 상한 — LLM 이 명사구 대신 문장을 반환하면 시대 라벨로 부적합해 거른다. */
+const TREND_TOPIC_MAX_LEN = 40;
+
+/** trend_topics.json(문자열) → 해당 카테고리 영상 제목 목록. 스키마 불일치/파싱 실패 → []. */
+export function parseTrendTitles(raw: string, category: string): string[] {
+	try {
+		const data = JSON.parse(raw) as {
+			categories?: Record<string, { topics?: unknown }>;
+		};
+		const topics = data?.categories?.[category]?.topics;
+		if (!Array.isArray(topics)) return [];
+		return topics
+			.map((t) =>
+				t &&
+				typeof t === "object" &&
+				typeof (t as { title?: unknown }).title === "string"
+					? (t as { title: string }).title.trim()
+					: "",
+			)
+			.filter((t) => t !== "");
+	} catch {
+		return []; // 트렌드 소비는 보조 경로 — 손상 파일로 배치를 죽이지 않는다
+	}
+}
+
+/**
+ * 변환된 토픽이 make-vlog 시대(era)로 쓸 만한지 검증.
+ * resolveEra 는 절대 실패하지 않는 폴백(자유 주제→커스텀 시대 합성)이라 여기서 걸러야
+ * 엉뚱한 정규화를 막는다: ① 1자 입력은 프리셋 느슨 매칭("a"⊂"ancient rome")에 오염,
+ * ② 특수문자만이면 합성 id 가 무의미("custom-era"), ③ 문장형은 시대 라벨로 부적합.
+ */
+export function isValidHistoryTrendTopic(topic: unknown): boolean {
+	const t = typeof topic === "string" ? topic.trim() : "";
+	if (t.length < 2 || t.length > TREND_TOPIC_MAX_LEN) return false;
+	return resolveEra(t).id !== "custom-era";
+}
+
 /** JobSpec → make-vlog argv. 장르무관 골격이지만 현재 지원 장르(history)만 통과. */
 export function jobToArgs(job: JobSpec, outDir: string): string[] {
 	if (job.genre !== "history")
@@ -335,6 +383,50 @@ function runJob(
 	});
 }
 
+/** 트렌드 파일 읽기 — 파일 부재/읽기 실패 → [] (보조 경로라 절대 throw 하지 않음). */
+export function readTrendTitles(path: string, category: string): string[] {
+	if (!existsSync(path)) return [];
+	try {
+		return parseTrendTitles(readFileSync(path, "utf8"), category);
+	} catch {
+		return [];
+	}
+}
+
+/**
+ * LLM 1콜: 인기 영상 제목 목록 → 역사 브이로그 시대/사건 토픽 후보(문자열).
+ * aiTopupTopics 와 동일 백엔드(PROXY /api/openai/chat) 패턴 재사용.
+ * 실패는 throw — 호출부가 트렌드 후보 전체를 스킵(부족분은 AI 보충이 메움).
+ * fetchImpl 주입은 테스트용(네트워크 격리).
+ */
+export async function convertTrendTitlesToTopics(
+	titles: string[],
+	count: number,
+	fetchImpl: typeof fetch = fetch,
+): Promise<string[]> {
+	if (count <= 0 || titles.length === 0) return [];
+	const list = titles
+		.slice(0, 20) // 프롬프트 비대 방지 — 계약상 카테고리당 최대 20건이지만 방어적으로 캡
+		.map((t) => `- ${t}`)
+		.join("\n");
+	const usr = `아래는 유튜브 "${TREND_CATEGORY}" 인기 영상 제목이다. 각 제목에서 시간여행 1인칭 브이로그로 만들 "시대/사건" 토픽을 뽑아라. 간결한 명사구만(예: "고대 로마", "임진왜란"), 역사와 무관한 제목은 건너뛰고, 최대 ${count}개. JSON: {"topics":["고대 로마",...]}\n\n제목:\n${list}`;
+	const cr = await fetchImpl(`${PROXY}/api/openai/chat`, {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({
+			messages: [
+				{ role: "system", content: "유튜브 콘텐츠 기획자. JSON만 출력." },
+				{ role: "user", content: usr },
+			],
+			response_format: { type: "json_object" },
+		}),
+	});
+	if (!cr.ok) throw new Error(`트렌드 토픽 변환 ${cr.status} (api-proxy 확인)`);
+	const parsed = JSON.parse((await cr.json()).choices[0].message.content);
+	const topics = Array.isArray(parsed.topics) ? parsed.topics : [];
+	return topics.filter((t: unknown): t is string => typeof t === "string");
+}
+
 /** LLM 토픽 보충(history). PROXY /api/openai/chat (make-vlog 와 동일 백엔드). */
 async function aiTopupTopics(genre: string, count: number): Promise<string[]> {
 	if (count <= 0) return [];
@@ -407,44 +499,82 @@ async function main(): Promise<void> {
 	}
 	const ledger = loadLedger(statePath);
 
-	// 2) AI 토픽 보충 — 대기 잡이 target 미만이면 보충(생성분에 영속)
+	// 2) 토픽 보충 — 대기 잡이 target 미만이면 ① 트렌드 소비 → ② 부족분만 AI 보충(생성분에 영속)
 	let topupFailed = false;
 	if (target !== undefined) {
 		const planNow = computePlan(jobs, ledger, { maxAttempts, retryFailed });
 		const need = target - planNow.pendingTotal;
 		if (need > 0) {
 			log(
-				`🔎 대기 ${planNow.pendingTotal} < 목표 ${target} → AI 토픽 ${need}개 보충...`,
+				`🔎 대기 ${planNow.pendingTotal} < 목표 ${target} → 토픽 ${need}개 보충...`,
 			);
 			const seenIds = new Set<string>([
 				...jobs.map(jobId),
 				...Object.keys(ledger.jobs),
 			]);
-			try {
-				const topics = await aiTopupTopics(
-					defaults.genre ?? DEFAULT_GENRE,
-					need,
-				);
-				// LLM 이 need 보다 많이 반환해도 부족분만큼만 채택(백로그 무한 증식 방지, Codex P2).
-				const fresh = mergeTopupTopics(topics, defaults, seenIds).slice(
-					0,
-					need,
-				);
-				if (fresh.length) {
-					const prevGen = existsSync(generatedPath)
-						? parseManifest(readFileSync(generatedPath, "utf8"), defaults)
-						: [];
-					writeFileSync(
-						generatedPath,
-						JSON.stringify([...prevGen, ...fresh], null, 2),
-					);
-					jobs.push(...fresh);
-					log(`   +${fresh.length}개: ${fresh.map((j) => j.era).join(", ")}`);
-				} else log("   (중복 제외 후 신규 토픽 0개)");
-			} catch (e) {
-				topupFailed = true;
-				log(`   ⚠ 토픽 보충 실패(${e}) — 기존 매니페스트로 진행`);
+			const fresh: JobSpec[] = [];
+
+			// 2a) 트렌드 토픽 우선(생산자: trend-topics.ts). 파일 부재/빈 목록 → 경고 1줄 후 기존 경로.
+			if ((defaults.genre ?? DEFAULT_GENRE) === "history") {
+				const trendPath = args.trend ?? DEFAULT_TREND_PATH;
+				const titles = readTrendTitles(trendPath, TREND_CATEGORY);
+				if (titles.length === 0) {
+					log(`   ⚠ 트렌드 토픽 없음(${trendPath}) — AI 보충 경로로 진행`);
+				} else {
+					try {
+						// LLM 1콜: 제목→시대 변환. resolveEra 검증 통과분만 dedup 병합.
+						const converted = await convertTrendTitlesToTopics(titles, need);
+						const picked = mergeTopupTopics(
+							converted.filter(isValidHistoryTrendTopic),
+							defaults,
+							seenIds,
+						).slice(0, need);
+						for (const j of picked) seenIds.add(jobId(j)); // AI 보충과의 중복 방지
+						fresh.push(...picked);
+						log(
+							`   📈 트렌드 ${picked.length}개${
+								picked.length
+									? `: ${picked.map((j) => j.era).join(", ")}`
+									: " (검증/중복 제외 후 신규 없음)"
+							}`,
+						);
+					} catch (e) {
+						log(
+							`   ⚠ 트렌드 변환 실패(${e}) — 해당 후보 스킵, AI 보충으로 진행`,
+						);
+					}
+				}
 			}
+
+			// 2b) 부족분만 기존 AI 아이디어 보충
+			const remain = need - fresh.length;
+			if (remain > 0) {
+				try {
+					const topics = await aiTopupTopics(
+						defaults.genre ?? DEFAULT_GENRE,
+						remain,
+					);
+					// LLM 이 remain 보다 많이 반환해도 부족분만큼만 채택(백로그 무한 증식 방지, Codex P2).
+					fresh.push(
+						...mergeTopupTopics(topics, defaults, seenIds).slice(0, remain),
+					);
+				} catch (e) {
+					topupFailed = true;
+					log(`   ⚠ 토픽 보충 실패(${e}) — 기존 매니페스트로 진행`);
+				}
+			}
+
+			if (fresh.length) {
+				const prevGen = existsSync(generatedPath)
+					? parseManifest(readFileSync(generatedPath, "utf8"), defaults)
+					: [];
+				writeFileSync(
+					generatedPath,
+					JSON.stringify([...prevGen, ...fresh], null, 2),
+				);
+				jobs.push(...fresh);
+				log(`   +${fresh.length}개: ${fresh.map((j) => j.era).join(", ")}`);
+			} else if (!topupFailed) log("   (중복 제외 후 신규 토픽 0개)");
 		}
 	}
 

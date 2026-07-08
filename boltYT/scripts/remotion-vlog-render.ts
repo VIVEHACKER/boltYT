@@ -24,6 +24,10 @@ import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
 import { bundle } from "@remotion/bundler";
 import { renderMedia, selectComposition } from "@remotion/renderer";
+import type {
+	SceneShot,
+	SceneShotMotion,
+} from "../src/lib/scene-shot-types.ts";
 import { getOverlapFrames } from "../src/remotion/timing.ts";
 import type { RemotionScene, TransitionType } from "../src/remotion/types.ts";
 import { floatEnv, posIntEnv } from "./vlog-shared.ts";
@@ -70,6 +74,36 @@ export interface VlogSceneInput {
 	audioUrl: string;
 	narration: string;
 	durationSec: number;
+	/** 컷별 카메라무빙(shot-plan 배정 → camera-movements remotionMotionFor 근사값).
+	 *  있으면 씬 전체를 커버하는 단일 SceneShot 으로 배선 — Scene.tsx computeShotMotion 이
+	 *  shot.motion 을 쓰고, Ken Burns 자동 휴리스틱(!shot 폴백)은 진입 불가가 된다(이중 적용 방지).
+	 *  미지정 씬은 기존 KB 휴리스틱 그대로 — 혼용 자동. */
+	cameraMove?: SceneShotMotion;
+}
+
+/**
+ * cameraMove → 씬 전체 단일 SceneShot 변환.
+ * 단일 샷은 buildShotTimeline(shot-timing.ts) 의 sequentialTimeline 이 [0, durationInFrames)
+ * 를 빈틈없이 커버 → useActiveShot 이 모든 프레임에서 shot 을 반환 → computeShotMotion 의
+ * KB 폴백 분기(Scene.tsx `if (!shot)`)에 절대 진입하지 않는다 = KB 스킵 구조적 보장.
+ */
+function cameraMoveShot(
+	motion: SceneShotMotion,
+	sceneIndex: number,
+	durationSec: number,
+): SceneShot {
+	return {
+		id: `cam-${sceneIndex}`,
+		// "context" = micro-edit(kindPulseParams/kindMicroTransform) 중립 default 분기 —
+		// 카메라무빙 외 펄스/이펙트 파라미터를 바꾸지 않는다.
+		kind: "context",
+		// 단일 샷은 scaledShotDurations 가 어차피 씬 전체로 스케일 — 값은 문서용(씬 오디오 길이).
+		duration_seconds: Math.max(1.5, durationSec),
+		motion,
+		// "full" = getShotScale default(baseScale 그대로, 추가 줌 없음). 정지컷 경로는
+		// objectFit "cover" 하드코딩(Scene.tsx DefaultSceneView)이라 레터박스 부작용도 없음.
+		crop: "full",
+	};
 }
 
 /**
@@ -93,6 +127,10 @@ export function buildVlogRemotionScenes(
 		// (type 안 바꾸면 DefaultSceneView 가 정지컷만 그려 클립이 무시됨 — Codex.) durationInFrames 는
 		// 오디오 길이 그대로라 .srt/오버랩 동기 무변경(클립이 짧으면 Remotion 이 루프/홀드).
 		videoUrl: s.videoUrl,
+		// 카메라무빙 배선 — cameraMove 미지정이면 키 자체를 만들지 않아 기존 출력 형태 100% 불변.
+		...(s.cameraMove
+			? { shots: [cameraMoveShot(s.cameraMove, i, s.durationSec)] }
+			: {}),
 		audioUrl: s.audioUrl,
 		narration: s.narration,
 		durationInFrames: Math.max(

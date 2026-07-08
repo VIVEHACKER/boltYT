@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { buildShotTimeline } from "../src/remotion/shot-timing.ts";
 import {
 	buildSceneTimeline,
 	getOverlapFrames,
@@ -93,11 +94,11 @@ describe("buildVlogRemotionScenes", () => {
 	it("P1-무클립: 각 씬 오디오 윈도 == 원본 오디오 길이(내레이션 꼬리 안 잘림)", () => {
 		const out = buildVlogRemotionScenes(inputs);
 		const timeline = buildSceneTimeline(out, 0, totalFrames(out));
-		timeline.forEach((seg, i) =>
+		timeline.forEach((seg, i) => {
 			expect(seg.audioTo - seg.audioFrom).toBe(
 				audioFrames(inputs[i].durationSec),
-			),
-		);
+			);
+		});
 	});
 
 	it("첫 씬은 전환 없음+hookBoost, 이후 씬은 전환 부여", () => {
@@ -119,5 +120,54 @@ describe("buildVlogRemotionScenes", () => {
 
 	it("빈 입력은 빈 배열", () => {
 		expect(buildVlogRemotionScenes([])).toEqual([]);
+	});
+
+	it("cameraMove 통과 — 지정 씬만 shots:[{motion, crop:'full'}], 미지정 씬은 undefined(혼용)", () => {
+		const out = buildVlogRemotionScenes([
+			{
+				imageUrl: "a.png",
+				audioUrl: "a.mp3",
+				narration: "씬1",
+				durationSec: 3,
+				cameraMove: "pan_left",
+			},
+			{
+				imageUrl: "b.png",
+				audioUrl: "b.mp3",
+				narration: "씬2",
+				durationSec: 2,
+			},
+		]);
+		expect(out[0].shots).toHaveLength(1);
+		expect(out[0].shots?.[0].motion).toBe("pan_left"); // 카메라무빙 씬
+		expect(out[0].shots?.[0].crop).toBe("full"); // 추가 줌 없음(getShotScale default)
+		expect(out[1].shots).toBeUndefined(); // 미지정 씬 무영향(KB 휴리스틱 유지)
+		// cameraMove 가 durationInFrames(오디오 동기)에 영향 주지 않음
+		expect(out[0].durationInFrames).toBeGreaterThanOrEqual(audioFrames(3));
+	});
+
+	it("KB 스킵 — 단일 샷이 씬 전 프레임을 빈틈없이 커버(computeShotMotion !shot 폴백 진입 불가)", () => {
+		const out = buildVlogRemotionScenes([
+			{
+				imageUrl: "a.png",
+				audioUrl: "a.mp3",
+				narration: "씬1",
+				durationSec: 3,
+				cameraMove: "slow_zoom_in",
+			},
+		]);
+		// Scene.tsx useActiveShot 과 동일 함수/입력으로 타임라인 재구성 — 렌더 경로 등가 검증.
+		const timeline = buildShotTimeline(out[0].shots, out[0].durationInFrames);
+		expect(timeline).toHaveLength(1);
+		expect(timeline[0].from).toBe(0);
+		// 전 프레임 커버 → 모든 프레임에서 shot 반환 → Ken Burns 폴백(!shot 분기) 이중 적용 불가
+		expect(timeline[0].durationInFrames).toBe(out[0].durationInFrames);
+	});
+
+	it("cameraMove 미지정 시 기존 출력 완전 불변 — shots 키 자체가 없음(스냅샷 동형)", () => {
+		const out = buildVlogRemotionScenes(inputs);
+		for (const s of out) {
+			expect("shots" in s).toBe(false); // 키 부재 = deep-equal 스냅샷까지 불변
+		}
 	});
 });

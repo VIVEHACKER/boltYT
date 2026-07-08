@@ -32,6 +32,9 @@ PROXY_URL="${API_PROXY_URL:-http://localhost:3459}"
 
 echo "[$(date '+%F %T')] vlog-batch-cron 시작 (max=$MAX target=$TARGET)"
 
+# 0) 트렌드 토픽 갱신(생산자, 24h 캐시) — 실패해도 배치 계속(소비 측 vlog-batch 가 파일 부재 폴백 처리).
+npm run trend:topics || true
+
 # ComfyUI 는 자동 기동하지 않음(GPU 메모리 관리 필요) — 없으면 중단.
 if ! curl -sf -m 5 "$COMFY_URL/system_stats" >/dev/null 2>&1; then
   echo "❌ ComfyUI($COMFY_URL) 응답 없음 — 먼저 켜야 함. 중단."

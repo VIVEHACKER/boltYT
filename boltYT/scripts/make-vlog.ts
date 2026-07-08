@@ -18,6 +18,12 @@ import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
+// 카메라무빙 — 컷별 결정적 배정(시드=era 식별자) → Remotion 모션 근사 + i2v 프롬프트 아티팩트.
+import {
+	assignCameraMoves,
+	i2vPromptFor,
+	remotionMotionFor,
+} from "../src/lib/camera-movements.ts";
 import {
 	buildHistoricalChapters,
 	buildHistoricalThumbnail,
@@ -32,11 +38,26 @@ import {
 	createStarterHost,
 	type HostCharacter,
 } from "../src/lib/host-character.ts";
+// 플랫폼 4종(youtube/tiktok/reels/naver_clip) 업로드 메타 변환 — 순수 함수.
+import { buildPlatformMeta } from "../src/lib/platform-meta.ts";
+// reference-ai-drama-codex-pipeline 보강 — shot-plan + story-sync 게이트(기본 ON).
+import {
+	auditStorySync,
+	budgetNarrationChars,
+	buildShotPlan,
+	cutId,
+	estimateSpeakingSeconds,
+	planRebudget,
+	summarizeAudit,
+	targetSecondsPerCut,
+} from "../src/lib/shot-plan.ts";
 import {
 	END_CARD_FRAMES,
 	TITLE_CARD_FRAMES,
 } from "../src/remotion/cards/card-frames.ts";
 import { renderVlogRemotion } from "./remotion-vlog-render.ts";
+// 최종 산출물 검수(ffprobe 실측 + srt 정합 + contact sheet) — 실패 시 exit 1(fail-closed).
+import { runVerifyOutput, WARN_CHECKS } from "./verify-output.ts";
 import {
 	buildChapterMarkers,
 	illustrationWorkflow,
@@ -432,6 +453,90 @@ async function genScenes(userPrompt: string): Promise<VlogScene[]> {
 	return (Array.isArray(parsed.scenes) ? parsed.scenes : []) as VlogScene[];
 }
 
+/**
+ * 단일 narration 을 목표 문자수에 맞게 재작성(액티브 rebudget) — 의미·시대·1인칭 톤 보존.
+ * 실패/빈 응답 시 원문 유지(비파괴). SHOTPLAN_REBUDGET 경로 전용.
+ */
+async function rewriteNarration(
+	narration: string,
+	targetChars: number,
+	direction: "expand" | "trim",
+	era: HistoricalEra,
+): Promise<string> {
+	// expand=환각/시대오류 방지, trim=사실 보존. 원문 문장 수(1~2) 유지로 의미 손실/런온 방지.
+	const guide =
+		direction === "expand"
+			? "기존 내용만 더 생생하게 풀어 써라(새 사실·고유명사·연도를 지어내지 마라)"
+			: "군더더기만 덜어 핵심 의미·사실을 보존하라";
+	const cr = await fetch(`${PROXY}/api/openai/chat`, {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({
+			messages: [
+				{
+					role: "system",
+					content: "한국 유튜브 시간여행 역사 브이로그 작가. JSON만 출력.",
+				},
+				{
+					role: "user",
+					content: `${era.subjectKo} 1인칭 브이로그 내레이션을 의미·톤 유지하며 약 ${targetChars}자(±15%)로 다시 써라. ${guide}. 원문 문장 수(1~2문장) 유지, 생생·몰입·한국어. JSON: {"narration":"..."}\n원문: ${narration}`,
+				},
+			],
+			response_format: { type: "json_object" },
+		}),
+	});
+	if (!cr.ok) throw new Error(`rebudget ${cr.status}`);
+	const parsed = JSON.parse((await cr.json()).choices[0].message.content);
+	const out =
+		typeof parsed.narration === "string" ? parsed.narration.trim() : "";
+	return out || narration;
+}
+
+/**
+ * visual 프롬프트 복구 — empty-visual/forbidden-location 은 비트맵이 아니라 visual *텍스트* 문제라,
+ * 같은 문자열로 이미지만 재생성하면 재감사가 동일 에러를 다시 잡는다(무의미 재시도). 텍스트 자체를 고친다.
+ * 실패/빈 응답 시 fallback(내레이션 기반 최소 묘사) — 절대 빈 문자열 반환 안 함(감사 통과 보장 시도).
+ */
+async function rewriteVisual(
+	scene: VlogScene,
+	forbidden: string[],
+	era: HistoricalEra,
+): Promise<string> {
+	const avoid = forbidden.length
+		? ` 다음 장소는 절대 등장/언급 금지: ${forbidden.join(", ")}.`
+		: "";
+	try {
+		const cr = await fetch(`${PROXY}/api/openai/chat`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				messages: [
+					{
+						role: "system",
+						content:
+							"AI 이미지 생성용 장면 묘사 작가(영어 시각 프롬프트). JSON만 출력.",
+					},
+					{
+						role: "user",
+						content: `${era.subjectKo} 시대의 이 브이로그 컷을 위한 구체적 시각 묘사를 영어 1문장으로 써라(인물/배경/조명/분위기).${avoid} 내레이션: ${scene.narration}\nJSON: {"visual":"..."}`,
+					},
+				],
+				response_format: { type: "json_object" },
+			}),
+		});
+		if (cr.ok) {
+			const parsed = JSON.parse((await cr.json()).choices[0].message.content);
+			const out = typeof parsed.visual === "string" ? parsed.visual.trim() : "";
+			if (out) return out;
+		}
+	} catch {
+		// 폴백으로 진행
+	}
+	// LLM 실패 시에도 빈 값은 금지 — 내레이션 앞부분으로 최소 묘사 생성(empty-visual 은 최소 해소).
+	const base = (scene.narration || era.subjectKo).slice(0, 80);
+	return `${era.subjectKo} scene: ${base}`;
+}
+
 // 6-비트 챕터별 분량 가중치(Chloe Rome 아크 기반: 훅 짧게→클라이맥스 최장→아웃트로 짧게).
 const CHAPTER_WEIGHTS: Record<string, number> = {
 	hook: 0.6,
@@ -539,6 +644,55 @@ async function main(): Promise<void> {
 			.slice(0, 110)}`,
 	);
 
+	// 1.b) 액티브 rebudget(visual-length→script-length, 기본 ON) — reference-ai-drama-codex-pipeline.
+	//      컷 목표 길이에 맞춰 대본 분량을 LLM 으로 재작성 → TTS 자연 속도(컷 과속/늘어짐 방지).
+	//      opt-out: SHOTPLAN_REBUDGET=0. 재작성 실패 컷은 원문 유지(비파괴). SHOTPLAN_TARGET_SEC=컷당 목표초.
+	if (process.env.SHOTPLAN_REBUDGET !== "0") {
+		const totalTargetSec = minutes
+			? minutes * 60
+			: scenes.length * Number(process.env.SHOTPLAN_TARGET_SEC ?? 10);
+		const targets = targetSecondsPerCut(totalTargetSec, scenes.length);
+		const cap = Number(process.env.SHOTPLAN_REBUDGET_MAX ?? 24);
+		// tolerance 0.25(계약 확정치 — 모듈 기본 0.35 보다 빡빡). SHOTPLAN_TOLERANCE 로 채널별 오버라이드.
+		const tolRaw = Number(process.env.SHOTPLAN_TOLERANCE);
+		const tolerance = Number.isFinite(tolRaw) && tolRaw > 0 ? tolRaw : 0.25;
+		const plan = planRebudget(
+			scenes.map((s) => s.narration),
+			targets,
+			{ tolerance },
+		)
+			// 롱폼 훅(챕터0 = 의도적 0~3초 패턴인터럽트)은 제외 — 의도된 짧은 페이싱 보존.
+			.filter((p) => !(minutes && p.index === (chapterStarts[0] ?? 0)))
+			.slice(0, Number.isFinite(cap) && cap > 0 ? cap : 24);
+		if (plan.length) {
+			log(
+				`1.b) 액티브 rebudget: ${plan.length}컷 대본 길이 재조정(목표 ~${targets[0]}s/컷)...`,
+			);
+			for (const p of plan) {
+				try {
+					const rewritten = await rewriteNarration(
+						scenes[p.index].narration,
+						p.targetChars,
+						p.direction,
+						era,
+					);
+					// 재작성이 목표에 더 가까울 때만 채택 — 과확장/길이폭주로 더 어긋나면 원문 유지.
+					const before = Math.abs(
+						estimateSpeakingSeconds(scenes[p.index].narration) - p.targetSec,
+					);
+					const after = Math.abs(
+						estimateSpeakingSeconds(rewritten) - p.targetSec,
+					);
+					if (after <= before)
+						scenes[p.index] = { ...scenes[p.index], narration: rewritten };
+					else log(`   컷${p.index + 1} rebudget 무시(재작성이 더 어긋남)`);
+				} catch (e) {
+					log(`   컷${p.index + 1} rebudget 생략(${e})`);
+				}
+			}
+		}
+	}
+
 	// 2) 호스트 레퍼런스(채널 캐시) — 포토리얼 모드만. 일러스트는 스타일이 일관성을 운반하므로 불필요.
 	const host = createStarterHost(channel, "ko");
 	let ref = "";
@@ -549,21 +703,20 @@ async function main(): Promise<void> {
 
 	// 3) 씬별 이미지 + 내레이션 (메타 수집 — 렌더는 4단계)
 	const made: { img: string; mp3: string; narration: string; d: number }[] = [];
-	const srt: string[] = [];
-	const sceneStart: number[] = []; // 씬 i 의 시작초(챕터 타임스탬프용)
 	// 카드는 롱폼 Remotion(YouTubeVideo) 전용 — Shorts/ffmpeg 경로엔 미적용(Codex P2).
 	const useCards =
 		!!minutes && args.shorts !== "true" && args.ffmpeg !== "true";
 	// 인트로 카드가 씬 블록을 TITLE_CARD_FRAMES(90f@30fps=3s)만큼 뒤로 민다 → .srt 도 동일 오프셋
 	// (Codex P2: 안 그러면 업로드 자막이 3초 빠름). 씬0 전치=none(overlap 0)이라 강체 이동만 보정하면 충분.
 	const introOffsetSec = useCards ? TITLE_CARD_FRAMES / 30 : 0;
-	let cursor = introOffsetSec;
-	for (let i = 0; i < scenes.length; i++) {
+	/**
+	 * 씬 i 이미지 생성 — 본문 루프·3.a 감사 재생성 루프 공용. seedOffset: 재생성 시 결정적 seed 변경.
+	 * 정지 이미지 프롬프트에는 카메라 무빙 문구를 넣지 않는다 — 정지컷 생성엔 무의미한 노이즈(모션은 Remotion 담당).
+	 */
+	const genSceneImage = (i: number, seedOffset = 0): Promise<string> => {
 		// 셀카(호스트 face-lock) ↔ 와이드(환경+군중) 교차. 0=셀카 훅, 1=와이드, 2=셀카 ...
 		const isWide = i % 2 === 1;
-		log(
-			`3.${i + 1}) ${isWide ? "와이드 환경샷(군중)" : "셀카 face-lock"} + 내레이션...`,
-		);
+		const seed = 1000 + i * 137 + seedOffset;
 		// 일러스트 모드: IPAdapter 없이 일관 일러스트체. era.settingKeywords 의 "photorealistic" 은 제거(스타일 충돌).
 		const povBase = buildPovVisualPrompt(scenes[i].visual, era);
 		const illusPrompt = isWide
@@ -575,15 +728,15 @@ async function main(): Promise<void> {
 					/photo-?realistic,?\s*/gi,
 					"",
 				);
-		const img = await runComfy(
+		return runComfy(
 			illustration
-				? illustrationWorkflow(illusPrompt, 1000 + i * 137, imgW, imgH)
+				? illustrationWorkflow(illusPrompt, seed, imgW, imgH)
 				: isWide
 					? wideWorkflow(
 							photoreal(
 								`${scenes[i].visual}, ${era.settingKeywords}, wide establishing shot, ${CROWD}`,
 							),
-							1000 + i * 137,
+							seed,
 							imgW,
 							imgH,
 						)
@@ -592,7 +745,7 @@ async function main(): Promise<void> {
 							photoreal(
 								`${buildPovVisualPrompt(scenes[i].visual, era)}, medium selfie shot waist-up, host positioned to one side, expansive detailed background with ${CROWD} clearly visible`,
 							),
-							1000 + i * 137,
+							seed,
 							ref,
 							ipaWeight,
 							ipaEndAt,
@@ -601,15 +754,166 @@ async function main(): Promise<void> {
 						),
 			join(work, `scene${i}.png`),
 		);
+	};
+	for (let i = 0; i < scenes.length; i++) {
+		log(
+			`3.${i + 1}) ${i % 2 === 1 ? "와이드 환경샷(군중)" : "셀카 face-lock"} + 내레이션...`,
+		);
+		const img = await genSceneImage(i);
 		const mp3 = join(work, `scene${i}.mp3`);
 		await tts(scenes[i].narration, mp3);
 		const d = await dur(mp3);
-		sceneStart.push(cursor);
 		made.push({ img, mp3, narration: scenes[i].narration, d });
-		srt.push(
-			`${i + 1}\n${srtTime(cursor)} --> ${srtTime(cursor + d)}\n${scenes[i].narration}\n`,
+	}
+
+	// 3.a) Shot-plan 스토리 싱크 게이트(기본 ON, opt-out: SHOTPLAN_AUDIT=0) — reference-ai-drama-codex-pipeline.
+	//      TTS 실측 후 감사 → error 컷은 재생성 루프 *정확히 1회*(내레이션 재작성+TTS 재생성+길이 재실측,
+	//      visual 이슈 컷은 이미지 seed 변경 재생성) → 재감사. 그래도 error>0 이면 audit.json 기록 후 throw
+	//      (main catch 가 exit 1) — cron/batch 가 실패 산출물을 업로드 라인에서 격리하는 근거.
+	//      SHOTPLAN_FORBIDDEN="장소1,장소2" 로 금지장소 지정.
+	if (process.env.SHOTPLAN_AUDIT !== "0") {
+		const forbidden = (process.env.SHOTPLAN_FORBIDDEN ?? "")
+			.split(",")
+			.map((s) => s.trim())
+			.filter(Boolean);
+		// 감사 스냅샷 — 재생성 후 재감사에서도 동일 기준(항상 현재 scenes/made 기준).
+		const auditNow = () =>
+			auditStorySync(
+				scenes.map((sc, i) => ({
+					cutId: cutId(i + 1),
+					narration: made[i]?.narration ?? sc.narration,
+					visual: sc.visual,
+					expectedSec: estimateSpeakingSeconds(
+						made[i]?.narration ?? sc.narration,
+					),
+					measuredSec: made[i]?.d,
+					forbiddenLocations: forbidden,
+				})),
+			);
+		let issues = auditNow();
+		let sum = summarizeAudit(issues);
+		log(`3.a) sync audit: ${sum.errors} error / ${sum.warns} warn`);
+		if (sum.errors > 0) {
+			log(`   재생성 루프(1회): ${sum.regenCuts.join(", ")}`);
+			// 목표 컷 길이는 1.b rebudget 과 동일 산식 — 재작성 방향/문자수 가이드용.
+			const targets = targetSecondsPerCut(
+				minutes
+					? minutes * 60
+					: scenes.length * Number(process.env.SHOTPLAN_TARGET_SEC ?? 10),
+				scenes.length,
+			);
+			const regen = new Set(sum.regenCuts);
+			for (let i = 0; i < scenes.length; i++) {
+				if (!regen.has(cutId(i + 1))) continue;
+				const targetSec = targets[i] ?? 10;
+				// (1) 내레이션 재작성(rewriteNarration 패턴) — 실패 시 원문 유지(비파괴).
+				try {
+					scenes[i] = {
+						...scenes[i],
+						narration: await rewriteNarration(
+							scenes[i].narration,
+							budgetNarrationChars(targetSec),
+							estimateSpeakingSeconds(scenes[i].narration) > targetSec
+								? "trim"
+								: "expand",
+							era,
+						),
+					};
+				} catch (e) {
+					log(`   컷${i + 1} 내레이션 재작성 실패 — 원문 유지(${e})`);
+				}
+				// (2) visual 이슈(error) 컷 — visual *텍스트* 를 먼저 복구한 뒤 이미지 재생성.
+				//     텍스트를 안 고치면 재감사가 같은 empty/forbidden 을 다시 잡아 재시도가 무의미.
+				const hasVisualError = issues.some(
+					(it) =>
+						it.cutId === cutId(i + 1) &&
+						it.severity === "error" &&
+						(it.code === "empty-visual" || it.code === "forbidden-location"),
+				);
+				if (hasVisualError) {
+					try {
+						scenes[i] = {
+							...scenes[i],
+							visual: await rewriteVisual(scenes[i], forbidden, era),
+						};
+					} catch (e) {
+						log(`   컷${i + 1} visual 복구 실패 — 원문 유지(${e})`);
+					}
+					made[i].img = await genSceneImage(i, 104729);
+				}
+				// (3) TTS 재생성 + 길이 재실측 → made[] 갱신(같은 mp3 경로 덮어쓰기).
+				await tts(scenes[i].narration, made[i].mp3);
+				made[i] = {
+					...made[i],
+					narration: scenes[i].narration,
+					d: await dur(made[i].mp3),
+				};
+			}
+			issues = auditNow();
+			sum = summarizeAudit(issues);
+			log(`   재감사: ${sum.errors} error / ${sum.warns} warn`);
+		}
+		// 아티팩트는 재생성 반영 후의 최종 상태로 기록.
+		const shotPlan = buildShotPlan(scenes, {
+			blockStarts: chapterStarts,
+			blockLabels: chapterRoles,
+			forbiddenLocations: forbidden,
+		});
+		const auditDir = join(work, "story_sync_audit");
+		mkdirSync(auditDir, { recursive: true });
+		const auditPath = join(auditDir, "audit.json");
+		writeFileSync(
+			auditPath,
+			JSON.stringify({ summary: sum, shotPlan, issues }, null, 2),
 		);
-		cursor += d;
+		if (sum.errors > 0)
+			throw new Error(
+				`스토리 싱크 감사 실패(재생성 후에도 error ${sum.errors}건: ${sum.regenCuts.join(", ")}) — ${auditPath} 참고`,
+			);
+	}
+
+	// .srt 타임라인은 감사·재생성 *완료 후* 의 made[] 기준으로 계산 — 재생성으로 길이가 바뀌어도 정합.
+	const srt: string[] = [];
+	const sceneStart: number[] = []; // 씬 i 의 시작초(챕터 타임스탬프용)
+	let cursor = introOffsetSec;
+	for (let i = 0; i < made.length; i++) {
+		sceneStart.push(cursor);
+		srt.push(
+			`${i + 1}\n${srtTime(cursor)} --> ${srtTime(cursor + made[i].d)}\n${made[i].narration}\n`,
+		);
+		cursor += made[i].d;
+	}
+
+	// 3.b) 카메라무빙(기본 ON, opt-out: CAMERA_MOVES=0) — 컷 구조 기반 결정적 배정.
+	//      seed 는 era 식별자 문자열(타임스탬프 금지) → 같은 토픽 재실행 시 동일 배정(재현성).
+	//      산출: (a) Remotion 입력 cameraMove(정지컷 모션 근사) (b) shot_plan.json(무빙 id +
+	//      i2v 프롬프트 전문 — 향후 i2v 전환 시 그대로 사용).
+	let cameraMoves: string[] = [];
+	if (process.env.CAMERA_MOVES !== "0") {
+		const cuts = buildShotPlan(scenes, {
+			blockStarts: chapterStarts,
+			blockLabels: chapterRoles,
+		});
+		cameraMoves = assignCameraMoves(
+			cuts.map((c) => ({ purpose: c.purpose, expectedSec: c.expectedSec })),
+			// 훅=punchy 무빙: 숏폼 훅(첫 컷)·롱폼 hook 챕터 시작 컷 모두 index 0.
+			{ seed: `vlog_${era.id}`, hookIndex: chapterStarts[0] ?? 0 },
+		);
+		writeFileSync(
+			join(work, "shot_plan.json"),
+			JSON.stringify(
+				cuts.map((c, i) => ({
+					...c,
+					cameraMove: cameraMoves[i],
+					i2vPrompt: i2vPromptFor(cameraMoves[i]),
+				})),
+				null,
+				2,
+			),
+		);
+		log(
+			`3.b) 카메라무빙 배정: ${cameraMoves.slice(0, 8).join(", ")}${cameraMoves.length > 8 ? " …" : ""} → shot_plan.json`,
+		);
 	}
 
 	// 썸네일 — 공식(놀란 표정 + 거대 텍스트 + 시대 배경). CTR 자산. 실패해도 영상엔 무영향.
@@ -732,11 +1036,15 @@ async function main(): Promise<void> {
 		// 4b) 기본: Remotion 렌더 — 동적 자막(chunked) + 전환 + BGM 덕킹 + Ken Burns.
 		log("4) Remotion 렌더(동적 자막 + 전환 + BGM)...");
 		await renderVlogRemotion({
-			scenes: made.map((m) => ({
+			scenes: made.map((m, i) => ({
 				imageUrl: m.img,
 				audioUrl: m.mp3,
 				narration: m.narration,
 				durationSec: m.d,
+				// 카메라무빙 → 정지컷 렌더러 근사 모션(remotionMotionFor). 미배정 씬은 기존 Ken Burns 휴리스틱.
+				...(cameraMoves[i]
+					? { cameraMove: remotionMotionFor(cameraMoves[i]) }
+					: {}),
 			})),
 			outPath: finalPath,
 			projectRoot: PROJECT_ROOT,
@@ -766,9 +1074,11 @@ async function main(): Promise<void> {
 	const videoTitle = buildHistoricalTitle(era, "ko");
 	const metaBase = join(outDir, `vlog_${era.id}_${stamp}`);
 	writeFileSync(`${metaBase}.title.txt`, videoTitle);
+	const AI_DISCLOSURE = "※ 본 영상은 AI로 제작된 가상의 시간여행 연출입니다.";
+	let uploadChapters: { title: string; startSec: number }[] = [];
 	if (minutes && chapterStarts.length > 0) {
 		const seenStart = new Set<number>();
-		const chapters = chapterStarts
+		uploadChapters = chapterStarts
 			.map((s, i) => ({
 				title: ROLE_KO[chapterRoles[i]] ?? chapterRoles[i],
 				start: sceneStart[s],
@@ -779,23 +1089,58 @@ async function main(): Promise<void> {
 				return true;
 			})
 			.map((c) => ({ title: c.title, startSec: c.start as number }));
-		const chapterLines = buildChapterMarkers(chapters);
+		const chapterLines = buildChapterMarkers(uploadChapters);
 		const description = [
 			videoTitle,
 			"",
 			"챕터",
 			...chapterLines,
 			"",
-			"※ 본 영상은 AI로 제작된 가상의 시간여행 연출입니다.",
+			AI_DISCLOSURE,
 		].join("\n");
 		writeFileSync(`${metaBase}.description.txt`, description);
 		writeFileSync(`${metaBase}.chapters.txt`, chapterLines.join("\n"));
 	}
+	// 플랫폼 4종(youtube/tiktok/reels/naver_clip) 업로드 메타 — 기존 txt 는 하위호환 유지, JSON 은 업로더 자동화용.
+	// isShorts = --minutes 부재(계약 확정치). 면책 문구는 disclosure 필드로 — 캡션 절삭 시에도 우선 생존.
+	const platformMeta = buildPlatformMeta({
+		title: videoTitle,
+		description: videoTitle,
+		tags: [era.subjectKo, "시간여행", "역사", "브이로그", "AI"],
+		hashtags: ["시간여행", era.subjectKo, "역사브이로그", "AI브이로그"],
+		chapters: uploadChapters.map((c) => ({ sec: c.startSec, label: c.title })),
+		isShorts: !minutes,
+		disclosure: AI_DISCLOSURE,
+	});
+	writeFileSync(
+		`${metaBase}.platform_meta.json`,
+		JSON.stringify(platformMeta, null, 2),
+	);
+
+	// 5) 최종 검수 게이트(fail-closed) — 렌더 실측 길이/.srt 정합/컷수 + contact sheet.
+	//    카드 보정치(인트로/아웃트로 초)를 전달 — 전환 오버랩은 렌더러 패딩이 상쇄(verify-output 헤더 참조).
+	//    실패 시 throw → main catch 가 exit 1: cron/batch 가 결함 산출물을 업로드 라인에서 걸러낸다.
+	log("5) 최종 검수(verify-output)...");
+	const report = await runVerifyOutput({
+		videoPath: finalPath,
+		srtPath,
+		audioSecTotal: made.reduce((s, m) => s + m.d, 0),
+		cutCount: made.length,
+		introOffsetSec,
+		outroSec: useCards ? END_CARD_FRAMES / 30 : 0,
+		contactSheet: true,
+	});
+	for (const c of report.checks)
+		if (!c.ok)
+			log(
+				`   ${WARN_CHECKS.has(c.name) ? "⚠" : "✗"} ${c.name}: ${c.detail ?? `기대=${c.expected} 실측=${c.actual}`}`,
+			);
+	if (!report.ok) throw new Error(`최종 검수 실패 — ${report.reportPath} 확인`);
 
 	// cursor = 인트로오프셋 + Σ씬오디오. 아웃트로 카드 길이를 더해 실제 영상 총길이 보고.
 	const totalSec = cursor + (useCards ? END_CARD_FRAMES / 30 : 0);
 	log(
-		`\n✅ 완성: ${finalPath} (${Math.round(totalSec)}초)\n   자막: ${srtPath} (YouTube 업로드용) · 메타: ${metaBase}.title.txt`,
+		`\n✅ 완성: ${finalPath} (${Math.round(totalSec)}초, 검수 통과)\n   자막: ${srtPath} (YouTube 업로드용) · 메타: ${metaBase}.title.txt`,
 	);
 }
 

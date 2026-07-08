@@ -31,6 +31,9 @@ export COMFY_PRESET="${COMFY_PRESET:-fast}"
 
 echo "[$(date '+%F %T')] economy-cron 시작 (minutes=$MINUTES)"
 
+# 0) 트렌드 토픽 갱신(생산자, 24h 캐시) — 실패해도 파이프라인 계속(수집기 자체도 exit 0 설계).
+npm run trend:topics || true
+
 # ComfyUI 는 자동 기동 안 함(GPU 메모리 관리) — 없으면 중단.
 if ! curl -sf -m 5 "$COMFY_URL/system_stats" >/dev/null 2>&1; then
   echo "❌ ComfyUI($COMFY_URL) 응답 없음 — 먼저 켜야 함. 중단."; exit 2

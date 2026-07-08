@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
 	canonicalRenderKey,
 	computePlan,
+	convertTrendTitlesToTopics,
+	isValidHistoryTrendTopic,
 	type JobSpec,
 	jobId,
 	jobToArgs,
@@ -9,6 +11,9 @@ import {
 	mergeTopupTopics,
 	normalizeJob,
 	parseManifest,
+	parseTrendTitles,
+	readTrendTitles,
+	TREND_CATEGORY,
 } from "./vlog-batch.ts";
 
 const emptyLedger = (): Ledger => ({ version: 1, jobs: {} });
@@ -225,6 +230,146 @@ describe("jobToArgs", () => {
 	it("style 미지정 시 --style 미포함(make-vlog 기본 illustration)", () => {
 		expect(jobToArgs(hist("로마", { minutes: 10 }), "/o")).not.toContain(
 			"--style",
+		);
+	});
+});
+
+// ── 트렌드 토픽 소비(trend_topics.json 계약) ────────────────────────────────
+const trendFixture = JSON.stringify({
+	fetchedAt: "2026-07-07T00:00:00.000Z",
+	categories: {
+		역사: {
+			query: "역사",
+			topics: [
+				{
+					rank: 1,
+					title: "고대 로마 멸망의 진짜 이유",
+					channel: "히스토리",
+					views: 1200000,
+					url: "https://www.youtube.com/watch?v=aaa",
+				},
+				{ rank: 2, title: "   ", channel: "x", views: 10, url: "u" }, // 공백 제목 → 제외
+				{
+					rank: 3,
+					title: "조선 후기 상인의 하루",
+					channel: "y",
+					views: 5000,
+					url: "https://www.youtube.com/watch?v=bbb",
+				},
+			],
+		},
+		경제: {
+			query: "경제",
+			topics: [
+				{ rank: 1, title: "금리 전망", channel: "z", views: 1, url: "u" },
+			],
+		},
+	},
+});
+
+describe("parseTrendTitles", () => {
+	it("계약 픽스처에서 해당 카테고리 제목만(공백 제목 제외)", () => {
+		expect(parseTrendTitles(trendFixture, TREND_CATEGORY)).toEqual([
+			"고대 로마 멸망의 진짜 이유",
+			"조선 후기 상인의 하루",
+		]);
+	});
+	it("다른 카테고리는 섞이지 않음", () => {
+		expect(parseTrendTitles(trendFixture, "경제")).toEqual(["금리 전망"]);
+	});
+	it("카테고리 없음/topics 배열 아님 → []", () => {
+		expect(parseTrendTitles(trendFixture, "쇼핑")).toEqual([]);
+		expect(
+			parseTrendTitles('{"categories":{"역사":{"topics":"x"}}}', "역사"),
+		).toEqual([]);
+	});
+	it("깨진 JSON → [] (배치를 죽이지 않음)", () => {
+		expect(parseTrendTitles("not json", TREND_CATEGORY)).toEqual([]);
+	});
+});
+
+describe("readTrendTitles", () => {
+	it("파일 부재 → [] (조용한 기존 경로 폴백)", () => {
+		expect(
+			readTrendTitles("/nonexistent/trend_topics.json", TREND_CATEGORY),
+		).toEqual([]);
+	});
+});
+
+describe("isValidHistoryTrendTopic", () => {
+	it("프리셋 시대/커스텀 시대 통과", () => {
+		expect(isValidHistoryTrendTopic("고대 로마")).toBe(true);
+		expect(isValidHistoryTrendTopic("임진왜란")).toBe(true); // 프리셋 밖 커스텀 합성도 유효
+	});
+	it("1자 입력 탈락 — 프리셋 느슨 매칭('a'⊂'ancient rome') 오염 방지", () => {
+		expect(isValidHistoryTrendTopic("a")).toBe(false);
+	});
+	it("특수문자만 → 합성 id 무의미(custom-era) → 탈락", () => {
+		expect(isValidHistoryTrendTopic("!!!")).toBe(false);
+	});
+	it("빈 문자열/비문자열/문장형(40자 초과) 탈락", () => {
+		expect(isValidHistoryTrendTopic("")).toBe(false);
+		expect(isValidHistoryTrendTopic(123)).toBe(false);
+		expect(isValidHistoryTrendTopic("가".repeat(41))).toBe(false);
+	});
+});
+
+describe("convertTrendTitlesToTopics", () => {
+	const okFetch = (payload: unknown, calls: string[] = []): typeof fetch =>
+		(async (_url: unknown, init?: { body?: string }) => {
+			calls.push(init?.body ?? "");
+			return {
+				ok: true,
+				json: async () => ({
+					choices: [{ message: { content: JSON.stringify(payload) } }],
+				}),
+			};
+		}) as unknown as typeof fetch;
+
+	it("프록시 1콜 → 문자열 topics 만 반환(비문자열 제거)", async () => {
+		const calls: string[] = [];
+		const topics = await convertTrendTitlesToTopics(
+			["고대 로마 멸망의 진짜 이유"],
+			2,
+			okFetch({ topics: ["고대 로마", 42, "임진왜란"] }, calls),
+		);
+		expect(topics).toEqual(["고대 로마", "임진왜란"]);
+		expect(calls).toHaveLength(1); // LLM 1콜 패턴
+		expect(calls[0]).toContain("고대 로마 멸망의 진짜 이유"); // 제목이 프롬프트에 실림
+	});
+	it("count<=0 또는 제목 0건 → 호출 없이 []", async () => {
+		const boom = (() => {
+			throw new Error("호출되면 안 됨");
+		}) as unknown as typeof fetch;
+		expect(await convertTrendTitlesToTopics([], 3, boom)).toEqual([]);
+		expect(await convertTrendTitlesToTopics(["제목"], 0, boom)).toEqual([]);
+	});
+	it("비정상 응답 → throw (호출부가 트렌드 후보 전체 스킵)", async () => {
+		const bad = (async () => ({
+			ok: false,
+			status: 502,
+		})) as unknown as typeof fetch;
+		await expect(convertTrendTitlesToTopics(["제목"], 2, bad)).rejects.toThrow(
+			/502/,
+		);
+	});
+});
+
+describe("트렌드 소비 dedup (mergeTopupTopics 경유)", () => {
+	it("이미 본 토픽(매니페스트/레저)은 스킵, 검증 탈락분 미병합", () => {
+		const seen = new Set([jobId(hist("고대 로마"))]);
+		const converted = ["고대 로마", "임진왜란", "a", "!!!"];
+		const merged = mergeTopupTopics(
+			converted.filter(isValidHistoryTrendTopic),
+			{ genre: "history" },
+			seen,
+		);
+		expect(merged.map((j) => j.era)).toEqual(["임진왜란"]);
+	});
+	it("별칭 dedup: 트렌드가 '로마' 를 내놔도 레저의 '고대 로마' 와 동일 잡", () => {
+		const seen = new Set([jobId(hist("고대 로마"))]);
+		expect(mergeTopupTopics(["로마"], { genre: "history" }, seen)).toHaveLength(
+			0,
 		);
 	});
 });

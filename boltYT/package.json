@@ -30,6 +30,8 @@
     "vlog:make": "npx tsx scripts/make-vlog.ts",
     "vlog:batch": "npx tsx scripts/vlog-batch.ts",
     "vlog:economy": "npx tsx scripts/make-economy.ts",
+    "trend:topics": "npx tsx scripts/trend-topics.ts",
+    "verify:output": "npx tsx scripts/verify-output.ts",
     "quality:loop": "npx tsx scripts/post-generation-improvement-loop.ts",
     "quality:loop:fix": "npx tsx scripts/post-generation-improvement-loop.ts --fix",
     "quality:dead-exports": "node scripts/check-dead-exports.mjs",

@@ -10,6 +10,13 @@
  * YMYL 안전 레인: "뉴스 요약 + 맥락 해설"만. 투자 조언/종목 추천/가격 예측 금지(LLM 시스템 프롬프트로 강제).
  * 기사 외 사실 창작 방지를 위해 LLM 에 RSS 제목/요약을 그대로 제공하고 그 범위로 해설하게 한다.
  *
+ * 품질 게이트(기본 ON — 해당 env 를 "0" 으로 두면 opt-out):
+ *   SHOTPLAN_REBUDGET  대본 생성 직후 컷별 분량 재작성(1패스). SHOTPLAN_TOLERANCE(기본 0.25) 초과
+ *                      어긋난 컷만 재작성 1회, 목표에 더 가까울 때만 채택.
+ *   SHOTPLAN_AUDIT     TTS 실측 후 스토리 싱크 감사 + 재생성 루프 정확히 1회. 그래도 error → exit 1.
+ *   CAMERA_MOVES       컷별 카메라무빙 결정적 배정(seed=기사 slug) → Remotion + shot_plan.json.
+ * 최종 렌더 후 verify-output 검수(길이/자막 정합 + contact sheet) 실패 시에도 exit 1(fail-closed).
+ *
  * 전제: ComfyUI(8188) + api-proxy(3459, LLM_BACKEND=claude + ELEVENLABS).
  */
 import {
@@ -21,20 +28,46 @@ import {
 } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+// 카메라무빙 — 결정적 배정(시드=기사 slug) + i2v 프롬프트 아티팩트 + Remotion 근사 모션.
+import {
+	assignCameraMoves,
+	i2vPromptFor,
+	remotionMotionFor,
+} from "../src/lib/camera-movements.ts";
+// 4플랫폼(유튜브/틱톡/릴스/네이버클립) 업로드 메타 변환 — 출처 리스트 + YMYL 면책 전파.
+import {
+	buildPlatformMeta,
+	type PlatformMetaInput,
+} from "../src/lib/platform-meta.ts";
+// reference-ai-drama-codex-pipeline — shot-plan/rebudget/story-sync 감사(게이트, 기본 ON).
+import {
+	auditStorySync,
+	budgetNarrationChars,
+	buildShotPlan,
+	cutId,
+	estimateSpeakingSeconds,
+	planRebudget,
+	summarizeAudit,
+	targetSecondsPerCut,
+} from "../src/lib/shot-plan.ts";
 // 인트로/아웃트로 카드 길이(순수 상수, remotion 비의존). 자막 오프셋·총길이 계산용.
 import {
 	END_CARD_FRAMES,
 	TITLE_CARD_FRAMES,
 } from "../src/remotion/cards/card-frames.ts";
 import { renderVlogRemotion } from "./remotion-vlog-render.ts";
+// 최종 산출물 검수(길이/자막 정합 + contact sheet) — 실패 시 exit 1(fail-closed).
+import { runVerifyOutput, WARN_CHECKS } from "./verify-output.ts";
 import {
 	buildChapterMarkers,
 	buildSourceDescription,
 	buildSourceListLines,
 	dur,
+	floatEnv,
 	log,
 	overlayThumbnailText,
 	parseArgs,
+	posIntEnv,
 	proxyChatJSON,
 	renderSourceListSlide,
 	runComfy,
@@ -497,6 +530,54 @@ async function generateExtensionScenes(
 	return scenes.slice(0, n);
 }
 
+/**
+ * 단일 narration 을 목표 문자수로 재작성(액티브 rebudget) — make-vlog rewriteNarration 패턴의 경제판.
+ * YMYL 가드: 기사에 없는 수치·기관명·인용을 지어내지 마라(특히 expand 방향의 환각 위험 차단).
+ * 실패/빈 응답 시 원문 유지(비파괴). SHOTPLAN_REBUDGET/감사 재생성 경로 전용.
+ */
+async function rewriteEconNarration(
+	narration: string,
+	targetChars: number,
+	direction: "expand" | "trim",
+): Promise<string> {
+	const guide =
+		direction === "expand"
+			? "기존 내용만 더 쉽게 풀어 써라 — 원문에 없는 수치·기관명·인용·사실을 절대 지어내지 마라"
+			: "군더더기만 덜어 수치·기관명·인용 등 핵심 사실을 그대로 보존하라";
+	const parsed = await proxyChatJSON(
+		ECON_SYSTEM,
+		`경제 뉴스 해설 내레이션을 의미·사실·구어체 톤을 유지하며 약 ${targetChars}자(±15%)로 다시 써라. ${guide}. 원문 문장 수(1~2문장) 유지, 한국어. JSON: {"narration":"..."}\n원문: ${narration}`,
+	);
+	const out =
+		typeof parsed.narration === "string" ? parsed.narration.trim() : "";
+	return out || narration;
+}
+
+/**
+ * visual 프롬프트 복구 — empty-visual/forbidden-location 은 visual *텍스트* 문제라 이미지만 재생성하면
+ * 재감사가 동일 에러를 다시 잡는다. 텍스트 자체를 고친다. 빈 값 절대 반환 안 함(감사 통과 보장 시도).
+ */
+async function rewriteEconVisual(
+	scene: Scene,
+	forbidden: string[],
+): Promise<string> {
+	const avoid = forbidden.length
+		? ` 다음 장소는 절대 등장/언급 금지: ${forbidden.join(", ")}.`
+		: "";
+	try {
+		const parsed = await proxyChatJSON(
+			"AI 이미지 생성용 장면 묘사 작가(영어 시각 프롬프트). 플랫 카툰 스타일. JSON만 출력.",
+			`이 경제 뉴스 해설 컷을 위한 플랫 카툰 시각 묘사를 영어 1문장으로 써라(피사체/배경/색조).${avoid} 내레이션: ${scene.narration}\nJSON: {"visual":"..."}`,
+		);
+		const out = typeof parsed.visual === "string" ? parsed.visual.trim() : "";
+		if (out) return out;
+	} catch {
+		// 폴백으로 진행
+	}
+	const base = (scene.narration || "economy news").slice(0, 80);
+	return `flat cartoon economy scene: ${base}`;
+}
+
 async function generateMeta(
 	article: RssItem,
 ): Promise<{ videoTitle: string; thumbText: string }> {
@@ -569,18 +650,61 @@ async function main(): Promise<void> {
 		minutes,
 	);
 	if (scenes.length === 0) throw new Error("대본 생성 실패 (씬 0개)");
+
+	// 2.b) 액티브 rebudget(대본 생성 직후 1패스, 기본 ON — opt-out: SHOTPLAN_REBUDGET=0).
+	//      컷당 목표초(=minutes*60/씬수)에 SHOTPLAN_TOLERANCE(기본 0.25) 초과로 어긋난 컷만 재작성 1회,
+	//      재작성이 목표에 더 가까울 때만 채택. 3.x 측정-연장과 목표 기준(minutes*60)을 통일했고,
+	//      역할도 분리: rebudget=컷 페이스 재작성, 측정-연장=총길이 부족분 "새 씬 추가"만 → 같은 컷을
+	//      반대 방향으로 당기는 충돌 없음(충돌 소지가 생기면 대본 직후 1패스인 rebudget 결과를 우선).
+	//      경제 훅(첫 씬)은 일반 1~2문장이라 vlog 롱폼의 0~3초 패턴인터럽트 훅 제외 규칙은 불필요.
+	if (process.env.SHOTPLAN_REBUDGET !== "0") {
+		const targets = targetSecondsPerCut(minutes * 60, scenes.length);
+		// tolerance 0.25(계약 확정치 — 모듈 기본 0.35 보다 빡빡). SHOTPLAN_TOLERANCE 로 채널별 오버라이드.
+		const tolerance = floatEnv("SHOTPLAN_TOLERANCE", 0.25);
+		const plan = planRebudget(
+			scenes.map((s) => s.narration),
+			targets,
+			{ tolerance },
+		).slice(0, posIntEnv("SHOTPLAN_REBUDGET_MAX", 24));
+		if (plan.length) {
+			log(
+				`2.b) 액티브 rebudget: ${plan.length}컷 분량 재조정(목표 ~${targets[0]}s/컷)...`,
+			);
+			for (const p of plan) {
+				try {
+					const rewritten = await rewriteEconNarration(
+						scenes[p.index].narration,
+						p.targetChars,
+						p.direction,
+					);
+					// 재작성이 목표에 더 가까울 때만 채택 — 더 어긋나면 원문 유지(과확장/길이폭주 방지).
+					const before = Math.abs(
+						estimateSpeakingSeconds(scenes[p.index].narration) - p.targetSec,
+					);
+					const after = Math.abs(
+						estimateSpeakingSeconds(rewritten) - p.targetSec,
+					);
+					if (after <= before)
+						scenes[p.index] = { ...scenes[p.index], narration: rewritten };
+					else log(`   컷${p.index + 1} rebudget 무시(재작성이 더 어긋남)`);
+				} catch (e) {
+					log(`   컷${p.index + 1} rebudget 생략(${e})`);
+				}
+			}
+		}
+	}
+
 	const meta = await generateMeta(article);
 	log(`   ${scenes.length}씬 · 제목 "${meta.videoTitle}"`);
 
-	const work = join(outDir, `economy_${slugify(article.title)}_${stamp}`);
+	const slug = slugify(article.title);
+	const work = join(outDir, `economy_${slug}_${stamp}`);
 	mkdirSync(work, { recursive: true });
 
-	// 3) 씬별 카툰 이미지 + 내레이션
+	// 3) 씬별 카툰 이미지 + 내레이션 — .srt/타임라인은 3.a 감사·재생성 "완료 후" made[] 기준으로
+	//    계산한다(재생성으로 컷 길이가 바뀌어도 자막 정합 유지 — 계약 확정치).
 	const made: { img: string; mp3: string; narration: string; d: number }[] = [];
-	const srt: string[] = [];
-	const sceneStart: number[] = []; // 씬 i 의 시작초(챕터 타임스탬프 계산용)
 	const introOffsetSec = TITLE_CARD_FRAMES / 30; // 인트로 카드만큼 자막 오프셋(make-vlog 와 동일 원리)
-	let cursor = introOffsetSec;
 	for (let i = 0; i < scenes.length; i++) {
 		log(`3.${i + 1}) 카툰 + 내레이션...`);
 		const img = await runComfyChecked(
@@ -591,19 +715,15 @@ async function main(): Promise<void> {
 		const mp3 = join(work, `scene${i}.mp3`);
 		await tts(scenes[i].narration, mp3);
 		const d = await dur(mp3);
-		sceneStart.push(cursor);
 		made.push({ img, mp3, narration: scenes[i].narration, d });
-		srt.push(
-			`${i + 1}\n${srtTime(cursor)} --> ${srtTime(cursor + d)}\n${scenes[i].narration}\n`,
-		);
-		cursor += d;
 	}
 
 	// 3.x) 길이 보정(measure-and-extend) — 실측 길이가 목표 미달이면 심화 씬 추가.
 	//      이미지는 비싼 단계라 SCENE_CAP/최대 3라운드로 캡. LLM 이 더 못 주면 즉시 중단.
+	//      목표 기준은 2.b rebudget 과 동일(minutes*60) — 여기선 기존 컷 재작성 없이 씬 추가만.
 	const targetSec = minutes * 60;
 	for (let round = 0; round < 3; round++) {
-		const bodySec = cursor - introOffsetSec;
+		const bodySec = made.reduce((s, m) => s + m.d, 0);
 		const need = scenesNeeded(
 			targetSec,
 			bodySec,
@@ -622,6 +742,8 @@ async function main(): Promise<void> {
 		if (extra.length === 0) break;
 		for (const sc of extra) {
 			const i = made.length;
+			// 확장 씬도 scenes 에 편입 — 3.a 감사·3.b 카메라무빙이 전체 컷을 커버(scenes↔made 정렬 유지).
+			scenes.push(sc);
 			const img = await runComfyChecked(
 				(s) => cartoonWorkflow(sc.visual, s),
 				1000 + i * 137,
@@ -630,12 +752,7 @@ async function main(): Promise<void> {
 			const mp3 = join(work, `scene${i}.mp3`);
 			await tts(sc.narration, mp3);
 			const d = await dur(mp3);
-			sceneStart.push(cursor);
-			srt.push(
-				`${made.length + 1}\n${srtTime(cursor)} --> ${srtTime(cursor + d)}\n${sc.narration}\n`,
-			);
 			made.push({ img, mp3, narration: sc.narration, d });
-			cursor += d;
 		}
 	}
 
@@ -658,17 +775,161 @@ async function main(): Promise<void> {
 		const srcMp3 = join(work, "sources.mp3");
 		await tts(srcNarr, srcMp3);
 		const sd = await dur(srcMp3);
-		srt.push(
-			`${made.length + 1}\n${srtTime(cursor)} --> ${srtTime(cursor + sd)}\n${srcNarr}\n`,
-		);
 		made.push({ img: srcImg, mp3: srcMp3, narration: srcNarr, d: sd });
-		cursor += sd;
 	} catch (e) {
 		log(`   출처 슬라이드 생략(${e})`);
 	}
 
+	// 3.a) Shot-plan 스토리 싱크 게이트(기본 ON, opt-out: SHOTPLAN_AUDIT=0) — reference-ai-drama-codex-pipeline.
+	//      TTS 실측 후 감사 → error 컷은 재생성 루프 *정확히 1회*(내레이션 재작성+TTS 재생성+길이 재실측,
+	//      visual 이슈 컷은 이미지 seed 변경 재생성) → 재감사. 그래도 error>0 이면 audit.json 기록 후 throw
+	//      (main catch 가 exit 1) — economy-cron/양산이 실패 산출물을 업로드 라인에서 격리하는 근거.
+	//      SHOTPLAN_FORBIDDEN="장소1,장소2" 로 금지장소 지정. (출처 슬라이드는 scenes 밖 — 감사 대상 아님.)
+	if (process.env.SHOTPLAN_AUDIT !== "0") {
+		const forbidden = (process.env.SHOTPLAN_FORBIDDEN ?? "")
+			.split(",")
+			.map((s) => s.trim())
+			.filter(Boolean);
+		// 감사 스냅샷 — 재생성 후 재감사에서도 동일 기준(항상 현재 scenes/made 기준).
+		const auditNow = () =>
+			auditStorySync(
+				scenes.map((sc, i) => ({
+					cutId: cutId(i + 1),
+					narration: made[i]?.narration ?? sc.narration,
+					visual: sc.visual,
+					expectedSec: estimateSpeakingSeconds(
+						made[i]?.narration ?? sc.narration,
+					),
+					measuredSec: made[i]?.d,
+					forbiddenLocations: forbidden,
+				})),
+			);
+		let issues = auditNow();
+		let sum = summarizeAudit(issues);
+		log(`3.a) sync audit: ${sum.errors} error / ${sum.warns} warn`);
+		if (sum.errors > 0) {
+			log(`   재생성 루프(1회): ${sum.regenCuts.join(", ")}`);
+			// 재작성 목표 컷 길이는 2.b rebudget 과 동일 산식(minutes*60 균등 분배) — 기준 통일.
+			const targets = targetSecondsPerCut(minutes * 60, scenes.length);
+			const regen = new Set(sum.regenCuts);
+			for (let i = 0; i < scenes.length; i++) {
+				if (!regen.has(cutId(i + 1))) continue;
+				const tSec = targets[i] ?? 10;
+				// (1) 내레이션 재작성(rewriteNarration 패턴, YMYL 가드 포함) — 실패 시 원문 유지(비파괴).
+				try {
+					scenes[i] = {
+						...scenes[i],
+						narration: await rewriteEconNarration(
+							scenes[i].narration,
+							budgetNarrationChars(tSec),
+							estimateSpeakingSeconds(scenes[i].narration) > tSec
+								? "trim"
+								: "expand",
+						),
+					};
+				} catch (e) {
+					log(`   컷${i + 1} 내레이션 재작성 실패 — 원문 유지(${e})`);
+				}
+				// (2) visual 이슈(error) 컷 — visual *텍스트* 를 먼저 복구한 뒤 이미지 재생성.
+				//     텍스트를 안 고치면 재감사가 같은 empty/forbidden 을 다시 잡아 재시도가 무의미.
+				const hasVisualError = issues.some(
+					(it) =>
+						it.cutId === cutId(i + 1) &&
+						it.severity === "error" &&
+						(it.code === "empty-visual" || it.code === "forbidden-location"),
+				);
+				if (hasVisualError) {
+					try {
+						scenes[i] = {
+							...scenes[i],
+							visual: await rewriteEconVisual(scenes[i], forbidden),
+						};
+					} catch (e) {
+						log(`   컷${i + 1} visual 복구 실패 — 원문 유지(${e})`);
+					}
+					made[i].img = await runComfyChecked(
+						(s) => cartoonWorkflow(scenes[i].visual, s),
+						1000 + i * 137 + 104729,
+						join(work, `scene${i}.png`),
+					);
+				}
+				// (3) TTS 재생성 + 길이 재실측 → made[] 갱신(같은 mp3 경로 덮어쓰기).
+				await tts(scenes[i].narration, made[i].mp3);
+				made[i] = {
+					...made[i],
+					narration: scenes[i].narration,
+					d: await dur(made[i].mp3),
+				};
+			}
+			issues = auditNow();
+			sum = summarizeAudit(issues);
+			log(`   재감사: ${sum.errors} error / ${sum.warns} warn`);
+		}
+		// 아티팩트는 재생성 반영 후의 최종 상태로 기록.
+		const shotPlan = buildShotPlan(scenes, {
+			blockStarts: beatStarts,
+			blockLabels: ECON_BEATS.map((b) => b.key),
+			forbiddenLocations: forbidden,
+		});
+		const auditDir = join(work, "story_sync_audit");
+		mkdirSync(auditDir, { recursive: true });
+		const auditPath = join(auditDir, "audit.json");
+		writeFileSync(
+			auditPath,
+			JSON.stringify({ summary: sum, shotPlan, issues }, null, 2),
+		);
+		if (sum.errors > 0)
+			throw new Error(
+				`스토리 싱크 감사 실패(재생성 후에도 error ${sum.errors}건: ${sum.regenCuts.join(", ")}) — ${auditPath} 참고`,
+			);
+	}
+
+	// .srt 타임라인은 감사·재생성 *완료 후* 의 made[] 기준으로 계산 — 재생성으로 길이가 바뀌어도 정합.
+	const srt: string[] = [];
+	const sceneStart: number[] = []; // 씬 i 의 시작초(챕터 타임스탬프 계산용)
+	let cursor = introOffsetSec;
+	for (let i = 0; i < made.length; i++) {
+		sceneStart.push(cursor);
+		srt.push(
+			`${i + 1}\n${srtTime(cursor)} --> ${srtTime(cursor + made[i].d)}\n${made[i].narration}\n`,
+		);
+		cursor += made[i].d;
+	}
+
+	// 3.b) 카메라무빙(기본 ON, opt-out: CAMERA_MOVES=0) — 컷 구조 기반 결정적 배정.
+	//      seed=기사 slug 문자열(타임스탬프 금지) → 같은 기사 재실행 시 동일 배정(재현성).
+	//      산출: (a) Remotion 입력 cameraMove(정지컷 모션 근사) (b) shot_plan.json(무빙 id +
+	//      i2v 프롬프트 전문 — 향후 i2v 전환용). 정지 이미지 생성 프롬프트에는 카메라 문구를 넣지
+	//      않는다 — 정지컷 생성엔 무의미한 노이즈(모션은 Remotion 담당).
+	let cameraMoves: string[] = [];
+	if (process.env.CAMERA_MOVES !== "0") {
+		const cuts = buildShotPlan(scenes, {
+			blockStarts: beatStarts,
+			blockLabels: ECON_BEATS.map((b) => b.key),
+		});
+		cameraMoves = assignCameraMoves(
+			cuts.map((c) => ({ purpose: c.purpose, expectedSec: c.expectedSec })),
+			// 훅=punchy 무빙: "무슨일" 비트 시작 컷(=0).
+			{ seed: `economy_${slug}`, hookIndex: beatStarts[0] ?? 0 },
+		);
+		writeFileSync(
+			join(work, "shot_plan.json"),
+			JSON.stringify(
+				cuts.map((c, i) => ({
+					...c,
+					cameraMove: cameraMoves[i],
+					i2vPrompt: i2vPromptFor(cameraMoves[i]),
+				})),
+				null,
+				2,
+			),
+		);
+		log(
+			`3.b) 카메라무빙 배정: ${cameraMoves.slice(0, 8).join(", ")}${cameraMoves.length > 8 ? " …" : ""} → shot_plan.json`,
+		);
+	}
+
 	// 4) 썸네일(카툰 + 거대 텍스트)
-	const slug = slugify(article.title);
 	const thumbPath = join(outDir, `economy_${slug}_${stamp}_thumb.jpg`);
 	try {
 		log("3.t) 썸네일...");
@@ -691,11 +952,15 @@ async function main(): Promise<void> {
 	const finalPath = join(outDir, `economy_${slug}_${stamp}.mp4`);
 	log("4) Remotion 렌더...");
 	await renderVlogRemotion({
-		scenes: made.map((m) => ({
+		scenes: made.map((m, i) => ({
 			imageUrl: m.img,
 			audioUrl: m.mp3,
 			narration: m.narration,
 			durationSec: m.d,
+			// 카메라무빙 → 정지컷 렌더러 근사 모션. 미배정 컷(출처 슬라이드 등)은 기존 Ken Burns 휴리스틱.
+			...(cameraMoves[i]
+				? { cameraMove: remotionMotionFor(cameraMoves[i]) }
+				: {}),
 		})),
 		outPath: finalPath,
 		projectRoot: PROJECT_ROOT,
@@ -723,6 +988,9 @@ async function main(): Promise<void> {
 		})
 		.map((c) => ({ title: c.key, startSec: c.start as number }));
 	const chapterLines = buildChapterMarkers(chapters);
+	// YMYL 면책 — description txt 와 platform_meta 4종 모두에 동일 문구 전파(계약 확정치).
+	const AI_DISCLOSURE =
+		"※ 본 영상의 이미지는 이해를 돕기 위한 AI 일러스트이며, 투자 조언이 아닙니다.";
 	const description = [
 		meta.videoTitle,
 		"",
@@ -731,20 +999,64 @@ async function main(): Promise<void> {
 		"",
 		buildSourceDescription(sources),
 		"",
-		"※ 본 영상의 이미지는 이해를 돕기 위한 AI 일러스트이며, 투자 조언이 아닙니다.",
+		AI_DISCLOSURE,
 	].join("\n");
 	const metaBase = join(outDir, `economy_${slug}_${stamp}`);
 	writeFileSync(`${metaBase}.title.txt`, meta.videoTitle);
 	writeFileSync(`${metaBase}.description.txt`, description);
 	writeFileSync(`${metaBase}.chapters.txt`, chapterLines.join("\n"));
 
-	// 7) 기사 사용 기록(중복 방지)
+	// 6.b) 플랫폼 4종(youtube/tiktok/reels/naver_clip) 업로드 메타 — 기존 txt 는 하위호환 유지,
+	//      JSON 은 업로더 자동화용. 출처 리스트 + YMYL 면책을 4종 모두에 전파(캡션 절삭 시에도
+	//      buildPlatformMeta 가 면책>출처>챕터>본문 순으로 생존시킨다).
+	const platformInput: PlatformMetaInput = {
+		title: meta.videoTitle,
+		// 본문만 전달 — 챕터/출처/면책은 필드로 넘겨 buildPlatformMeta 가 조립(중복 부착 방지).
+		description: meta.videoTitle,
+		tags: ["경제", "경제뉴스", "뉴스해설", ...extractKeywords(article.title)],
+		hashtags: ["경제뉴스", "경제", "뉴스해설"],
+		chapters: chapters.map((c) => ({ sec: c.startSec, label: c.title })),
+		isShorts: false, // economy 는 롱폼 전용 — 숏폼은 make-vlog 경로 담당
+		sourceList: sources.map((s) =>
+			[[s.date, s.source, s.title].filter(Boolean).join(" · "), s.url]
+				.filter(Boolean)
+				.join(" "),
+		),
+		disclosure: AI_DISCLOSURE,
+	};
+	writeFileSync(
+		`${metaBase}.platform_meta.json`,
+		JSON.stringify(buildPlatformMeta(platformInput), null, 2),
+	);
+
+	// 7) 최종 검수 게이트(fail-closed) — 렌더 실측 길이/.srt 정합/컷수 + contact sheet.
+	//    카드 보정치(인트로/아웃트로 초) 전달 — economy 는 인트로/아웃트로 카드 상시 사용.
+	//    실패 시 throw → main catch 가 exit 1. 기사 사용 기록 "전"에 실행 — 실패 잡이 기사를
+	//    소진하지 않아 수정 후 같은 기사로 재시도 가능(economy-cron 격리 근거).
+	log("7) 최종 검수(verify-output)...");
+	const report = await runVerifyOutput({
+		videoPath: finalPath,
+		srtPath,
+		audioSecTotal: made.reduce((s, m) => s + m.d, 0),
+		cutCount: made.length,
+		introOffsetSec,
+		outroSec: END_CARD_FRAMES / 30,
+		contactSheet: true,
+	});
+	for (const c of report.checks)
+		if (!c.ok)
+			log(
+				`   ${WARN_CHECKS.has(c.name) ? "⚠" : "✗"} ${c.name}: ${c.detail ?? `기대=${c.expected} 실측=${c.actual}`}`,
+			);
+	if (!report.ok) throw new Error(`최종 검수 실패 — ${report.reportPath} 확인`);
+
+	// 8) 기사 사용 기록(중복 방지) — 검수 통과 후에만.
 	used.add(article.link);
 	saveUsed(usedPath, used);
 
 	const totalSec = cursor + END_CARD_FRAMES / 30;
 	log(
-		`\n✅ 완성: ${finalPath} (${Math.round(totalSec)}초)\n   자막: ${srtPath} · 썸네일: ${thumbPath}\n   메타: ${metaBase}.{title,description,chapters}.txt`,
+		`\n✅ 완성: ${finalPath} (${Math.round(totalSec)}초, 검수 통과)\n   자막: ${srtPath} · 썸네일: ${thumbPath}\n   메타: ${metaBase}.{title,description,chapters}.txt + platform_meta.json`,
 	);
 }
 
