@@ -5,15 +5,19 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
 	beatSceneCounts,
 	buildCartoonPrompt,
+	compositionIdFor,
 	containsInvestmentAdvice,
 	decodeXml,
 	ECON_ANGLES,
 	estimateSceneCount,
+	estimateShortsSceneCount,
+	estimateShortsTotalSec,
 	extractKeywords,
 	groundingContext,
 	hashStr,
 	isUsableArticle,
 	loadYoutubeTrendTerms,
+	outputStem,
 	parseRssItems,
 	parseTrendTerms,
 	pickAngle,
@@ -22,6 +26,9 @@ import {
 	type RssItem,
 	relatedArticles,
 	SCENE_CAP,
+	SHORTS_BEATS,
+	SHORTS_MAX_SEC,
+	sceneImageDims,
 	scenesNeeded,
 	scoreEmotionalAngle,
 	scoreTrend,
@@ -165,10 +172,11 @@ describe("scenesNeeded (measure-and-extend)", () => {
 });
 
 describe("buildCartoonPrompt", () => {
-	it("카툰 스타일 prefix + 텍스트 억제 + visual 포함", () => {
+	it("카툰 스타일 prefix + text-free 유도 + visual 포함, infographic 미포함", () => {
 		const p = buildCartoonPrompt("a bank vault overflowing with money");
 		expect(p).toContain("flat 2D vector cartoon");
-		expect(p).toContain("no text");
+		expect(p).toContain("text-free");
+		expect(p).not.toContain("infographic"); // 텍스트 유발어 제거
 		expect(p).toContain("a bank vault overflowing with money");
 	});
 });
@@ -430,5 +438,57 @@ describe("loadYoutubeTrendTerms", () => {
 		const bad = join(dir, "bad.json");
 		writeFileSync(bad, "{ not json");
 		expect(loadYoutubeTrendTerms(bad)).toEqual([]);
+	});
+});
+
+// ── --shorts 모드(순수 로직) ─────────────────────────────────────────────────
+
+describe("SHORTS_BEATS / estimateShortsSceneCount / estimateShortsTotalSec", () => {
+	it("숏폼 아크는 훅으로 시작, 5개 고정 비트", () => {
+		expect(SHORTS_BEATS.length).toBe(5);
+		expect(SHORTS_BEATS[0].key).toBe("훅");
+	});
+	it("씬수 추정은 6 이하", () => {
+		expect(estimateShortsSceneCount()).toBeLessThanOrEqual(6);
+		expect(estimateShortsSceneCount()).toBeGreaterThan(0);
+	});
+	it("예상 총 발화초는 60초 하드캡 이내", () => {
+		expect(estimateShortsTotalSec()).toBeLessThanOrEqual(SHORTS_MAX_SEC);
+	});
+	it("씬수 인자를 받으면 그 값으로 계산", () => {
+		expect(estimateShortsTotalSec(1)).toBeLessThan(estimateShortsTotalSec(6));
+	});
+});
+
+describe("sceneImageDims (씬 이미지 차원)", () => {
+	it("shorts=true → 세로(width < height)", () => {
+		const dims = sceneImageDims(true);
+		expect(dims).toBeDefined();
+		expect(dims?.width).toBeLessThan(dims?.height ?? 0);
+	});
+	it("shorts=false(롱폼) → undefined(기존 가로 기본값 유지, 회귀 방지)", () => {
+		expect(sceneImageDims(false)).toBeUndefined();
+	});
+});
+
+describe("compositionIdFor", () => {
+	it("shorts=true → YouTubeShorts", () => {
+		expect(compositionIdFor(true)).toBe("YouTubeShorts");
+	});
+	it("shorts=false → YouTubeVideo(기존 동작 불변)", () => {
+		expect(compositionIdFor(false)).toBe("YouTubeVideo");
+	});
+});
+
+describe("outputStem (산출물 파일명)", () => {
+	it("롱폼(shorts=false) → 기존 규칙 그대로(접미사 없음)", () => {
+		expect(outputStem("sk하이닉스-45조", 1234, false)).toBe(
+			"economy_sk하이닉스-45조_1234",
+		);
+	});
+	it("shorts=true → _shorts 접미사", () => {
+		expect(outputStem("sk하이닉스-45조", 1234, true)).toBe(
+			"economy_sk하이닉스-45조_1234_shorts",
+		);
 	});
 });

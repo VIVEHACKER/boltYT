@@ -64,6 +64,7 @@ import {
 	buildSourceListLines,
 	dur,
 	floatEnv,
+	latentDimEnv,
 	log,
 	overlayThumbnailText,
 	parseArgs,
@@ -326,6 +327,15 @@ export function slugify(s: string): string {
 	);
 }
 
+/** 산출물 파일명 stem — shorts 면 "_shorts" 접미사(롱폼은 빈 문자열 = 기존 동작 100% 불변). */
+export function outputStem(
+	slug: string,
+	stamp: number,
+	isShorts: boolean,
+): string {
+	return `economy_${slug}_${stamp}${isShorts ? "_shorts" : ""}`;
+}
+
 /** 경제 해설 4비트 챕터(무슨일→배경→시장영향→요약). conflict 없이 정보 아크. */
 export const ECON_BEATS: { key: string; note: string }[] = [
 	{
@@ -345,6 +355,52 @@ export const ECON_BEATS: { key: string; note: string }[] = [
 		note: "핵심을 3줄로 정리 + 시청자가 알아둘 포인트. 투자 조언이 아님을 분명히.",
 	},
 ];
+
+/**
+ * 숏폼(≤60초) 단일 아크 — 4비트 다중씬 대신 훅→핵심사실→관점→시청자영향→마무리 5씬 고정.
+ * 항목당 정확히 1씬(SHORTS_BEATS.length = 씬수). 훅은 0~3초 강한 패턴인터럽트 지향.
+ */
+export const SHORTS_BEATS: { key: string; note: string }[] = [
+	{
+		key: "훅",
+		note: "0~3초 강한 패턴인터럽트 — 헤드라인의 가장 놀라운 숫자/사실로 즉시 시작(이탈 방지). 군더더기 인사말 금지.",
+	},
+	{
+		key: "핵심사실",
+		note: "무슨 일이 일어났는지 핵심 사실을 짧고 명확하게.",
+	},
+	{
+		key: "관점",
+		note: "해설 앵글의 핵심 논지를 압축 전달(왜 중요한지).",
+	},
+	{
+		key: "시청자영향",
+		note: "이 뉴스가 시청자의 지갑/생활에 뭘 바꾸는지 구체적으로.",
+	},
+	{
+		key: "마무리",
+		note: "핵심을 한 줄로 정리 + 담백한 마무리(투자 조언이 아님을 분명히, 과장된 CTA 금지).",
+	},
+];
+
+// 숏폼 길이 제어 — 55초 목표(소프트), 60초 하드캡. 롱폼의 3.x 측정-연장(길이 채우기)은 숏폼엔 역효과라
+// 스킵하고, 대신 대본 프롬프트에서 씬당 짧게 유도 + 사후 경고 로그로 대응(자르지는 않음).
+export const SHORTS_TARGET_SEC = 55;
+export const SHORTS_MAX_SEC = 60;
+// 씬당 평균 발화초 추정치(패턴인터럽트 훅 포함 컴팩트 서술 가정) — 씬수/총길이 사전 추정용, TTS 실측과 별개.
+export const SHORTS_SEC_PER_SCENE = 9;
+
+/** 숏폼 목표 씬수 — SHORTS_BEATS 고정 아크(≤6). */
+export function estimateShortsSceneCount(): number {
+	return Math.min(6, SHORTS_BEATS.length);
+}
+
+/** 숏폼 예상 총 발화초 — 씬수 × SHORTS_SEC_PER_SCENE. 60초 하드캡 이내인지 사전 점검용. */
+export function estimateShortsTotalSec(
+	sceneCount = estimateShortsSceneCount(),
+): number {
+	return sceneCount * SHORTS_SEC_PER_SCENE;
+}
 
 const ECON_SYSTEM =
 	"한국 경제 뉴스 해설 유튜브 작가. 제공된 기사의 '사실에만' 근거해 쉽게 설명한다. 투자 조언·종목 추천·매수매도 권유·가격 예측 절대 금지(YMYL). 기사에 없는 수치/사실 창작 금지. JSON만 출력.";
@@ -449,25 +505,55 @@ export function beatSceneCounts(totalScenes: number): number[] {
 	return weights.map((w) => Math.max(2, Math.round((totalScenes * w) / sum)));
 }
 
-/** 플랫 카툰 이미지 프롬프트(경제읽음이 스타일). 텍스트/포토리얼 억제. */
+/**
+ * 플랫 카툰 이미지 프롬프트(경제읽음이 스타일). 텍스트/포토리얼 억제.
+ * "infographic"(라벨·숫자 유발)·positive "no text"(SDXL 은 positive 부정 무시) 제거 →
+ * text-free editorial 스타일로 유도하고 실제 억제는 negative(cartoonWorkflow)에 맡긴다(SDXL 텍스트 누수 저감).
+ */
 export function buildCartoonPrompt(visual: string): string {
-	return `flat 2D vector cartoon illustration, bold clean outlines, minimal flat color palette, simple rounded shapes, Korean economic news explainer infographic style, expressive and clear, centered composition, no text no letters: ${visual}`;
+	return `flat 2D vector cartoon illustration, bold clean outlines, minimal flat color palette, simple rounded shapes, Korean economic news editorial illustration, clean text-free conceptual style, expressive and clear, centered composition: ${visual}`;
 }
 
 // ── IO / 워크플로 ────────────────────────────────────────────────────────────
 
+// 숏폼(--shorts true) 세로 9:16 생성 차원 — make-vlog SHORTS_W/H 와 동일 값·동일 env 규칙(레버 A 이식).
+// 기본 768x1344 = SDXL 1MP 9:16 버킷. FLUX 면 SHORTS_W=1080 SHORTS_H=1920 권장(env 오버라이드).
+const SHORTS_W = latentDimEnv("SHORTS_W", 768);
+const SHORTS_H = latentDimEnv("SHORTS_H", 1344);
+
+/** 씬 이미지 생성 차원 — shorts 면 세로, 롱폼이면 undefined(textToImageWorkflow 기본 가로 SCENE_W/H 유지 = 회귀 방지). */
+export function sceneImageDims(
+	isShorts: boolean,
+): { width: number; height: number } | undefined {
+	return isShorts ? { width: SHORTS_W, height: SHORTS_H } : undefined;
+}
+
+/** Remotion 컴포지션 선택 — shorts 면 세로 Shorts 컴포지션, 롱폼이면 기존 YouTubeVideo(불변). */
+export function compositionIdFor(
+	isShorts: boolean,
+): "YouTubeVideo" | "YouTubeShorts" {
+	return isShorts ? "YouTubeShorts" : "YouTubeVideo";
+}
+
 /**
  * 플랫 카툰 워크플로(SDXL/FLUX 공용) — IPAdapter/호스트 없음(경제는 일관 캐릭터 불필요).
- * 모델 분기는 공유 textToImageWorkflow(IMAGE_MODEL)가 담당. 경제는 롱폼 전용이라 가로(SCENE_W/H).
+ * 모델 분기는 공유 textToImageWorkflow(IMAGE_MODEL)가 담당. dims 미지정 시 가로(SCENE_W/H, 롱폼 기존 동작);
+ * shorts 는 호출부가 sceneImageDims(true) 로 세로 차원을 넘긴다.
  */
-function cartoonWorkflow(prompt: string, seed: number) {
+function cartoonWorkflow(
+	prompt: string,
+	seed: number,
+	dims?: { width: number; height: number },
+) {
 	return textToImageWorkflow({
 		positive: buildCartoonPrompt(prompt),
+		// 텍스트 누수 강화 차단(SDXL 은 차트/대시보드 씬에서 라벨·글자를 잘 흘림).
 		negative:
-			"photorealistic, realistic, 3d render, photograph, text, letters, words, watermark, signature, ugly, blurry, jpeg artifacts, cluttered, deformed",
+			"photorealistic, realistic, 3d render, photograph, text, letters, words, numbers, typography, captions, labels, gibberish text, random characters, fake writing, watermark, signature, logo, ugly, blurry, jpeg artifacts, cluttered, deformed",
 		seed,
 		filenamePrefix: "econ_scene",
 		cfg: 7,
+		...(dims ?? {}),
 	});
 }
 
@@ -665,6 +751,45 @@ async function generateEconomyScript(
 	return { scenes: all, beatStarts };
 }
 
+/**
+ * 숏폼(≤60초) 단일 아크 대본 — SHORTS_BEATS(훅→핵심사실→관점→시청자영향→마무리) 정확히 1씬씩, 1회 호출.
+ * 롱폼(generateEconomyScript)의 4비트×다중씬은 60초엔 과하다 — 컴팩트 아크로 압축.
+ * thesis(해설 앵글)는 숏폼에도 전체 아크에 관통시킨다 — 중립 요약이 아닌 '관점 있는 해설' 유지(YMYL 가드 동일).
+ */
+async function generateEconomyShortsScript(
+	g: Grounding,
+	thesis?: AngleThesis | null,
+): Promise<{ scenes: Scene[]; beatStarts: number[] }> {
+	const context = groundingContext(g);
+	const angleLine = thesis
+		? `\n\n[이 영상의 해설 관점: ${thesis.angle}] ${thesis.thesis}${thesis.points.length ? `\n관점 근거(기사 사실): ${thesis.points.join(" / ")}` : ""}\n전체 아크를 이 관점으로 전개하되, 투자 조언·예측은 하지 마라.`
+		: "";
+	const beatLines = SHORTS_BEATS.map(
+		(b, i) => `${i + 1}. ${b.key}: ${b.note}`,
+	).join("\n");
+	const usr = `${context}${angleLine}\n\n위 자료의 '사실에만' 근거해 60초 이하 숏폼 뉴스 해설 영상을 쓴다. 정확히 ${SHORTS_BEATS.length}개 씬, 아래 순서·역할을 그대로 따르고 각 항목은 1씬씩만:\n${beatLines}\n각 씬 narration 은 한국어 1문장, 매우 짧고 임팩트 있는 구어체(숏폼 템포). 1번(훅) 씬은 특히 숫자·반전으로 강하게 시작해 0~3초 이탈을 막는다.\nvisual(English, a flat cartoon illustration for this scene). JSON: {"scenes":[{"narration":"...","visual":"..."}]}`;
+	// narration·visual 이 모두 채워진 씬만 유효로 카운트(부분/빈 씬 방지).
+	const attempt = async (): Promise<Scene[]> => {
+		const parsed = await proxyChatJSON(ECON_SYSTEM, usr);
+		return (Array.isArray(parsed.scenes) ? (parsed.scenes as Scene[]) : [])
+			.filter((s) => s?.narration?.trim() && s?.visual?.trim())
+			.slice(0, SHORTS_BEATS.length);
+	};
+	let scenes = await attempt();
+	// 비트 누락(예: CTA 빠짐)은 숏폼 아크를 깨므로 1회 재시도 후에도 미달이면 fail-closed(격리).
+	if (scenes.length < SHORTS_BEATS.length) {
+		log(`   숏폼 대본 ${scenes.length}/${SHORTS_BEATS.length}씬 → 1회 재생성`);
+		const retry = await attempt();
+		if (retry.length > scenes.length) scenes = retry;
+	}
+	log(`   숏폼 단일 아크 → ${scenes.length}/${SHORTS_BEATS.length}씬`);
+	if (scenes.length < SHORTS_BEATS.length)
+		throw new Error(
+			`숏폼 대본 불완전(${scenes.length}/${SHORTS_BEATS.length}씬 — 비트 누락) — 재실행 권장`,
+		);
+	return { scenes, beatStarts: scenes.map((_, i) => i) };
+}
+
 /** 길이 미달 시 심화 씬 추가 — 이미 다룬 내용과 중복 없는 추가 배경/세부수치/파급효과. */
 async function generateExtensionScenes(
 	g: Grounding,
@@ -758,6 +883,8 @@ async function generateMeta(
 async function main(): Promise<void> {
 	const args = parseArgs(process.argv.slice(2));
 	const minutes = Math.max(1, Number(args.minutes ?? "10"));
+	// --shorts true → 60초 이하 세로(9:16) 숏폼. 미지정 시 기존 롱폼 경로 100% 불변(additive 분기).
+	const isShorts = args.shorts === "true";
 	const channel = args.channel ?? "경제 한입";
 	const topic = args.topic;
 	const feeds = args.feed ? [args.feed] : DEFAULT_FEEDS;
@@ -768,7 +895,7 @@ async function main(): Promise<void> {
 		Number(process.env.SOURCE_DATE_EPOCH) || Math.floor(Date.now() / 1000);
 
 	log(
-		`▶ 경제 뉴스 해설 (~${minutes}분) — 채널 ${channel}${topic ? ` / 토픽 "${topic}"` : " / 최신"}`,
+		`▶ 경제 뉴스 해설 ${isShorts ? "(숏폼 ≤60초 세로)" : `(~${minutes}분)`} — 채널 ${channel}${topic ? ` / 토픽 "${topic}"` : " / 최신"}`,
 	);
 
 	// 1) 실제 뉴스 RSS → (트렌드 정렬) → 미사용 기사
@@ -816,30 +943,42 @@ async function main(): Promise<void> {
 	const thesis = await deriveAngleThesis(grounding, angle);
 	if (thesis) log(`   논지: ${thesis.thesis}`);
 
-	// 2) 사실 기반 대본(Claude) — 다중 소스 grounded + 해설 앵글 관통
-	log("2) 뉴스 해설 대본(grounded)...");
-	const { scenes, beatStarts } = await generateEconomyScript(
-		grounding,
-		minutes,
-		thesis,
+	// 2) 사실 기반 대본(Claude) — 다중 소스 grounded + 해설 앵글 관통.
+	//    shorts 는 4비트 다중씬 대신 SHORTS_BEATS 단일 아크(훅→핵심사실→관점→시청자영향→마무리) 1회 호출.
+	log(
+		isShorts
+			? "2) 뉴스 해설 대본(숏폼 단일 아크, grounded)..."
+			: "2) 뉴스 해설 대본(grounded)...",
 	);
+	const { scenes, beatStarts } = isShorts
+		? await generateEconomyShortsScript(grounding, thesis)
+		: await generateEconomyScript(grounding, minutes, thesis);
 	if (scenes.length === 0) throw new Error("대본 생성 실패 (씬 0개)");
+	// 컷 페이스/길이 보정의 총 길이 목표 — 롱폼은 minutes*60, shorts 는 SHORTS_TARGET_SEC(55s) 고정.
+	const targetTotalSec = isShorts ? SHORTS_TARGET_SEC : minutes * 60;
+	// 3.a 감사·3.b 카메라무빙의 shot-plan 블록 라벨 — 비트 구조가 장르(롱폼/숏폼)별로 다르다.
+	const beatKeys = isShorts
+		? SHORTS_BEATS.map((b) => b.key)
+		: ECON_BEATS.map((b) => b.key);
 
 	// 2.b) 액티브 rebudget(대본 생성 직후 1패스, 기본 ON — opt-out: SHOTPLAN_REBUDGET=0).
-	//      컷당 목표초(=minutes*60/씬수)에 SHOTPLAN_TOLERANCE(기본 0.25) 초과로 어긋난 컷만 재작성 1회,
-	//      재작성이 목표에 더 가까울 때만 채택. 3.x 측정-연장과 목표 기준(minutes*60)을 통일했고,
+	//      컷당 목표초(=targetTotalSec/씬수)에 SHOTPLAN_TOLERANCE(기본 0.25) 초과로 어긋난 컷만 재작성 1회,
+	//      재작성이 목표에 더 가까울 때만 채택. 3.x 측정-연장과 목표 기준(targetTotalSec)을 통일했고,
 	//      역할도 분리: rebudget=컷 페이스 재작성, 측정-연장=총길이 부족분 "새 씬 추가"만 → 같은 컷을
 	//      반대 방향으로 당기는 충돌 없음(충돌 소지가 생기면 대본 직후 1패스인 rebudget 결과를 우선).
 	//      경제 훅(첫 씬)은 일반 1~2문장이라 vlog 롱폼의 0~3초 패턴인터럽트 훅 제외 규칙은 불필요.
 	if (process.env.SHOTPLAN_REBUDGET !== "0") {
-		const targets = targetSecondsPerCut(minutes * 60, scenes.length);
+		const targets = targetSecondsPerCut(targetTotalSec, scenes.length);
 		// tolerance 0.25(계약 확정치 — 모듈 기본 0.35 보다 빡빡). SHOTPLAN_TOLERANCE 로 채널별 오버라이드.
 		const tolerance = floatEnv("SHOTPLAN_TOLERANCE", 0.25);
-		const plan = planRebudget(
+		let plan = planRebudget(
 			scenes.map((s) => s.narration),
 			targets,
 			{ tolerance },
 		).slice(0, posIntEnv("SHOTPLAN_REBUDGET_MAX", 24));
+		// 숏폼은 trim 만 — 균등 목표로 expand 하면 의도적 0~3초 훅을 늘려 페이싱을 깬다(Codex).
+		//   과길이 컷 텍스트만 줄여 5비트를 모두 유지한 채 60s 안에 넣는다(컷 드롭 금지).
+		if (isShorts) plan = plan.filter((p) => p.direction === "trim");
 		if (plan.length) {
 			log(
 				`2.b) 액티브 rebudget: ${plan.length}컷 분량 재조정(목표 ~${targets[0]}s/컷)...`,
@@ -872,17 +1011,23 @@ async function main(): Promise<void> {
 	log(`   ${scenes.length}씬 · 제목 "${meta.videoTitle}"`);
 
 	const slug = slugify(article.title);
-	const work = join(outDir, `economy_${slug}_${stamp}`);
+	const stem = outputStem(slug, stamp, isShorts);
+	const work = join(outDir, stem);
 	mkdirSync(work, { recursive: true });
+
+	// 이미지 생성 차원 — shorts 는 세로(SHORTS_W/H), 롱폼은 undefined(기존 가로 SCENE_W/H = 회귀 없음).
+	const dims = sceneImageDims(isShorts);
 
 	// 3) 씬별 카툰 이미지 + 내레이션 — .srt/타임라인은 3.a 감사·재생성 "완료 후" made[] 기준으로
 	//    계산한다(재생성으로 컷 길이가 바뀌어도 자막 정합 유지 — 계약 확정치).
 	const made: { img: string; mp3: string; narration: string; d: number }[] = [];
-	const introOffsetSec = TITLE_CARD_FRAMES / 30; // 인트로 카드만큼 자막 오프셋(make-vlog 와 동일 원리)
+	// 인트로 카드만큼 자막 오프셋(make-vlog 와 동일 원리) — shorts 는 카드를 안 씀(renderVlogRemotion 이
+	// YouTubeShorts 컴포지션에서 intro/outro 를 자동 무시) 이라 오프셋도 0(안 그러면 자막이 3초 밀림).
+	const introOffsetSec = isShorts ? 0 : TITLE_CARD_FRAMES / 30;
 	for (let i = 0; i < scenes.length; i++) {
 		log(`3.${i + 1}) 카툰 + 내레이션...`);
 		const img = await runComfyChecked(
-			(s) => cartoonWorkflow(scenes[i].visual, s),
+			(s) => cartoonWorkflow(scenes[i].visual, s, dims),
 			1000 + i * 137,
 			join(work, `scene${i}.png`),
 		);
@@ -894,65 +1039,73 @@ async function main(): Promise<void> {
 
 	// 3.x) 길이 보정(measure-and-extend) — 실측 길이가 목표 미달이면 심화 씬 추가.
 	//      이미지는 비싼 단계라 SCENE_CAP/최대 3라운드로 캡. LLM 이 더 못 주면 즉시 중단.
-	//      목표 기준은 2.b rebudget 과 동일(minutes*60) — 여기선 기존 컷 재작성 없이 씬 추가만.
-	const targetSec = minutes * 60;
-	for (let round = 0; round < 3; round++) {
-		const bodySec = made.reduce((s, m) => s + m.d, 0);
-		const need = scenesNeeded(
-			targetSec,
-			bodySec,
-			bodySec / Math.max(1, made.length),
-			SCENE_CAP - made.length,
-		);
-		if (need === 0) break;
-		log(
-			`3.x) 길이 ${Math.round(bodySec)}s/${targetSec}s → 심화 ${need}씬 추가 (라운드 ${round + 1})`,
-		);
-		const extra = await generateExtensionScenes(
-			grounding,
-			need,
-			made.map((m) => m.narration),
-			thesis,
-		);
-		if (extra.length === 0) break;
-		for (const sc of extra) {
-			const i = made.length;
-			// 확장 씬도 scenes 에 편입 — 3.a 감사·3.b 카메라무빙이 전체 컷을 커버(scenes↔made 정렬 유지).
-			scenes.push(sc);
-			const img = await runComfyChecked(
-				(s) => cartoonWorkflow(sc.visual, s),
-				1000 + i * 137,
-				join(work, `scene${i}.png`),
+	//      목표 기준은 2.b rebudget 과 동일(targetTotalSec) — 여기선 기존 컷 재작성 없이 씬 추가만.
+	//      shorts 는 스킵 — measure-and-extend 는 "길이 채우기"용이라 60초 캡을 지켜야 하는 숏폼엔 역효과.
+	if (!isShorts) {
+		const targetSec = targetTotalSec;
+		for (let round = 0; round < 3; round++) {
+			const bodySec = made.reduce((s, m) => s + m.d, 0);
+			const need = scenesNeeded(
+				targetSec,
+				bodySec,
+				bodySec / Math.max(1, made.length),
+				SCENE_CAP - made.length,
 			);
-			const mp3 = join(work, `scene${i}.mp3`);
-			await tts(sc.narration, mp3);
-			const d = await dur(mp3);
-			made.push({ img, mp3, narration: sc.narration, d });
+			if (need === 0) break;
+			log(
+				`3.x) 길이 ${Math.round(bodySec)}s/${targetSec}s → 심화 ${need}씬 추가 (라운드 ${round + 1})`,
+			);
+			const extra = await generateExtensionScenes(
+				grounding,
+				need,
+				made.map((m) => m.narration),
+				thesis,
+			);
+			if (extra.length === 0) break;
+			for (const sc of extra) {
+				const i = made.length;
+				// 확장 씬도 scenes 에 편입 — 3.a 감사·3.b 카메라무빙이 전체 컷을 커버(scenes↔made 정렬 유지).
+				scenes.push(sc);
+				const img = await runComfyChecked(
+					(s) => cartoonWorkflow(sc.visual, s, dims),
+					1000 + i * 137,
+					join(work, `scene${i}.png`),
+				);
+				const mp3 = join(work, `scene${i}.mp3`);
+				await tts(sc.narration, mp3);
+				const d = await dur(mp3);
+				made.push({ img, mp3, narration: sc.narration, d });
+			}
 		}
 	}
 
 	// 3.s) 출처 리스트 엔드슬라이드 — 실제 인용 자료를 화면에 표기(YouTube 재사용 콘텐츠 비수익화 회피).
 	//      마지막 "씬"으로 끼워 ffmpeg/Remotion 양 경로에서 자동 노출. 실패해도 영상엔 무영향.
+	//      sources 자체는 설명/platform_meta 로도 전파되므로 항상 계산.
 	const sources: SourceRef[] = [article, ...related].map((a) => ({
 		title: a.title,
 		source: publisherFromUrl(a.link),
 		date: a.pubDate,
 		url: a.link,
 	}));
-	try {
-		log("3.s) 출처 리스트 슬라이드...");
-		const srcImg = await renderSourceListSlide(
-			"출처 / Sources",
-			buildSourceListLines(sources),
-			join(work, "sources.png"),
-		);
-		const srcNarr = "이 영상은 아래 보도 자료를 참고해 제작했습니다.";
-		const srcMp3 = join(work, "sources.mp3");
-		await tts(srcNarr, srcMp3);
-		const sd = await dur(srcMp3);
-		made.push({ img: srcImg, mp3: srcMp3, narration: srcNarr, d: sd });
-	} catch (e) {
-		log(`   출처 슬라이드 생략(${e})`);
+	// 숏폼은 화면 슬라이드 스킵 — ≤60초에 출처 슬라이드는 부적합하고, made 에만 붙어 scenes 와 길이가
+	//   어긋나면 뒤의 캡 트림(made·scenes lockstep)이 깨진다. 출처는 설명/메타로만 전파.
+	if (!isShorts) {
+		try {
+			log("3.s) 출처 리스트 슬라이드...");
+			const srcImg = await renderSourceListSlide(
+				"출처 / Sources",
+				buildSourceListLines(sources),
+				join(work, "sources.png"),
+			);
+			const srcNarr = "이 영상은 아래 보도 자료를 참고해 제작했습니다.";
+			const srcMp3 = join(work, "sources.mp3");
+			await tts(srcNarr, srcMp3);
+			const sd = await dur(srcMp3);
+			made.push({ img: srcImg, mp3: srcMp3, narration: srcNarr, d: sd });
+		} catch (e) {
+			log(`   출처 슬라이드 생략(${e})`);
+		}
 	}
 
 	// 3.a) Shot-plan 스토리 싱크 게이트(기본 ON, opt-out: SHOTPLAN_AUDIT=0) — reference-ai-drama-codex-pipeline.
@@ -984,8 +1137,8 @@ async function main(): Promise<void> {
 		log(`3.a) sync audit: ${sum.errors} error / ${sum.warns} warn`);
 		if (sum.errors > 0) {
 			log(`   재생성 루프(1회): ${sum.regenCuts.join(", ")}`);
-			// 재작성 목표 컷 길이는 2.b rebudget 과 동일 산식(minutes*60 균등 분배) — 기준 통일.
-			const targets = targetSecondsPerCut(minutes * 60, scenes.length);
+			// 재작성 목표 컷 길이는 2.b rebudget 과 동일 산식(targetTotalSec 균등 분배) — 기준 통일.
+			const targets = targetSecondsPerCut(targetTotalSec, scenes.length);
 			const regen = new Set(sum.regenCuts);
 			for (let i = 0; i < scenes.length; i++) {
 				if (!regen.has(cutId(i + 1))) continue;
@@ -1023,7 +1176,7 @@ async function main(): Promise<void> {
 						log(`   컷${i + 1} visual 복구 실패 — 원문 유지(${e})`);
 					}
 					made[i].img = await runComfyChecked(
-						(s) => cartoonWorkflow(scenes[i].visual, s),
+						(s) => cartoonWorkflow(scenes[i].visual, s, dims),
 						1000 + i * 137 + 104729,
 						join(work, `scene${i}.png`),
 					);
@@ -1043,7 +1196,7 @@ async function main(): Promise<void> {
 		// 아티팩트는 재생성 반영 후의 최종 상태로 기록.
 		const shotPlan = buildShotPlan(scenes, {
 			blockStarts: beatStarts,
-			blockLabels: ECON_BEATS.map((b) => b.key),
+			blockLabels: beatKeys,
 			forbiddenLocations: forbidden,
 		});
 		const auditDir = join(work, "story_sync_audit");
@@ -1059,7 +1212,21 @@ async function main(): Promise<void> {
 			);
 	}
 
-	// .srt 타임라인은 감사·재생성 *완료 후* 의 made[] 기준으로 계산 — 재생성으로 길이가 바뀌어도 정합.
+	// 숏폼 ≤60초 계약 강제 — 컷 드롭 금지(5비트 완전성 유지). 위 trim-only rebudget 으로 텍스트를 줄였는데도
+	//   총 길이가 초과하면 자르지 않고 fail-closed(격리) — 마무리/면책 비트를 떨궈 불완전 숏폼을 내지 않는다.
+	//   cron/batch 는 exit 1 로 불량 숏폼을 업로드 레인에서 제외하고, 재실행 시 새 대본으로 다시 시도.
+	if (isShorts) {
+		const total = made.reduce((s, m) => s + m.d, 0);
+		// Remotion 이 컷마다 프레임 단위로 올림(30fps)하므로 렌더 길이는 오디오합보다 최대 (컷수/30)초 길어진다.
+		//   그 마진을 미리 빼서 검사 → 렌더 실측이 확실히 ≤60s. (verify-output tolerance 로도 새지 않게 사전 차단.)
+		const frameMargin = made.length / 30;
+		if (total > SHORTS_MAX_SEC - frameMargin)
+			throw new Error(
+				`숏폼 ≤${SHORTS_MAX_SEC}s 초과(오디오 ${total.toFixed(1)}s + 프레임마진 ${frameMargin.toFixed(2)}s, 전 비트 유지) — 대본/TTS 확인 후 재실행`,
+			);
+	}
+
+	// .srt 타임라인은 감사·재생성·트림 *완료 후* 의 made[] 기준으로 계산 — 길이가 바뀌어도 정합.
 	const srt: string[] = [];
 	const sceneStart: number[] = []; // 씬 i 의 시작초(챕터 타임스탬프 계산용)
 	let cursor = introOffsetSec;
@@ -1080,7 +1247,7 @@ async function main(): Promise<void> {
 	if (process.env.CAMERA_MOVES !== "0") {
 		const cuts = buildShotPlan(scenes, {
 			blockStarts: beatStarts,
-			blockLabels: ECON_BEATS.map((b) => b.key),
+			blockLabels: beatKeys,
 		});
 		cameraMoves = assignCameraMoves(
 			cuts.map((c) => ({ purpose: c.purpose, expectedSec: c.expectedSec })),
@@ -1104,8 +1271,9 @@ async function main(): Promise<void> {
 		);
 	}
 
-	// 4) 썸네일(카툰 + 거대 텍스트)
-	const thumbPath = join(outDir, `economy_${slug}_${stamp}_thumb.jpg`);
+	// 4) 썸네일(카툰 + 거대 텍스트) — overlayThumbnailText 가 항상 1280x720 로 크롭하므로 shorts 도
+	//    가로 dims 로 생성(make-vlog 와 동일 전례 — 썸네일은 세로 소스가 필요 없다).
+	const thumbPath = join(outDir, `${stem}_thumb.jpg`);
 	try {
 		log("3.t) 썸네일...");
 		const raw = await runComfy(
@@ -1121,10 +1289,10 @@ async function main(): Promise<void> {
 		log(`   썸네일 생략(${e})`);
 	}
 
-	// 5) .srt + Remotion 렌더(인트로/아웃트로 카드)
-	const srtPath = join(outDir, `economy_${slug}_${stamp}.srt`);
+	// 5) .srt + Remotion 렌더(인트로/아웃트로 카드 — shorts 는 renderVlogRemotion 이 자동 생략)
+	const srtPath = join(outDir, `${stem}.srt`);
 	writeFileSync(srtPath, srt.join("\n"));
-	const finalPath = join(outDir, `economy_${slug}_${stamp}.mp4`);
+	const finalPath = join(outDir, `${stem}.mp4`);
 	log("4) Remotion 렌더...");
 	await renderVlogRemotion({
 		scenes: made.map((m, i) => ({
@@ -1139,8 +1307,10 @@ async function main(): Promise<void> {
 		})),
 		outPath: finalPath,
 		projectRoot: PROJECT_ROOT,
-		compositionId: "YouTubeVideo",
+		compositionId: compositionIdFor(isShorts),
 		runId: `economy_${stamp}`,
+		// intro/outro 는 compositionId==="YouTubeVideo" 일 때만 renderVlogRemotion 이 실제 사용
+		// (YouTubeShorts 는 자동 무시) — shorts 도 그냥 전달해 두지만 렌더에는 영향 없다.
 		intro: { title: meta.videoTitle, channelName: channel },
 		outro: {
 			channelName: channel,
@@ -1151,17 +1321,20 @@ async function main(): Promise<void> {
 
 	// 6) 업로드 메타데이터(title/description/chapters) — make-economy 가 실제 업로드 자산까지 출력.
 	//    챕터: 4비트 시작 씬의 누적초 → YouTube 타임스탬프. 첫 챕터는 0:00 강제.
+	//    shorts 는 챕터 없음(단일 아크, 60초 미만이라 타임스탬프 무의미) — 생성/전달 자체를 스킵.
 	const seenStart = new Set<number>();
-	const chapters = beatStarts
-		.map((s, i) => ({ key: ECON_BEATS[i].key, start: sceneStart[s] }))
-		// 빈 비트(start 인덱스가 범위 밖)·중복 시작초 제거 → YouTube 챕터 규칙 위반 방지.
-		.filter((c) => {
-			if (typeof c.start !== "number") return false;
-			if (seenStart.has(c.start)) return false;
-			seenStart.add(c.start);
-			return true;
-		})
-		.map((c) => ({ title: c.key, startSec: c.start as number }));
+	const chapters: { title: string; startSec: number }[] = isShorts
+		? []
+		: beatStarts
+				.map((s, i) => ({ key: beatKeys[i], start: sceneStart[s] }))
+				// 빈 비트(start 인덱스가 범위 밖)·중복 시작초 제거 → YouTube 챕터 규칙 위반 방지.
+				.filter((c) => {
+					if (typeof c.start !== "number") return false;
+					if (seenStart.has(c.start)) return false;
+					seenStart.add(c.start);
+					return true;
+				})
+				.map((c) => ({ title: c.key, startSec: c.start as number }));
 	const chapterLines = buildChapterMarkers(chapters);
 	// YMYL 면책 — description txt 와 platform_meta 4종 모두에 동일 문구 전파(계약 확정치).
 	const AI_DISCLOSURE =
@@ -1169,17 +1342,16 @@ async function main(): Promise<void> {
 	const description = [
 		meta.videoTitle,
 		"",
-		"챕터",
-		...chapterLines,
-		"",
+		...(isShorts ? [] : ["챕터", ...chapterLines, ""]),
 		buildSourceDescription(sources),
 		"",
 		AI_DISCLOSURE,
 	].join("\n");
-	const metaBase = join(outDir, `economy_${slug}_${stamp}`);
+	const metaBase = join(outDir, stem);
 	writeFileSync(`${metaBase}.title.txt`, meta.videoTitle);
 	writeFileSync(`${metaBase}.description.txt`, description);
-	writeFileSync(`${metaBase}.chapters.txt`, chapterLines.join("\n"));
+	if (!isShorts)
+		writeFileSync(`${metaBase}.chapters.txt`, chapterLines.join("\n"));
 
 	// 6.b) 플랫폼 4종(youtube/tiktok/reels/naver_clip) 업로드 메타 — 기존 txt 는 하위호환 유지,
 	//      JSON 은 업로더 자동화용. 출처 리스트 + YMYL 면책을 4종 모두에 전파(캡션 절삭 시에도
@@ -1190,8 +1362,13 @@ async function main(): Promise<void> {
 		description: meta.videoTitle,
 		tags: ["경제", "경제뉴스", "뉴스해설", ...extractKeywords(article.title)],
 		hashtags: ["경제뉴스", "경제", "뉴스해설"],
-		chapters: chapters.map((c) => ({ sec: c.startSec, label: c.title })),
-		isShorts: false, // economy 는 롱폼 전용 — 숏폼은 make-vlog 경로 담당
+		// shorts 는 챕터 미전달(요구사항) — 필드 자체를 생략(빈 배열이 아니라 undefined).
+		...(isShorts
+			? {}
+			: {
+					chapters: chapters.map((c) => ({ sec: c.startSec, label: c.title })),
+				}),
+		isShorts,
 		sourceList: sources.map((s) =>
 			[[s.date, s.source, s.title].filter(Boolean).join(" · "), s.url]
 				.filter(Boolean)
@@ -1205,17 +1382,19 @@ async function main(): Promise<void> {
 	);
 
 	// 7) 최종 검수 게이트(fail-closed) — 렌더 실측 길이/.srt 정합/컷수 + contact sheet.
-	//    카드 보정치(인트로/아웃트로 초) 전달 — economy 는 인트로/아웃트로 카드 상시 사용.
+	//    카드 보정치(인트로/아웃트로 초) 전달 — economy 롱폼은 인트로/아웃트로 카드 상시 사용,
+	//    shorts 는 카드가 없으므로 0(introOffsetSec 과 동일 원리 — Codex P2 재발 방지).
 	//    실패 시 throw → main catch 가 exit 1. 기사 사용 기록 "전"에 실행 — 실패 잡이 기사를
 	//    소진하지 않아 수정 후 같은 기사로 재시도 가능(economy-cron 격리 근거).
 	log("7) 최종 검수(verify-output)...");
+	const outroSec = isShorts ? 0 : END_CARD_FRAMES / 30;
 	const report = await runVerifyOutput({
 		videoPath: finalPath,
 		srtPath,
 		audioSecTotal: made.reduce((s, m) => s + m.d, 0),
 		cutCount: made.length,
 		introOffsetSec,
-		outroSec: END_CARD_FRAMES / 30,
+		outroSec,
 		contactSheet: true,
 	});
 	for (const c of report.checks)
@@ -1229,9 +1408,9 @@ async function main(): Promise<void> {
 	used.add(article.link);
 	saveUsed(usedPath, used);
 
-	const totalSec = cursor + END_CARD_FRAMES / 30;
+	const totalSec = cursor + outroSec;
 	log(
-		`\n✅ 완성: ${finalPath} (${Math.round(totalSec)}초, 검수 통과)\n   자막: ${srtPath} · 썸네일: ${thumbPath}\n   메타: ${metaBase}.{title,description,chapters}.txt + platform_meta.json`,
+		`\n✅ 완성: ${finalPath} (${Math.round(totalSec)}초, 검수 통과)\n   자막: ${srtPath} · 썸네일: ${thumbPath}\n   메타: ${metaBase}.{title,description${isShorts ? "" : ",chapters"}}.txt + platform_meta.json`,
 	);
 }
 
