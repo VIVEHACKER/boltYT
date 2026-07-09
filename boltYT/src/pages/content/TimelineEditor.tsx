@@ -400,7 +400,7 @@ export default function TimelineEditor() {
 						<Player
 							ref={playerRef}
 							component={VideoComposition}
-							inputProps={{ scenes: remotionScenes, bgmUrl: project.bgmUrl }}
+							inputProps={{ scenes: remotionScenes, bgmUrl: project.bgmUrl, usage: "preview" }}
 							durationInFrames={playerFrames}
 							fps={FPS}
 							compositionWidth={isShorts ? SHORTS_WIDTH : VIDEO_WIDTH}

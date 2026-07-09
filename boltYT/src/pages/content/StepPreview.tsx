@@ -2819,6 +2819,7 @@ export default function StepPreview({
 					<Player
 						component={VideoComposition}
 						inputProps={{
+							usage: "preview",
 							scenes: remotionScenes,
 							// script-scoped BGM URL 우선 (리로드 후에도 안전), legacy 전역 키는 fallback
 							bgmUrl,

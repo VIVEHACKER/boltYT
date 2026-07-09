@@ -4,6 +4,7 @@ import {
 	Audio,
 	Img,
 	interpolate,
+	OffthreadVideo,
 	Sequence,
 	staticFile,
 	useCurrentFrame,
@@ -2199,6 +2200,13 @@ function VideoSceneView({
 	const audioVolume = useAudioVolume(durationInFrames);
 	const viewOpacity = useTailFade(durationInFrames, fadeOutFrames);
 	const layout = useLayoutMode();
+	// During RENDER use OffthreadVideo (ffmpeg frame extraction) — Chrome's
+	// <Video>/<Html5Video> stalls on frame-accurate seeks in headless and trips
+	// delayRender timeouts (esp. for screen-recorded chart clips). Preview keeps
+	// <Video> for scrubbing. Runtime uses OffthreadVideo; props are Video-compatible.
+	const VideoTag = (
+		usage === "render" ? OffthreadVideo : Video
+	) as typeof Video;
 
 	const shotTimeline = useMemo(
 		() =>
@@ -2327,7 +2335,7 @@ function VideoSceneView({
 								}}
 							>
 								{isVideoShot && shotSrc ? (
-									<Video
+									<VideoTag
 										src={shotSrc}
 										startFrom={startFrom}
 										style={mergeMotionStyles(
@@ -2395,7 +2403,7 @@ function VideoSceneView({
 						});
 						return (
 							<>
-								<Video
+								<VideoTag
 									src={videoSrc}
 									startFrom={0}
 									style={mergeMotionStyles(

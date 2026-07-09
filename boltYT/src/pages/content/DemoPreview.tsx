@@ -67,7 +67,7 @@ export default function DemoPreview({ onBack }: DemoPreviewProps) {
 			<div className="mb-static-lg rounded-[8px] overflow-hidden bg-[#000]">
 				<Player
 					component={VideoComposition}
-					inputProps={{ scenes: remotionScenes }}
+					inputProps={{ scenes: remotionScenes, usage: "preview" }}
 					durationInFrames={totalFrames}
 					fps={VIDEO_FPS}
 					compositionWidth={VIDEO_WIDTH}

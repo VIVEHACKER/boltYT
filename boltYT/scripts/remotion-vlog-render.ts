@@ -29,6 +29,7 @@ import type {
 	SceneShotMotion,
 } from "../src/lib/scene-shot-types.ts";
 import { getOverlapFrames } from "../src/remotion/timing.ts";
+import type { SubtitleBgStyle } from "../src/remotion/Composition.tsx";
 import type { RemotionScene, TransitionType } from "../src/remotion/types.ts";
 import { floatEnv, posIntEnv } from "./vlog-shared.ts";
 
@@ -214,6 +215,8 @@ export interface RenderVlogOpts {
 	intro?: { title: string; subtitle?: string; channelName?: string };
 	/** 아웃트로 엔드 카드(롱폼). */
 	outro?: { channelName?: string; ctaText?: string };
+	/** 자막 배경 스타일. 기본은 기존 동작 유지(pill). */
+	subtitleBgStyle?: SubtitleBgStyle;
 }
 
 export async function renderVlogRemotion(
@@ -265,7 +268,7 @@ export async function renderVlogRemotion(
 			scenes: remotionScenes,
 			captionStyle: "chunked" as const,
 			subtitlePosition: "bottom" as const,
-			subtitleBgStyle: "pill" as const,
+			subtitleBgStyle: opts.subtitleBgStyle ?? ("pill" as const),
 			subtitleAccentColor: "#FFD700",
 			bgmUrl,
 			bgmLoop: true,
