@@ -30,6 +30,7 @@
     "vlog:make": "npx tsx scripts/make-vlog.ts",
     "vlog:batch": "npx tsx scripts/vlog-batch.ts",
     "vlog:economy": "npx tsx scripts/make-economy.ts",
+    "economy:real": "npx tsx scripts/make-economy-real.ts",
     "cartoon:money": "npx tsx scripts/make-money-cartoon-short.ts",
     "reference:shopping": "npx tsx scripts/make-shopping-shorts-interview.ts",
     "shopping:product": "npx tsx scripts/make-shopping-product-short.ts",

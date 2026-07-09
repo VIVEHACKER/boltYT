@@ -83,7 +83,7 @@ const PROJECT_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 // 경제 피드 — 전부 HTTPS 라이브 검증(2026-07-08). YMYL 해설 근거라 http 소스는 기본값에서 제외
 //   (변조 벡터 차단; edaily 는 https 미지원이라 뺐고, 필요 시 --feed 로 옵트인). fetchFeed 가 죽은 피드는 skip.
-const DEFAULT_FEEDS = [
+export const DEFAULT_FEEDS = [
 	"https://www.yna.co.kr/rss/economy.xml", // 연합뉴스 경제
 	"https://www.yna.co.kr/rss/market.xml", // 연합뉴스 시장
 	"https://www.hankyung.com/feed/economy", // 한국경제 경제
@@ -402,7 +402,7 @@ export function estimateShortsTotalSec(
 	return sceneCount * SHORTS_SEC_PER_SCENE;
 }
 
-const ECON_SYSTEM =
+export const ECON_SYSTEM =
 	"한국 경제 뉴스 해설 유튜브 작가. 제공된 기사의 '사실에만' 근거해 쉽게 설명한다. 투자 조언·종목 추천·매수매도 권유·가격 예측 절대 금지(YMYL). 기사에 없는 수치/사실 창작 금지. JSON만 출력.";
 
 /**
@@ -561,7 +561,7 @@ function cartoonWorkflow(
  * 모든 피드를 합산(link 로 dedup) — 첫 피드가 닿아도 거기서 멈추지 않는다(Codex P2).
  * 그래야 topic 이 뒤 피드에만 있거나 앞 피드가 소진돼도 폴백이 동작. 순서 보존(앞 피드=풍부한 요약 우선).
  */
-async function fetchFeed(feeds: string[]): Promise<RssItem[]> {
+export async function fetchFeed(feeds: string[]): Promise<RssItem[]> {
 	const all: RssItem[] = [];
 	const seen = new Set<string>();
 	for (const url of feeds) {
@@ -590,7 +590,7 @@ async function fetchFeed(feeds: string[]): Promise<RssItem[]> {
  * 기사 본문 수집 — Jina Reader(r.jina.ai)로 뉴스 사이트 무관 본문 텍스트화. 키 불필요.
  * 실패/타임아웃 시 빈 문자열(요약 기반 폴백). maxChars 로 컨텍스트 예산 제한.
  */
-async function fetchArticleBody(url: string, maxChars = 3000): Promise<string> {
+export async function fetchArticleBody(url: string, maxChars = 3000): Promise<string> {
 	try {
 		const r = await fetch(`https://r.jina.ai/${url}`, {
 			headers: { "User-Agent": "Mozilla/5.0", "X-Return-Format": "text" },
