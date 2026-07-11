@@ -19,6 +19,7 @@ import {
 import { createClient } from "@supabase/supabase-js";
 import {
 	type RenderQualityPreset,
+	resolveMemoryRenderOptions,
 	resolveRenderOptions,
 	toRenderMediaOptions,
 } from "../lib/render-options";
@@ -232,6 +233,8 @@ async function main() {
 	try {
 		await renderMedia({
 			...(toRenderMediaOptions(rOpts) as Parameters<typeof renderMedia>[0]),
+			// RAM 상한(concurrency / offthread·media 캐시) — 렌더 단계 피크 메모리 억제.
+			...resolveMemoryRenderOptions(),
 			composition: { ...composition, durationInFrames: totalFrames },
 			serveUrl: bundled,
 			outputLocation: outputPath,

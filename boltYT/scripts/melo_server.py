@@ -12,6 +12,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 PORT = int(os.environ.get("MELO_PORT", "3461"))
@@ -20,10 +21,21 @@ DEVICE = os.environ.get("MELO_DEVICE", "cpu")
 
 print(f"[melo-server] loading MeloTTS lang={LANG} device={DEVICE} ...", flush=True)
 from melo.api import TTS  # noqa: E402
+import torch  # noqa: E402  (melo 의존성 — CPU 스레드/추론 메모리 제어용)
+
+# CPU 스레드 상한(선택). 병렬 워커가 코어를 과점해 스케줄링/스레드 스택 RAM 이 몰리는 것을 막는다.
+# 미설정 시 torch 기본값 유지 → 기존 동작 무변화.
+_threads = os.environ.get("MELO_THREADS", "")
+if _threads.isdigit() and int(_threads) > 0:
+    torch.set_num_threads(int(_threads))
+    print(f"[melo-server] torch threads capped at {_threads}", flush=True)
 
 _tts = TTS(language=LANG, device=DEVICE)
 _spk = dict(_tts.hps.data.spk2id)  # HParams → dict(.get 없음)
 _sid = _spk.get(os.environ.get("MELO_SPEAKER", ""), next(iter(_spk.values())))
+# 동시 합성 직렬화 락 — ThreadingHTTPServer 로 여러 /tts 가 동시에 와도 모델 활성화 메모리를
+# 1회분으로 억제한다(피크 RAM 을 "몰아서" 쓰지 않게). ffmpeg 인코딩은 락 밖이라 병렬 유지.
+_synth_lock = threading.Lock()
 print(f"[melo-server] ready :{PORT} speakers={_spk}", flush=True)
 
 
@@ -31,7 +43,10 @@ def _synth_mp3(text: str, speed: float) -> bytes:
     with tempfile.TemporaryDirectory() as d:
         wav = os.path.join(d, "o.wav")
         mp3 = os.path.join(d, "o.mp3")
-        _tts.tts_to_file(text, _sid, wav, speed=speed)
+        # 직렬화 + inference_mode: 동시 요청이 와도 모델 활성화 RAM 을 1회분으로 억제하고
+        # autograd 부기 메모리를 제거한다(합성은 추론 전용이라 그래프 불필요).
+        with _synth_lock, torch.inference_mode():
+            _tts.tts_to_file(text, _sid, wav, speed=speed)
         subprocess.run(
             ["ffmpeg", "-y", "-i", wav, "-c:a", "libmp3lame", "-q:a", "2", mp3],
             check=True,

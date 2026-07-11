@@ -8,6 +8,12 @@ import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
+import { loadEnv } from "../server/lib/env.ts";
+
+// CLI entry points do not inherit Vite's env loading. Load the project .env
+// before resolving service URLs, model paths, and TTS settings. Explicit shell
+// variables still win because loadEnv() never overwrites an existing value.
+loadEnv();
 
 export const exec = promisify(execFile);
 export const COMFY = process.env.COMFY_URL ?? "http://localhost:8188";
@@ -169,6 +175,34 @@ export async function runComfy(
 		}
 	}
 	throw new Error(`ComfyUI timeout (${outPath})`);
+}
+
+/**
+ * ComfyUI 모델 언로드(best-effort). 한 잡의 이미지 생성이 "모두 끝난 뒤 렌더 직전"에 1회 호출해
+ * SDXL/IPAdapter 의 상주 VRAM/RAM 을 회수한다 — 렌더러(Remotion)와 확산 모델이 한 프로세스에서
+ * 동시 상주("몰아서")하지 않도록 단계를 분리하는 것이 목적이다. 렌더는 ComfyUI 모델을 쓰지 않으므로 안전.
+ *
+ * /free 는 ComfyUI 표준 라우트. {unload_models,free_memory} 는 모델 가중치 + 실행기 캐시를 모두 비운다.
+ * fire-and-forget(200 즉시 반환, 실제 회수는 워커 idle 시점) 이라 렌더 시작 무렵이면 회수가 끝난다.
+ * 다음 /prompt 는 모델을 자동 재로드하므로 기능상 문제 없다(재로드 지연만 발생).
+ * 서버 부재/네트워크 오류는 삼킨다 — RAM 회수 실패가 렌더를 막아선 안 된다. FREE_COMFY_BEFORE_RENDER=0 로 비활성.
+ *
+ * 5s AbortSignal 타임아웃: ComfyUI 가 TCP 는 받되 응답이 없는 경우(= 이 기능이 노리는 저RAM/스래싱
+ * 상황과 가장 상관된 실패 모드)에도 렌더가 undici headersTimeout(수분)까지 멈추지 않도록 한다.
+ * 주의: "씬 사이"가 아니라 "잡 전체 생성 완료 후"에만 호출할 것 — 사이에 부르면 다음 씬이 재로드 페널티를 문다.
+ */
+export async function freeComfy(): Promise<void> {
+	if (process.env.FREE_COMFY_BEFORE_RENDER === "0") return;
+	try {
+		await fetch(`${COMFY}/free`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ unload_models: true, free_memory: true }),
+			signal: AbortSignal.timeout(5000),
+		});
+	} catch {
+		// ComfyUI 미기동/네트워크 오류/타임아웃 — 무시(렌더는 계속).
+	}
 }
 
 /** 이미지가 사실상 단색/공백인지 — SDXL 흔한 실패(빈 캔버스/솔리드)는 grayscale stddev 가 매우 낮다. */
@@ -398,9 +432,13 @@ export async function proxyChatJSON(
 	system: string,
 	user: string,
 ): Promise<Record<string, unknown>> {
+	// The local proxy enforces a 180s Claude CLI timeout. Keep a slightly larger
+	// client-side deadline so a dropped socket cannot stall an entire episode run.
+	const timeoutMs = posIntEnv("LLM_REQUEST_TIMEOUT_MS", 195_000);
 	const cr = await fetch(`${PROXY}/api/openai/chat`, {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
+		signal: AbortSignal.timeout(timeoutMs),
 		body: JSON.stringify({
 			messages: [
 				{ role: "system", content: system },
@@ -458,13 +496,23 @@ export async function overlayThumbnailText(
 		"w, h = im.size",
 		"left, top = (w - tw) // 2, (h - th) // 2",
 		"im = im.crop((left, top, left + tw, top + th))",
-		'f = ImageFont.truetype("/System/Library/Fonts/AppleSDGothicNeo.ttc", 150, index=0)',
 		"x, y = 44, 28",
+		'font_path = "/System/Library/Fonts/AppleSDGothicNeo.ttc"',
+		"font_size = 150",
+		"probe = ImageDraw.Draw(im)",
+		"while font_size > 72:",
+		"    f = ImageFont.truetype(font_path, font_size, index=0)",
+		"    bb = probe.textbbox((x, y), text, font=f, stroke_width=stroke_width)",
+		"    if bb[2] - bb[0] <= tw - (x * 2) and bb[3] - bb[1] <= 210:",
+		"        break",
+		"    font_size -= 4",
+		"else:",
+		"    f = ImageFont.truetype(font_path, 72, index=0)",
 		"if band:",
 		"    layer = Image.new('RGBA', im.size, (0, 0, 0, 0))",
 		"    ld = ImageDraw.Draw(layer)",
 		"    bb = ld.textbbox((x, y), text, font=f, stroke_width=stroke_width)",
-		"    ld.rectangle((bb[0]-28, bb[1]-18, bb[2]+28, bb[3]+18), fill=(0, 0, 0, 150))",
+		"    ld.rectangle((max(0, bb[0]-28), max(0, bb[1]-18), min(tw, bb[2]+28), min(th, bb[3]+18)), fill=(0, 0, 0, 150))",
 		"    im = Image.alpha_composite(im.convert('RGBA'), layer).convert('RGB')",
 		"d = ImageDraw.Draw(im)",
 		"d.text((x, y), text, font=f, fill=fill, stroke_width=stroke_width, stroke_fill=stroke_fill)",

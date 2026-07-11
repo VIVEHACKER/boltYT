@@ -21,17 +21,18 @@ import {
 } from "node:fs";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
-import { extname, join } from "node:path";
+import { extname, join, resolve, sep } from "node:path";
 import { bundle } from "@remotion/bundler";
 import { renderMedia, selectComposition } from "@remotion/renderer";
+import { resolveMemoryRenderOptions } from "../src/lib/render-options.ts";
 import type {
 	SceneShot,
 	SceneShotMotion,
 } from "../src/lib/scene-shot-types.ts";
-import { getOverlapFrames } from "../src/remotion/timing.ts";
 import type { SubtitleBgStyle } from "../src/remotion/Composition.tsx";
+import { getOverlapFrames } from "../src/remotion/timing.ts";
 import type { RemotionScene, TransitionType } from "../src/remotion/types.ts";
-import { floatEnv, posIntEnv } from "./vlog-shared.ts";
+import { floatEnv, freeComfy, posIntEnv } from "./vlog-shared.ts";
 
 const FPS = 30;
 // 중간 프레임 JPEG 품질(기본 100). Remotion 기본 80 은 h264 인코딩 전 이중 압축이라
@@ -162,14 +163,34 @@ export function buildVlogRemotionScenes(
 	});
 }
 
+/** 요청 경로가 정적 루트 밖으로 탈출하지 않을 때만 절대 경로를 반환한다. */
+export function resolveStaticAssetPath(
+	rootDir: string,
+	requestPath: string,
+): string | null {
+	const root = resolve(rootDir);
+	const relative = requestPath.replace(/^\/+/, "");
+	const candidate = resolve(root, relative);
+	return candidate === root || candidate.startsWith(`${root}${sep}`)
+		? candidate
+		: null;
+}
+
 /** 단일 디렉토리를 정적 서빙하는 throwaway HTTP 서버(127.0.0.1, 랜덤 포트). */
 function startStaticServer(
 	rootDir: string,
 ): Promise<{ origin: string; close: () => Promise<void> }> {
 	const server = createServer((req, res) => {
-		const rel = decodeURIComponent((req.url ?? "/").split("?")[0]);
-		const file = join(rootDir, rel);
-		if (!file.startsWith(rootDir)) {
+		let rel = "";
+		try {
+			rel = decodeURIComponent((req.url ?? "/").split("?")[0]);
+		} catch {
+			res.writeHead(400);
+			res.end("bad request");
+			return;
+		}
+		const file = resolveStaticAssetPath(rootDir, rel);
+		if (!file) {
 			res.writeHead(403);
 			res.end();
 			return;
@@ -217,6 +238,9 @@ export interface RenderVlogOpts {
 	outro?: { channelName?: string; ctaText?: string };
 	/** 자막 배경 스타일. 기본은 기존 동작 유지(pill). */
 	subtitleBgStyle?: SubtitleBgStyle;
+	/** 자막(내레이션 오버레이) 끄기. 텍스트가 이미 이미지에 구워진 카드형 씬용(senior-money).
+	 *  기본 false — 기존 파이프라인(스톡/일러스트 씬)은 자막 그대로. .srt 사이드카는 무관. */
+	noSubtitle?: boolean;
 }
 
 export async function renderVlogRemotion(
@@ -266,7 +290,9 @@ export async function renderVlogRemotion(
 		const remotionScenes = buildVlogRemotionScenes(served);
 		const inputProps = {
 			scenes: remotionScenes,
-			captionStyle: "chunked" as const,
+			captionStyle: (opts.noSubtitle ? "none" : "chunked") as
+				| "none"
+				| "chunked",
 			subtitlePosition: "bottom" as const,
 			subtitleBgStyle: opts.subtitleBgStyle ?? ("pill" as const),
 			subtitleAccentColor: "#FFD700",
@@ -282,6 +308,10 @@ export async function renderVlogRemotion(
 			outro: compositionId === "YouTubeVideo" ? opts.outro : undefined,
 		};
 
+		// SDXL/IPAdapter(ComfyUI) 상주 RAM 을 렌더 전에 회수 — 확산 모델과 Remotion 렌더러가
+		// 한 프로세스에서 동시 상주("몰아서")하지 않도록 단계 분리. best-effort(서버 없으면 무시).
+		await freeComfy();
+
 		// 2) 번들 + 컴포지션 선택(calculateMetadata 가 총 프레임 계산)
 		const bundled = await bundle({
 			entryPoint: join(projectRoot, "src/remotion/index.ts"),
@@ -295,6 +325,8 @@ export async function renderVlogRemotion(
 
 		// 3) 렌더(자막은 React 로 그려지므로 libass 불필요)
 		await renderMedia({
+			// RAM 상한(concurrency / offthread·media 캐시) — 렌더 단계 피크 메모리 억제.
+			...resolveMemoryRenderOptions(),
 			composition,
 			serveUrl: bundled,
 			codec: "h264",

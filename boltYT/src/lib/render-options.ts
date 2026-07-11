@@ -254,3 +254,41 @@ export function toRenderMediaOptions(
 	if (opts.codec === "h264") base.x264Preset = opts.x264Preset;
 	return base;
 }
+
+/**
+ * RAM 부하 최소화용 렌더 메모리 노브 — renderMedia() 에 그대로 스프레드한다.
+ *
+ * 로컬 파이프라인은 SDXL(ComfyUI)·MeloTTS 와 Remotion 렌더가 한 프로세스 안에서 RAM 을
+ * 두고 경합한다. Remotion 기본값은 고코어/대용량 RAM 머신에서 메모리를 "몰아서" 쓰므로 상한을 둔다:
+ *  - concurrency: 동시 프레임 렌더(헤드리스 브라우저 탭). Remotion 기본 = min(8, cpus/2).
+ *    탭당 ~250-450MB 로 피크 RAM 의 최대 변수. 기본 2 로 낮춤(env REMOTION_CONCURRENCY 로 상향 시 속도↑·RAM↑).
+ *  - offthreadVideoCacheSizeInBytes: <OffthreadVideo> 프레임 LRU 캐시. Remotion 기본(null)=가용 RAM 의 일부.
+ *    기본 512MB(env REMOTION_OFFTHREAD_CACHE_MB).
+ *  - mediaCacheSizeInBytes: @remotion/media 캐시. Remotion 기본 = 시스템 메모리의 "절반"(가장 큰 숨은 항).
+ *    기본 512MB(env REMOTION_MEDIA_CACHE_MB).
+ *
+ * 모두 양의 정수 env(MB 단위) 로 오버라이드하며 잘못된 값은 기본값으로 폴백한다. 이 함수는
+ * 노드 렌더 경로에서만 호출되고 UI 번들에는 들어가지 않으므로 process 접근을 typeof 로 가드해 둔다.
+ */
+export interface MemoryRenderOptions {
+	concurrency: number;
+	offthreadVideoCacheSizeInBytes: number;
+	mediaCacheSizeInBytes: number;
+}
+
+export function resolveMemoryRenderOptions(): MemoryRenderOptions {
+	const env: Record<string, string | undefined> =
+		typeof process !== "undefined" && process.env ? process.env : {};
+	const posInt = (raw: string | undefined, dflt: number): number => {
+		if (raw === undefined || raw === "") return dflt;
+		const n = Number(raw);
+		return Number.isInteger(n) && n > 0 ? n : dflt;
+	};
+	const MB = 1024 * 1024;
+	return {
+		concurrency: posInt(env.REMOTION_CONCURRENCY, 2),
+		offthreadVideoCacheSizeInBytes:
+			posInt(env.REMOTION_OFFTHREAD_CACHE_MB, 512) * MB,
+		mediaCacheSizeInBytes: posInt(env.REMOTION_MEDIA_CACHE_MB, 512) * MB,
+	};
+}

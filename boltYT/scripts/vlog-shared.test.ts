@@ -1,10 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import {
 	buildChapterMarkers,
 	buildSourceDescription,
 	buildSourceListLines,
 	buildTextbookIllustrationPrompt,
+	COMFY,
 	formatTimestamp,
+	freeComfy,
 	illustrationWorkflow,
 	isDegenerateImageStats,
 	resolveTtsProvider,
@@ -285,5 +287,52 @@ describe("illustrationWorkflow", () => {
 		const wf = illustrationWorkflow("x", 1, 768, 1344);
 		expect(latentNode(wf)?.inputs.width).toBe(768);
 		expect(latentNode(wf)?.inputs.height).toBe(1344);
+	});
+});
+
+describe("freeComfy", () => {
+	const origFetch = globalThis.fetch;
+	afterEach(() => {
+		globalThis.fetch = origFetch;
+		delete process.env.FREE_COMFY_BEFORE_RENDER;
+	});
+
+	it("POST /free with {unload_models,free_memory} to unload SDXL before render", async () => {
+		const calls: Array<[unknown, { method?: string; body?: string }]> = [];
+		globalThis.fetch = ((
+			url: unknown,
+			init: { method?: string; body?: string },
+		) => {
+			calls.push([url, init]);
+			return Promise.resolve({ ok: true } as Response);
+		}) as typeof fetch;
+
+		await freeComfy();
+
+		expect(calls).toHaveLength(1);
+		expect(String(calls[0][0])).toBe(`${COMFY}/free`);
+		expect(calls[0][1].method).toBe("POST");
+		expect(JSON.parse(calls[0][1].body ?? "{}")).toEqual({
+			unload_models: true,
+			free_memory: true,
+		});
+	});
+
+	it("FREE_COMFY_BEFORE_RENDER=0 disables the call (escape hatch)", async () => {
+		process.env.FREE_COMFY_BEFORE_RENDER = "0";
+		let called = false;
+		globalThis.fetch = (() => {
+			called = true;
+			return Promise.resolve({ ok: true } as Response);
+		}) as typeof fetch;
+
+		await freeComfy();
+		expect(called).toBe(false);
+	});
+
+	it("swallows network errors — RAM 회수 실패가 렌더를 막지 않는다", async () => {
+		globalThis.fetch = (() =>
+			Promise.reject(new Error("ECONNREFUSED"))) as typeof fetch;
+		await expect(freeComfy()).resolves.toBeUndefined();
 	});
 });

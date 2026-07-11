@@ -4,7 +4,10 @@ import {
 	buildSceneTimeline,
 	getOverlapFrames,
 } from "../src/remotion/timing.ts";
-import { buildVlogRemotionScenes } from "./remotion-vlog-render.ts";
+import {
+	buildVlogRemotionScenes,
+	resolveStaticAssetPath,
+} from "./remotion-vlog-render.ts";
 
 const FPS = 30;
 const MIN_SCENE_FRAMES = 45;
@@ -169,5 +172,22 @@ describe("buildVlogRemotionScenes", () => {
 		for (const s of out) {
 			expect("shots" in s).toBe(false); // 키 부재 = deep-equal 스냅샷까지 불변
 		}
+	});
+});
+
+describe("resolveStaticAssetPath", () => {
+	it("정적 루트 안의 정상 자산만 해석", () => {
+		expect(resolveStaticAssetPath("/tmp/vlog-assets", "/scene0.png")).toBe(
+			"/tmp/vlog-assets/scene0.png",
+		);
+	});
+
+	it("상위 디렉터리와 prefix 유사 경로 탈출을 차단", () => {
+		expect(
+			resolveStaticAssetPath("/tmp/vlog-assets", "/../vlog-assets2/key.txt"),
+		).toBeNull();
+		expect(
+			resolveStaticAssetPath("/tmp/vlog-assets", "/../../etc/passwd"),
+		).toBeNull();
 	});
 });
