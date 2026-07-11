@@ -31,7 +31,12 @@ import type {
 } from "../src/lib/scene-shot-types.ts";
 import type { SubtitleBgStyle } from "../src/remotion/Composition.tsx";
 import { getOverlapFrames } from "../src/remotion/timing.ts";
-import type { RemotionScene, TransitionType } from "../src/remotion/types.ts";
+import type {
+	MotionGraphicSpec,
+	RemotionScene,
+	SceneMood,
+	TransitionType,
+} from "../src/remotion/types.ts";
 import { floatEnv, freeComfy, posIntEnv } from "./vlog-shared.ts";
 
 const FPS = 30;
@@ -81,6 +86,13 @@ export interface VlogSceneInput {
 	 *  shot.motion 을 쓰고, Ken Burns 자동 휴리스틱(!shot 폴백)은 진입 불가가 된다(이중 적용 방지).
 	 *  미지정 씬은 기존 KB 휴리스틱 그대로 — 혼용 자동. */
 	cameraMove?: SceneShotMotion;
+	/** 씬에 얹을 데이터 모션그래픽(숫자 카운터·증감 화살표·출처 로워서드) 스펙.
+	 *  미지정이면 키를 만들지 않아 기존 출력 100% 불변 — 경제/뉴스 생성기만 채운다.
+	 *  scene-motion-graphics.ts 의 빌더로 생성. Scene.tsx:961 이 렌더. */
+	motionGraphics?: MotionGraphicSpec[];
+	/** 씬 분위기. 기본 "neutral". 경제/뉴스는 "news" 로 두면 먼지 파티클 제거 +
+	 *  비네트/그레인 완화(작은 숫자·차트 가독성↑). 미지정 시 기존 출력 불변. */
+	mood?: SceneMood;
 }
 
 /**
@@ -133,6 +145,8 @@ export function buildVlogRemotionScenes(
 		...(s.cameraMove
 			? { shots: [cameraMoveShot(s.cameraMove, i, s.durationSec)] }
 			: {}),
+		// 데이터 모션그래픽 패스스루 — 미지정/빈 배열이면 키를 안 만들어 출력 불변.
+		...(s.motionGraphics?.length ? { motionGraphics: s.motionGraphics } : {}),
 		audioUrl: s.audioUrl,
 		narration: s.narration,
 		durationInFrames: Math.max(
@@ -143,7 +157,7 @@ export function buildVlogRemotionScenes(
 		transition: (i === 0
 			? "none"
 			: TRANSITION_ROTATION[i % TRANSITION_ROTATION.length]) as TransitionType,
-		mood: "neutral" as const,
+		mood: s.mood ?? "neutral",
 		hookBoost: i === 0,
 		colorGrade: "warm-film" as const,
 	}));
