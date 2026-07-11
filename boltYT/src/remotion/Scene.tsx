@@ -52,6 +52,15 @@ import type {
 	TextEffect,
 } from "./types";
 import { DEFAULT_SUBTITLE, isVertical, SHORTS_SAFE_AREA } from "./types";
+import {
+	FOCUS_WORD_LEAD_BASE_COLOR,
+	FOCUS_WORD_SCALE,
+	FOCUS_WORD_TITLE_SHADOW,
+	FOCUS_WORD_WEIGHT,
+	FONT_STACKS,
+	HOTCLIP_TEXT,
+	NEWS_TEXT,
+} from "./typography";
 
 /** 쇼츠 여부에 따른 레이아웃 값 */
 function useLayoutMode() {
@@ -64,7 +73,9 @@ function useLayoutMode() {
 		topPad: vertical ? SHORTS_SAFE_AREA.top : 0,
 		cardPad: vertical ? 32 : 120,
 		cardMaxWidth: vertical ? "95%" : "85%",
-		newsTitleSize: vertical ? 36 : 42,
+		newsTitleSize: vertical
+			? NEWS_TEXT.title.fontSize.shorts
+			: NEWS_TEXT.title.fontSize.longform,
 		captionMaxWidth: vertical ? "95%" : "85%",
 		imgTransformOrigin: vertical
 			? ("center 35%" as const)
@@ -1397,7 +1408,7 @@ function NewsOverlayView({
 							{scene.newsSource && (
 								<span
 									style={{
-										fontFamily: "'Noto Sans KR', -apple-system, sans-serif",
+										fontFamily: FONT_STACKS.sans,
 										...cardTheme.source,
 									}}
 								>
@@ -1407,7 +1418,7 @@ function NewsOverlayView({
 							{scene.newsDate && cardTheme.datePlacement === "meta" && (
 								<span
 									style={{
-										fontFamily: "'Noto Sans KR', -apple-system, sans-serif",
+										fontFamily: FONT_STACKS.sans,
 										...cardTheme.date,
 									}}
 								>
@@ -1945,7 +1956,7 @@ function SocialClipCardSceneView({
 				background:
 					"linear-gradient(180deg, #ffffff 0%, #ffffff 58%, #eeeeee 100%)",
 				overflow: "hidden",
-				fontFamily: "'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif",
+				fontFamily: HOTCLIP_TEXT.rootFontFamily,
 			}}
 		>
 			<div
@@ -1965,10 +1976,9 @@ function SocialClipCardSceneView({
 					left: 62,
 					right: 62,
 					textAlign: "center",
-					fontFamily:
-						"'AppleMyungjo', 'Hiragino Mincho ProN', 'Nanum Myeongjo', serif",
-					fontWeight: 900,
-					color: "#050505",
+					fontFamily: HOTCLIP_TEXT.title.fontFamily,
+					fontWeight: HOTCLIP_TEXT.title.fontWeight,
+					color: HOTCLIP_TEXT.title.color,
 					letterSpacing: "-0.045em",
 					lineHeight: 1.18,
 				}}
@@ -1977,7 +1987,10 @@ function SocialClipCardSceneView({
 					<div
 						key={`${line}-${index}`}
 						style={{
-							fontSize: index === 0 ? 76 : 82,
+							fontSize:
+								index === 0
+									? HOTCLIP_TEXT.title.fontSizeFirst
+									: HOTCLIP_TEXT.title.fontSizeRest,
 							transform:
 								index === 0
 									? `translateY(${Math.sin(frame / 18) * 1.2}px)`
@@ -2000,9 +2013,9 @@ function SocialClipCardSceneView({
 						borderRadius: 999,
 						transform: "translateX(-50%)",
 						background: "rgba(0,0,0,0.62)",
-						color: "#fff",
-						fontSize: 25,
-						fontWeight: 760,
+						color: HOTCLIP_TEXT.hookPill.color,
+						fontSize: HOTCLIP_TEXT.hookPill.fontSize,
+						fontWeight: HOTCLIP_TEXT.hookPill.fontWeight,
 						lineHeight: 1.25,
 						textAlign: "center",
 						boxShadow: "0 6px 20px rgba(0,0,0,0.18)",
@@ -2066,9 +2079,9 @@ function SocialClipCardSceneView({
 						padding: "8px 12px",
 						borderRadius: 8,
 						background: "#ffcf21",
-						color: "#ed1b3a",
-						fontSize: 27,
-						fontWeight: 950,
+						color: HOTCLIP_TEXT.badge.color,
+						fontSize: HOTCLIP_TEXT.badge.fontSize,
+						fontWeight: HOTCLIP_TEXT.badge.fontWeight,
 						letterSpacing: "-0.05em",
 						boxShadow: "0 4px 0 rgba(0,0,0,0.22)",
 					}}
@@ -2083,11 +2096,11 @@ function SocialClipCardSceneView({
 						bottom: 38,
 						textAlign: "center",
 						color: captionColor,
-						fontSize: 55,
-						fontWeight: 930,
+						fontSize: HOTCLIP_TEXT.caption.fontSize,
+						fontWeight: HOTCLIP_TEXT.caption.fontWeight,
 						lineHeight: 1.18,
 						letterSpacing: "-0.045em",
-						textShadow: "0 4px 0 rgba(0,0,0,0.86), 0 0 18px rgba(0,0,0,0.72)",
+						textShadow: HOTCLIP_TEXT.caption.textShadow,
 					}}
 				>
 					{captionLines.map((line, index) => (
@@ -2128,14 +2141,20 @@ function SocialClipCardSceneView({
 							display: "flex",
 							alignItems: "center",
 							justifyContent: "center",
-							color: "#fff",
-							fontSize: 34,
-							fontWeight: 950,
+							color: HOTCLIP_TEXT.handleAvatar.color,
+							fontSize: HOTCLIP_TEXT.handleAvatar.fontSize,
+							fontWeight: HOTCLIP_TEXT.handleAvatar.fontWeight,
 						}}
 					>
 						♪
 					</div>
-					<div style={{ color: "#111", fontSize: 30, fontWeight: 900 }}>
+					<div
+						style={{
+							color: HOTCLIP_TEXT.handle.color,
+							fontSize: HOTCLIP_TEXT.handle.fontSize,
+							fontWeight: HOTCLIP_TEXT.handle.fontWeight,
+						}}
+					>
 						{handle}
 					</div>
 					<div
@@ -2144,9 +2163,9 @@ function SocialClipCardSceneView({
 							padding: "12px 30px",
 							borderRadius: 999,
 							background: "#fff",
-							color: "#111",
-							fontSize: 29,
-							fontWeight: 900,
+							color: HOTCLIP_TEXT.subscribeCta.color,
+							fontSize: HOTCLIP_TEXT.subscribeCta.fontSize,
+							fontWeight: HOTCLIP_TEXT.subscribeCta.fontWeight,
 							boxShadow: "0 4px 18px rgba(0,0,0,0.16)",
 						}}
 					>
@@ -2731,11 +2750,24 @@ function CinematicTextEmphasis({
 	cardTransform: string;
 }) {
 	const leadFontSize = Math.round(
-		sub.emphasisFontSize * (vertical ? 0.46 : 0.42),
+		sub.emphasisFontSize *
+			(vertical
+				? FOCUS_WORD_SCALE.lead.shorts
+				: FOCUS_WORD_SCALE.lead.longform),
 	);
 	const focusFontSize = isStacked
-		? Math.round(sub.emphasisFontSize * (vertical ? 0.78 : 0.7))
-		: Math.round(sub.emphasisFontSize * (vertical ? 0.92 : 0.86));
+		? Math.round(
+				sub.emphasisFontSize *
+					(vertical
+						? FOCUS_WORD_SCALE.focusStacked.shorts
+						: FOCUS_WORD_SCALE.focusStacked.longform),
+			)
+		: Math.round(
+				sub.emphasisFontSize *
+					(vertical
+						? FOCUS_WORD_SCALE.focusSolo.shorts
+						: FOCUS_WORD_SCALE.focusSolo.longform),
+			);
 	const topSpacing = vertical ? 22 : 26;
 	const titleBlock = (
 		<div
@@ -2745,7 +2777,7 @@ function CinematicTextEmphasis({
 				alignItems: "center",
 				gap: isStacked ? (vertical ? 18 : 16) : 0,
 				textAlign: "center",
-				textShadow: "0 9px 34px rgba(0,0,0,0.78), 0 1px 2px rgba(0,0,0,0.9)",
+				textShadow: FOCUS_WORD_TITLE_SHADOW,
 				letterSpacing: scene.hookBoost ? "-0.035em" : "-0.02em",
 			}}
 		>
@@ -2756,8 +2788,8 @@ function CinematicTextEmphasis({
 					fontSize={leadFontSize}
 					fontFamily={sub.fontFamily}
 					activeColor={accentColor}
-					baseColor="rgba(235, 238, 244, 0.84)"
-					baseWeight={690}
+					baseColor={FOCUS_WORD_LEAD_BASE_COLOR}
+					baseWeight={FOCUS_WORD_WEIGHT.lead}
 					align="center"
 					tone={tone}
 				/>
@@ -2769,7 +2801,11 @@ function CinematicTextEmphasis({
 				fontFamily={sub.fontFamily}
 				activeColor={accentColor}
 				baseColor="#ffffff"
-				baseWeight={scene.hookBoost ? 900 : 830}
+				baseWeight={
+					scene.hookBoost
+						? FOCUS_WORD_WEIGHT.focusHook
+						: FOCUS_WORD_WEIGHT.focus
+				}
 				align="center"
 				tone={tone}
 			/>
@@ -2839,9 +2875,11 @@ function CinematicTextEmphasis({
 						border: `1px solid ${hexToRgbaLocal(accentColor, 0.38)}`,
 						background: "rgba(0,0,0,0.34)",
 						color: accentColor,
-						fontFamily: "'Noto Sans KR', -apple-system, sans-serif",
-						fontSize: vertical ? 17 : 18,
-						fontWeight: 820,
+						fontFamily: FONT_STACKS.sans,
+						fontSize: vertical
+							? NEWS_TEXT.label.fontSize.shorts
+							: NEWS_TEXT.label.fontSize.longform,
+						fontWeight: NEWS_TEXT.label.fontWeight,
 						letterSpacing: "0.11em",
 						textTransform: "uppercase",
 						boxShadow: `0 0 24px ${hexToRgbaLocal(accentColor, 0.16)}`,
@@ -2872,12 +2910,14 @@ function CinematicTextEmphasis({
 							flexWrap: "wrap",
 							transform: metaTransform,
 							opacity: metaOpacity,
-							fontFamily: "'Noto Sans KR', -apple-system, sans-serif",
-							fontSize: vertical ? 16 : 17,
-							fontWeight: 650,
+							fontFamily: FONT_STACKS.sans,
+							fontSize: vertical
+								? NEWS_TEXT.source.fontSize.shorts
+								: NEWS_TEXT.source.fontSize.longform,
+							fontWeight: NEWS_TEXT.source.fontWeight,
 							letterSpacing: "0.02em",
-							color: "rgba(229, 231, 235, 0.82)",
-							textShadow: "0 2px 10px rgba(0,0,0,0.8)",
+							color: NEWS_TEXT.source.color,
+							textShadow: NEWS_TEXT.source.textShadow,
 						}}
 					>
 						{source && <span>{source}</span>}

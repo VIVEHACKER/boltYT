@@ -11,6 +11,7 @@ import {
 	isEmphasisWord,
 } from "../lib/narration-caption-theme";
 import type { NewsSurfaceTone } from "../lib/news-surface-theme";
+import { CAPTION_EFFECTS } from "./typography";
 import type { RemotionScene, SubtitleStyle, WordTiming } from "./types";
 
 interface KaraokeCaptionProps {
@@ -99,9 +100,8 @@ export function KaraokeCaption({
 				lineHeight: 1.6,
 				textAlign: "center",
 				margin: 0,
-				textShadow:
-					"0 2px 8px rgba(0,0,0,0.9), 0 0 2px rgba(0,0,0,0.9), 0 0 4px rgba(0,0,0,0.6)",
-				WebkitTextStroke: "1.5px rgba(0,0,0,0.8)",
+				textShadow: CAPTION_EFFECTS.karaoke.textShadow,
+				WebkitTextStroke: CAPTION_EFFECTS.karaoke.stroke,
 				fontFamily: sub.fontFamily,
 				letterSpacing: "-0.01em",
 				opacity: Math.min(enterProgress, exitProgress),

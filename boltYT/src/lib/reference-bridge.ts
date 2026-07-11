@@ -12,6 +12,7 @@ import type {
 	SubtitleStyle,
 	TransitionType,
 } from "../remotion/types";
+import { captionStyleFor } from "../remotion/typography";
 import type { ReferenceTemplate } from "../types/database";
 import type { BgmMood } from "./bgm";
 import {
@@ -76,16 +77,8 @@ export interface ReferencePreset {
 
 // ─── 매핑 헬퍼 ───
 
-const SIZE_FONT_MAP: Record<
-	ReferenceTemplate["subtitle_size_preset"],
-	{ regular: number; emphasis: number; shorts: number; shortsEmphasis: number }
-> = {
-	xs: { regular: 32, emphasis: 52, shorts: 40, shortsEmphasis: 64 },
-	sm: { regular: 40, emphasis: 64, shorts: 48, shortsEmphasis: 76 },
-	md: { regular: 46, emphasis: 76, shorts: 56, shortsEmphasis: 88 },
-	lg: { regular: 56, emphasis: 88, shorts: 68, shortsEmphasis: 104 },
-	xl: { regular: 68, emphasis: 104, shorts: 84, shortsEmphasis: 128 },
-};
+// 자막 크기 스케일(xs~xl)은 typography.ts 의 CAPTION_SIZE_SCALE 단일 소스로 이관.
+// 최종 자막 스타일은 captionStyleFor(format, preset) 로 파생한다(아래 referenceToPreset).
 
 const TRANSITION_MAP: Record<
 	ReferenceTemplate["transition_style"],
@@ -138,7 +131,9 @@ function numericField(value: unknown): number | undefined {
 }
 
 function finiteNumberField(value: unknown): number | undefined {
-	return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+	return typeof value === "number" && Number.isFinite(value)
+		? value
+		: undefined;
 }
 
 function clampTargetDuration(
@@ -200,9 +195,7 @@ function explicitFormatProfile(
 	const profiles = isRecord(method?.formatProfiles)
 		? method.formatProfiles
 		: undefined;
-	const profile = isRecord(profiles?.[format])
-		? profiles[format]
-		: undefined;
+	const profile = isRecord(profiles?.[format]) ? profiles[format] : undefined;
 	if (!profile) return undefined;
 	return {
 		durationSeconds: numericField(profile.durationSeconds),
@@ -225,7 +218,9 @@ function explicitSceneLayout(
 		: undefined;
 	const candidate =
 		sceneLayouts?.[format] ??
-		method?.sceneLayout ?? method?.layoutVariant ?? raw?.sceneLayout;
+		method?.sceneLayout ??
+		method?.layoutVariant ??
+		raw?.sceneLayout;
 	if (format === "longform" && candidate === "social_clip_card") {
 		return undefined;
 	}
@@ -275,12 +270,7 @@ export function referenceToPreset(
 	ref: ReferenceTemplate,
 	format: "shorts" | "longform" = "shorts",
 ): ReferencePreset {
-	const fontSizes = SIZE_FONT_MAP[ref.subtitle_size_preset] ?? SIZE_FONT_MAP.md;
 	const isShorts = format === "shorts";
-	const fontSize = isShorts ? fontSizes.shorts : fontSizes.regular;
-	const emphasisFontSize = isShorts
-		? fontSizes.shortsEmphasis
-		: fontSizes.emphasis;
 
 	const bgmMoodKey = ref.bgm_mood.toLowerCase().trim();
 	const bgmMood = BGM_MOOD_MAP[bgmMoodKey] ?? "";
@@ -336,13 +326,8 @@ export function referenceToPreset(
 			tempo: ref.bgm_tempo,
 		},
 		composition: {
-			subtitleStyle: {
-				fontSize,
-				emphasisFontSize,
-				fontFamily: "'Noto Sans KR', -apple-system, sans-serif",
-				fontWeight: isShorts ? 700 : 600,
-				color: "#ffffff",
-			},
+			// 자막 크기/글씨체/굵기/색은 typography.ts 단일 소스에서 파생 (포맷 + 크기 프리셋)
+			subtitleStyle: captionStyleFor(format, ref.subtitle_size_preset),
 			captionStyle: "chunked",
 			subtitlePosition: ref.subtitle_position,
 			subtitleBgStyle: ref.subtitle_bg_style,

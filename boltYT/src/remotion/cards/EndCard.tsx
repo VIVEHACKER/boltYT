@@ -10,6 +10,7 @@ import {
 	useVideoConfig,
 } from "remotion";
 import { END_CARD_FRAMES } from "./card-frames";
+import { END_CARD_TEXT } from "../typography";
 
 export interface EndCardProps {
 	channelName?: string;
@@ -66,20 +67,21 @@ export function EndCard({
 		{ extrapolateLeft: "clamp", extrapolateRight: "clamp" },
 	);
 
-	const opacity = fadeIn * fadeOut;
+	const contentOpacity = fadeIn * fadeOut;
 
 	return (
 		<AbsoluteFill
 			style={{
-				backgroundColor: "#0a0a0a",
-				opacity,
+				// 배경은 마지막 프레임까지 유지한다. 전체 카드를 투명하게 만들면
+				// Remotion 캔버스의 검정이 노출돼 최종 QC에서 black segment가 된다.
+				backgroundColor: "#111827",
 			}}
 		>
 			{/* 배경 그라데이션 */}
 			<AbsoluteFill
 				style={{
 					background:
-						"radial-gradient(ellipse at 30% 40%, rgba(30,30,80,0.4) 0%, transparent 60%), radial-gradient(ellipse at 70% 60%, rgba(80,30,30,0.3) 0%, transparent 60%)",
+						"radial-gradient(ellipse at 28% 36%, rgba(37,99,235,0.42) 0%, transparent 58%), radial-gradient(ellipse at 72% 64%, rgba(245,158,11,0.24) 0%, transparent 56%), linear-gradient(145deg, #111827 0%, #172554 100%)",
 				}}
 			/>
 
@@ -90,16 +92,17 @@ export function EndCard({
 					alignItems: "center",
 					gap: 30,
 					flexDirection: "column",
+					opacity: contentOpacity,
 				}}
 			>
 				{/* 채널명 */}
 				{channelName && (
 					<span
 						style={{
-							fontSize: 20,
-							fontWeight: 500,
-							color: "rgba(255,255,255,0.5)",
-							fontFamily: "'Noto Sans KR', sans-serif",
+							fontSize: END_CARD_TEXT.channel.fontSize,
+							fontWeight: END_CARD_TEXT.channel.fontWeight,
+							color: END_CARD_TEXT.channel.color,
+							fontFamily: END_CARD_TEXT.channel.fontFamily,
 							letterSpacing: "0.12em",
 							textTransform: "uppercase",
 							opacity: fadeIn,
@@ -112,15 +115,15 @@ export function EndCard({
 				{/* CTA 텍스트 */}
 				<h2
 					style={{
-						fontSize: 48,
-						fontWeight: 800,
-						color: "#ffffff",
-						fontFamily: "'Noto Sans KR', sans-serif",
+						fontSize: END_CARD_TEXT.cta.fontSize,
+						fontWeight: END_CARD_TEXT.cta.fontWeight,
+						color: END_CARD_TEXT.cta.color,
+						fontFamily: END_CARD_TEXT.cta.fontFamily,
 						margin: 0,
 						transform: `translateY(${interpolate(ctaSpring, [0, 1], [40, 0])}px)`,
 						opacity: ctaSpring,
 						letterSpacing: "-0.02em",
-						textShadow: "0 2px 20px rgba(0,0,0,0.5)",
+						textShadow: END_CARD_TEXT.cta.textShadow,
 					}}
 				>
 					{ctaText}
@@ -142,10 +145,10 @@ export function EndCard({
 				>
 					<span
 						style={{
-							fontSize: 22,
-							fontWeight: 700,
-							color: "#ffffff",
-							fontFamily: "'Noto Sans KR', sans-serif",
+							fontSize: END_CARD_TEXT.subscribeButton.fontSize,
+							fontWeight: END_CARD_TEXT.subscribeButton.fontWeight,
+							color: END_CARD_TEXT.subscribeButton.color,
+							fontFamily: END_CARD_TEXT.subscribeButton.fontFamily,
 						}}
 					>
 						구독하기

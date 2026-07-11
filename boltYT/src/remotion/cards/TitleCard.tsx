@@ -11,6 +11,7 @@ import {
 	useVideoConfig,
 } from "remotion";
 import { TITLE_CARD_FRAMES } from "./card-frames";
+import { CARD_TEXT } from "../typography";
 
 export interface TitleCardProps {
 	title: string;
@@ -119,10 +120,10 @@ export function TitleCard({
 				>
 					<span
 						style={{
-							fontSize: 18,
-							fontWeight: 500,
-							color: "rgba(255,255,255,0.6)",
-							fontFamily: "'Noto Sans KR', sans-serif",
+							fontSize: CARD_TEXT.channel.fontSize,
+							fontWeight: CARD_TEXT.channel.fontWeight,
+							color: CARD_TEXT.channel.color,
+							fontFamily: CARD_TEXT.channel.fontFamily,
 							letterSpacing: "0.15em",
 							textTransform: "uppercase",
 						}}
@@ -149,14 +150,17 @@ export function TitleCard({
 				>
 					<h1
 						style={{
-							fontSize: Math.min(64, width * 0.035),
-							fontWeight: 900,
-							color: "#ffffff",
-							fontFamily: "'Noto Sans KR', sans-serif",
+							fontSize: Math.min(
+								CARD_TEXT.title.fontSizeMax,
+								width * CARD_TEXT.title.fontSizeWidthFactor,
+							),
+							fontWeight: CARD_TEXT.title.fontWeight,
+							color: CARD_TEXT.title.color,
+							fontFamily: CARD_TEXT.title.fontFamily,
 							lineHeight: 1.3,
 							margin: 0,
 							letterSpacing: "-0.02em",
-							textShadow: "0 4px 30px rgba(0,0,0,0.6)",
+							textShadow: CARD_TEXT.title.textShadow,
 						}}
 					>
 						{title}
@@ -167,10 +171,10 @@ export function TitleCard({
 				{subtitle && (
 					<p
 						style={{
-							fontSize: 24,
-							fontWeight: 400,
-							color: "rgba(255,255,255,0.7)",
-							fontFamily: "'Noto Sans KR', sans-serif",
+							fontSize: CARD_TEXT.subtitle.fontSize,
+							fontWeight: CARD_TEXT.subtitle.fontWeight,
+							color: CARD_TEXT.subtitle.color,
+							fontFamily: CARD_TEXT.subtitle.fontFamily,
 							marginTop: 20,
 							opacity: subOpacity,
 							letterSpacing: "0.02em",

@@ -44,30 +44,17 @@ export type CaptionStyle = "karaoke" | "chunked" | "none";
 export type LayoutVariant = "full" | "split" | "letterbox" | "social_clip_card";
 
 // ─── Subtitle ───
-export interface SubtitleStyle {
-	fontSize?: number;
-	emphasisFontSize?: number;
-	fontFamily?: string;
-	fontWeight?: number;
-	color?: string;
-}
-
-export const DEFAULT_SUBTITLE: Required<SubtitleStyle> = {
-	fontSize: 46,
-	emphasisFontSize: 76,
-	fontFamily: "'Noto Sans KR', -apple-system, sans-serif",
-	fontWeight: 600,
-	color: "#ffffff",
-};
-
-/** 숏폼(9:16)은 글씨가 더 커야 함 */
-export const SHORTS_SUBTITLE: Required<SubtitleStyle> = {
-	fontSize: 56,
-	emphasisFontSize: 88,
-	fontFamily: "'Noto Sans KR', -apple-system, sans-serif",
-	fontWeight: 700,
-	color: "#ffffff",
-};
+// SubtitleStyle 타입과 자막 프리셋(DEFAULT_SUBTITLE/SHORTS_SUBTITLE)의 정의는
+// typography.ts(영상 타이포 단일 소스)로 이관됨. 기존 import("./types") 경로 호환을 위해 재노출.
+export type { SubtitleStyle } from "./typography";
+export {
+	CAPTION_SIZE_SCALE,
+	captionStyleFor,
+	DEFAULT_SUBTITLE,
+	resolveVideoFormat,
+	SHORTS_SUBTITLE,
+	type VideoFormat,
+} from "./typography";
 
 // ─── Word Timing ───
 export interface WordTiming {

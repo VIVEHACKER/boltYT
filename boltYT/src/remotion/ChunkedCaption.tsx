@@ -11,6 +11,7 @@ import {
 	isEmphasisWord,
 } from "../lib/narration-caption-theme";
 import type { NewsSurfaceTone } from "../lib/news-surface-theme";
+import { CAPTION_EFFECTS } from "./typography";
 import type { RemotionScene, SubtitleStyle, WordTiming } from "./types";
 
 export type ChunkedCaptionBgStyle =
@@ -192,32 +193,31 @@ function getWordEffect(
 ): Pick<React.CSSProperties, "textShadow" | "WebkitTextStroke"> {
 	if (bgStyle === "stroke") {
 		return {
-			WebkitTextStroke: "1.5px rgba(0,0,0,0.9)",
+			WebkitTextStroke: CAPTION_EFFECTS.stroke.stroke,
 			// 멀티 레이어: 가까운 그림자 + 먼 부드러운 그림자
 			textShadow: isActive
-				? "0 1px 0 rgba(0,0,0,0.76), 0 2px 6px rgba(0,0,0,0.56), 0 5px 14px rgba(0,0,0,0.28)"
-				: "0 1px 0 rgba(0,0,0,0.62), 0 2px 4px rgba(0,0,0,0.46)",
+				? CAPTION_EFFECTS.stroke.shadowActive
+				: CAPTION_EFFECTS.stroke.shadowInactive,
 		};
 	}
 	if (bgStyle === "glow") {
 		return {
-			WebkitTextStroke: "1.5px rgba(0,0,0,0.9)",
+			WebkitTextStroke: CAPTION_EFFECTS.glow.stroke,
 			// 글로우 + 깊이 그림자
-			textShadow: `0 0 6px ${accentColor}66, 0 0 14px ${accentColor}33, 0 2px 6px rgba(0,0,0,0.76)`,
+			textShadow: CAPTION_EFFECTS.glow.shadow(accentColor),
 		};
 	}
 	if (bgStyle === "ticker" || bgStyle === "spotlight") {
 		return {
-			WebkitTextStroke: "1px rgba(0,0,0,0.9)",
-			textShadow:
-				"0 1px 0 rgba(0,0,0,0.6), 0 2px 4px rgba(0,0,0,0.45), 0 4px 12px rgba(0,0,0,0.3)",
+			WebkitTextStroke: CAPTION_EFFECTS.ticker.stroke,
+			textShadow: CAPTION_EFFECTS.ticker.textShadow,
 		};
 	}
 	return {
-		WebkitTextStroke: "1.5px rgba(0,0,0,0.85)",
+		WebkitTextStroke: CAPTION_EFFECTS.default.stroke,
 		textShadow: isActive
-			? "0 1px 0 rgba(0,0,0,0.62), 0 2px 5px rgba(0,0,0,0.52), 0 4px 10px rgba(0,0,0,0.24)"
-			: "0 1px 0 rgba(0,0,0,0.48), 0 2px 4px rgba(0,0,0,0.38)",
+			? CAPTION_EFFECTS.default.shadowActive
+			: CAPTION_EFFECTS.default.shadowInactive,
 	};
 }
 
@@ -345,7 +345,10 @@ export function ChunkedCaption({
 						? interpolate(
 								frame,
 								[w.startFrame, w.startFrame + 3],
-								[Math.min(motionTheme.activeWordScale, emphasis ? 1.08 : 1.05), 1.0],
+								[
+									Math.min(motionTheme.activeWordScale, emphasis ? 1.08 : 1.05),
+									1.0,
+								],
 								{
 									extrapolateLeft: "clamp",
 									extrapolateRight: "clamp",

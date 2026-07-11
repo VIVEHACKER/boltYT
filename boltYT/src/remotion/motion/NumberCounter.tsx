@@ -4,6 +4,7 @@
  */
 
 import { interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
+import { MOTION_TEXT } from "../typography";
 
 export interface NumberCounterParams {
 	target: number;
@@ -77,14 +78,13 @@ export function NumberCounter({ params, startFrame, duration }: Props) {
 		>
 			<div
 				style={{
-					fontSize: params.fontSize ?? 140,
-					fontWeight: 900,
-					color: params.color ?? "#FFD700",
-					fontFamily: "'Noto Sans KR', sans-serif",
+					fontSize: params.fontSize ?? MOTION_TEXT.numberCounter.fontSize,
+					fontWeight: MOTION_TEXT.numberCounter.fontWeight,
+					color: params.color ?? MOTION_TEXT.numberCounter.color,
+					fontFamily: MOTION_TEXT.numberCounter.fontFamily,
 					letterSpacing: "-0.04em",
-					textShadow:
-						"0 4px 16px rgba(0,0,0,0.9), 0 0 24px rgba(255,215,0,0.4)",
-					WebkitTextStroke: "2px rgba(0,0,0,0.9)",
+					textShadow: MOTION_TEXT.numberCounter.textShadow,
+					WebkitTextStroke: MOTION_TEXT.numberCounter.stroke,
 					transform: `scale(${scale})`,
 					opacity,
 					lineHeight: 1,

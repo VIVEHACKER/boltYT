@@ -4,6 +4,7 @@
  */
 
 import { interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
+import { MOTION_TEXT } from "../typography";
 
 export interface LowerThirdParams {
 	title: string;
@@ -91,10 +92,10 @@ export function LowerThirdV2({ params, startFrame, duration }: Props) {
 			>
 				<div
 					style={{
-						fontSize: 44,
-						fontWeight: 800,
-						color: "#fff",
-						fontFamily: "'Noto Sans KR', sans-serif",
+						fontSize: MOTION_TEXT.lowerThirdTitle.fontSize,
+						fontWeight: MOTION_TEXT.lowerThirdTitle.fontWeight,
+						color: MOTION_TEXT.lowerThirdTitle.color,
+						fontFamily: MOTION_TEXT.lowerThirdTitle.fontFamily,
 						letterSpacing: "-0.02em",
 						lineHeight: 1.15,
 					}}
@@ -104,11 +105,11 @@ export function LowerThirdV2({ params, startFrame, duration }: Props) {
 				{params.subtitle && (
 					<div
 						style={{
-							fontSize: 24,
-							fontWeight: 500,
+							fontSize: MOTION_TEXT.lowerThirdSubtitle.fontSize,
+							fontWeight: MOTION_TEXT.lowerThirdSubtitle.fontWeight,
 							color: `${accent}`,
 							marginTop: 6,
-							fontFamily: "'Noto Sans KR', sans-serif",
+							fontFamily: MOTION_TEXT.lowerThirdSubtitle.fontFamily,
 							textTransform: "uppercase",
 							letterSpacing: "0.08em",
 						}}
