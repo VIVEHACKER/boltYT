@@ -51,3 +51,7 @@ topics.generated.json
 
 # 로컬 렌더 복구/검증 전용 — 커밋 대상 아님(파일 헤더 명시)
 scripts/_resume-render.ts
+
+# Python 바이트코드 캐시
+__pycache__/
+*.pyc
