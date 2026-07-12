@@ -164,3 +164,40 @@ export function buildSceneGraphics(input: {
 	}
 	return out;
 }
+
+/**
+ * 내레이션에서 경제 핵심 "퍼센트" 수치만 보수적으로 추출(순수). 지수/원/억 등은 단위 모호성과
+ * YMYL 오독 위험이 커 이번 범위에서 제외 — 퍼센트가 가장 흔하고 명확하다. grounding 검증(소스에
+ * 실제 존재하는 숫자인지)은 호출측이 책임진다. 반환 KeyFigure 는 delta 미포함(중립) — 자유 서술에서
+ * 증감 방향을 신뢰성 있게 판정할 수 없어 색/화살표를 쓰지 않는다("하락을 막았다"=실제로는 상승 등).
+ * 값+접미사 기준 중복 제거. %p/%포인트 는 접미사 "%p".
+ */
+export function parseEconomyPercentages(narration: string): KeyFigure[] {
+	// 범위 표현(2~3% / 3-5% / "2에서 3%")은 단일 정밀 수치로 오해되므로 통째로 배제(모호 → 카운터 없음).
+	if (
+		/\d[\d.,]*\s*(?:[~\-–]|에서|부터)\s*\d[\d.,]*\s*(?:%|퍼센트)/.test(
+			narration,
+		)
+	)
+		return [];
+	const out: KeyFigure[] = [];
+	const seen = new Set<string>();
+	// (?<![\d.]): 앞에 숫자·소수점이 붙은 수의 부분 매칭 방지(연도·큰 수 꼬리 오추출 차단).
+	// 천단위 콤마 허용 + 정수부 전체 캡처(1,234% → 1234, 잘라서 234 로 조작 금지). 부호는 취하지
+	// 않는다 — 중립 카운터는 크기만 표시하고, 방향(±)은 grounding 이 검증하지 않으므로 표시하지 않는다.
+	const re = /(?<![\d.])(\d+(?:,\d{3})*(?:\.\d+)?)\s*(?:%|퍼센트)(p|포인트)?/g;
+	let m: RegExpExecArray | null = re.exec(narration);
+	while (m !== null) {
+		const target = Number(m[1].replace(/,/g, ""));
+		if (Number.isFinite(target)) {
+			const suffix = m[2] ? "%p" : "%";
+			const key = `${target}${suffix}`;
+			if (!seen.has(key)) {
+				seen.add(key);
+				out.push({ target, suffix, format: "number" });
+			}
+		}
+		m = re.exec(narration);
+	}
+	return out;
+}

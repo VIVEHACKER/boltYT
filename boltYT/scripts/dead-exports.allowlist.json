@@ -268,16 +268,6 @@
       "reason": "Title card timing constant is exposed for composition tuning."
     },
     {
-      "file": "src/remotion/overlays/FilmGrain.tsx",
-      "exports": ["FilmGrain"],
-      "reason": "Overlay component is part of the Remotion visual toolkit."
-    },
-    {
-      "file": "src/remotion/overlays/Vignette.tsx",
-      "exports": ["Vignette"],
-      "reason": "Overlay component is part of the Remotion visual toolkit."
-    },
-    {
       "file": "src/remotion/shot-timing.ts",
       "exports": ["__test"],
       "reason": "Private timing helpers are intentionally exposed for focused tests."
