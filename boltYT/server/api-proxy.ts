@@ -69,6 +69,9 @@ const execFileP = promisify(execFile);
 loadEnv();
 
 const PORT = Number(process.env.API_PROXY_PORT ?? 3459);
+// 미인증 로컬 프록시(유료 LLM/TTS)를 기본으로 루프백에만 바인딩한다. 네트워크
+// 노출이 필요하면 API_PROXY_HOST=0.0.0.0 으로 명시 opt-in.
+const HOST = process.env.API_PROXY_HOST?.trim() || "127.0.0.1";
 
 validateEnv(["OPENAI_API_KEY"], SERVICE);
 
@@ -2796,9 +2799,10 @@ const server = createServer(async (req, res) => {
 	json(req, res, 404, { error: "Not found" });
 });
 
-server.listen(PORT, () => {
+server.listen(PORT, HOST, () => {
 	log.info("Server started", {
 		port: PORT,
+		host: HOST,
 		configured: Object.entries(KEYS)
 			.filter(([, v]) => Boolean(v))
 			.map(([k]) => k),
