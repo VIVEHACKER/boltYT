@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
 	buildSceneGraphics,
+	corroboratedDelta,
 	deltaArrowSpec,
 	KR_DOWN,
 	KR_UP,
 	krDeltaColor,
+	llmKeyFigureToKeyFigure,
 	numberCounterSpec,
 	parseEconomyPercentages,
+	parseLlmKeyFigure,
 	sourceLowerThird,
 } from "./scene-motion-graphics";
 
@@ -163,5 +166,101 @@ describe("parseEconomyPercentages (보수적·중립)", () => {
 		expect(parseEconomyPercentages("성장률 2~3% 전망")).toEqual([]);
 		expect(parseEconomyPercentages("기준선 3-5%")).toEqual([]);
 		expect(parseEconomyPercentages("2에서 3% 사이")).toEqual([]);
+	});
+});
+
+describe("corroboratedDelta (LLM 방향 × 내레이션 교차검증, YMYL)", () => {
+	it("방향과 키워드가 일치하면 부호 반환", () => {
+		expect(corroboratedDelta("코스피가 3.5% 상승했다", "up")).toBe(1);
+		expect(corroboratedDelta("기준금리를 인하했다", "down")).toBe(-1);
+	});
+	it("'하락을 막았다' 함정: down 키워드 있는데 LLM up → 중립(오방향 방지)", () => {
+		// down 단어(하락)가 있어 up 이 뒷받침 안 됨 → undefined. 틀린 ▲빨강 방지.
+		expect(corroboratedDelta("하락을 막아냈다", "up")).toBeUndefined();
+	});
+	it("양방향 서술은 모호 → 중립", () => {
+		expect(corroboratedDelta("상승했다가 다시 하락했다", "up")).toBeUndefined();
+		expect(
+			corroboratedDelta("상승했다가 다시 하락했다", "down"),
+		).toBeUndefined();
+	});
+	it("flat/무방향/무키워드 → 중립", () => {
+		expect(corroboratedDelta("3.5%로 유지됐다", "flat")).toBeUndefined();
+		expect(corroboratedDelta("3.5%로 유지됐다", undefined)).toBeUndefined();
+		expect(corroboratedDelta("환율은 3.5% 수준이다", "up")).toBeUndefined();
+	});
+	it("동음이의 부분매칭 방지(오른쪽/인상적/건너뛴)", () => {
+		expect(corroboratedDelta("오른쪽 그래프를 보라", "up")).toBeUndefined();
+		expect(corroboratedDelta("인상적인 실적이었다", "up")).toBeUndefined();
+		expect(corroboratedDelta("한 칸 건너뛴 수치", "up")).toBeUndefined();
+	});
+});
+
+describe("llmKeyFigureToKeyFigure", () => {
+	it("변화율(%,%p)만 ▲/▼ 글리프 + delta(색)", () => {
+		const up = llmKeyFigureToKeyFigure(
+			{ label: "물가", value: 3.5, unit: "%" },
+			1,
+		);
+		expect(up.prefix).toBe("물가 ▲");
+		expect(up.suffix).toBe("%");
+		expect(up.delta).toBe(1);
+		expect(llmKeyFigureToKeyFigure({ value: 3.5, unit: "%" }, -1).prefix).toBe(
+			"▼",
+		);
+	});
+	it("수준 값(포인트/원)은 글리프 없이 색(delta)만 — 변화로 오독 방지", () => {
+		const k = llmKeyFigureToKeyFigure(
+			{ label: "코스피", value: 2650, unit: "포인트" },
+			1,
+		);
+		expect(k.target).toBe(2650);
+		expect(k.prefix).toBe("코스피 "); // ▲ 없음(수준 값)
+		expect(k.suffix).toBe("포인트");
+		expect(k.delta).toBe(1); // 색은 유지
+	});
+	it("delta 없으면 글리프·색 없음(중립)", () => {
+		const neutral = llmKeyFigureToKeyFigure(
+			{ label: "물가", value: 3.5, unit: "%" },
+			undefined,
+		);
+		expect(neutral.prefix).toBe("물가 ");
+		expect(neutral.delta).toBeUndefined();
+	});
+	it("중립 delta 는 numberCounterSpec 에서 색 미지정", () => {
+		const k = llmKeyFigureToKeyFigure({ value: 3.5, unit: "%" }, undefined);
+		expect(numberCounterSpec(k, 150)?.params.color).toBeUndefined();
+	});
+});
+
+describe("parseLlmKeyFigure (비파괴 타입가드)", () => {
+	it("정상 객체를 파싱", () => {
+		expect(
+			parseLlmKeyFigure({
+				label: "코스피",
+				value: 2650,
+				unit: "포인트",
+				direction: "up",
+			}),
+		).toEqual({
+			label: "코스피",
+			value: 2650,
+			unit: "포인트",
+			direction: "up",
+		});
+	});
+	it("문자열 숫자도 허용, 잘못된 direction 은 생략", () => {
+		expect(
+			parseLlmKeyFigure({ value: "3.5", unit: "%", direction: "왼쪽" }),
+		).toEqual({
+			value: 3.5,
+			unit: "%",
+		});
+	});
+	it("value 없거나 비유한/객체 아님 → undefined(씬 무효화 안 함)", () => {
+		expect(parseLlmKeyFigure({ label: "x" })).toBeUndefined();
+		expect(parseLlmKeyFigure({ value: "abc" })).toBeUndefined();
+		expect(parseLlmKeyFigure(null)).toBeUndefined();
+		expect(parseLlmKeyFigure("3.5%")).toBeUndefined();
 	});
 });

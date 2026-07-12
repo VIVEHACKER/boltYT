@@ -201,3 +201,90 @@ export function parseEconomyPercentages(narration: string): KeyFigure[] {
 	}
 	return out;
 }
+
+/** LLM(대본)이 비트별로 낸 구조화 핵심 수치 — regex 추출보다 정확(라벨·단위·방향 포함). */
+export interface LlmKeyFigure {
+	label?: string;
+	value: number;
+	unit?: string;
+	direction?: "up" | "down" | "flat";
+}
+
+// 동음이의 부분매칭 주의: 오른쪽/인상적/건너뛴/빠져나가다 는 방향어가 아니라 lookahead·제외로 거른다.
+const UP_WORDS =
+	/상승|올라|올랐|오름|오른(?!쪽)|급등|증가|늘어|늘었|늘리|확대|인상(?!적)|상향|반등|강세|치솟/;
+const DOWN_WORDS =
+	/하락|내려|내렸|떨어|급락|감소|줄어|줄었|줄이|축소|인하|하향|약세|빠져(?!나)|고꾸라|꺾/;
+
+/**
+ * LLM 이 낸 방향(direction)을 씬 내레이션과 교차검증해 신뢰 가능한 delta 부호만 반환(순수).
+ * YMYL 함정 방지: 자유서술 방향판정의 오류("하락을 막았다"=실제 상승)를 피하려고, LLM 방향과
+ * 내레이션 방향 키워드가 '일치하고 반대 키워드가 없을 때'만 부호를 준다. 애매(양방향/무키워드/flat)
+ * → undefined(중립, 화살표·색 없음). LLM 방향 환각과 텍스트 함정 양쪽에 대해 fail-closed.
+ */
+export function corroboratedDelta(
+	narration: string,
+	direction: LlmKeyFigure["direction"],
+): number | undefined {
+	if (direction !== "up" && direction !== "down") return undefined;
+	const up = UP_WORDS.test(narration);
+	const down = DOWN_WORDS.test(narration);
+	if (up && down) return undefined; // 양방향 서술 → 모호 → 중립
+	if (direction === "up" && up) return 1;
+	if (direction === "down" && down) return -1;
+	return undefined; // 내레이션이 LLM 방향을 뒷받침하지 않음 → 중립
+}
+
+/**
+ * 검증 통과한 LlmKeyFigure + 교차검증된 delta → 렌더용 KeyFigure.
+ * 방향 표시 규칙(YMYL): ▲/▼ 글리프는 '변화율'(%,%p)에만 붙인다 — 지수·가격 등 '수준' 값에 붙이면
+ * 그 크기만큼의 '변화'로 오독된다("코스피 ▲2,650포인트"=+2,650 상승으로 읽힘). 수준 값의 방향은
+ * 한국식 색(상승=빨강/하락=파랑, delta 부호로 numberCounterSpec 이 처리)으로만 표현한다.
+ * value 의 grounding 검증은 호출측(생성기)이 끝냈다고 가정한다.
+ */
+export function llmKeyFigureToKeyFigure(
+	fig: LlmKeyFigure,
+	delta: number | undefined,
+): KeyFigure {
+	const unit = fig.unit?.trim() ?? "";
+	const isRate = unit === "%" || unit === "%p";
+	const glyph =
+		isRate && delta !== undefined
+			? delta > 0
+				? "▲"
+				: delta < 0
+					? "▼"
+					: ""
+			: "";
+	const label = fig.label?.trim() ?? "";
+	const prefix = `${label ? `${label} ` : ""}${glyph}`;
+	return {
+		target: fig.value,
+		...(prefix ? { prefix } : {}),
+		...(unit ? { suffix: unit } : {}),
+		...(delta !== undefined ? { delta } : {}),
+	};
+}
+
+/**
+ * LLM 응답의 임의 객체 → LlmKeyFigure(신뢰). value(유한수) 필수, 나머지는 타입가드.
+ * 잘못된 형태는 undefined — 씬 자체를 무효화하지 않고 keyFigure 만 생략(비파괴 fail-closed).
+ */
+export function parseLlmKeyFigure(raw: unknown): LlmKeyFigure | undefined {
+	if (!raw || typeof raw !== "object") return undefined;
+	const o = raw as Record<string, unknown>;
+	const value = typeof o.value === "number" ? o.value : Number(o.value);
+	if (!Number.isFinite(value)) return undefined;
+	const label = typeof o.label === "string" ? o.label.trim() : "";
+	const unit = typeof o.unit === "string" ? o.unit.trim() : "";
+	const direction =
+		o.direction === "up" || o.direction === "down" || o.direction === "flat"
+			? o.direction
+			: undefined;
+	return {
+		value,
+		...(label ? { label } : {}),
+		...(unit ? { unit } : {}),
+		...(direction ? { direction } : {}),
+	};
+}
