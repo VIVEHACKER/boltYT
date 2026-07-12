@@ -9,10 +9,11 @@ import {
 	getNarrationCaptionContainerToneStyle,
 	getNarrationCaptionWordToneStyle,
 	isEmphasisWord,
+	isNumberEmphasisWord,
 } from "../lib/narration-caption-theme";
 import type { NewsSurfaceTone } from "../lib/news-surface-theme";
-import { CAPTION_EFFECTS } from "./typography";
 import type { RemotionScene, SubtitleStyle, WordTiming } from "./types";
+import { CAPTION_EFFECTS } from "./typography";
 
 export type ChunkedCaptionBgStyle =
 	| "none"
@@ -363,27 +364,36 @@ export function ChunkedCaption({
 						state,
 						accentColor,
 					});
-					// 자동 emphasis: 숫자/강조부사/감탄사는 항상 accent 컬러 + heavier weight
+					// 자동 emphasis: 숫자/강조부사/감탄사는 accent 컬러 + heavier weight
 					const emphasized = isEmphasisWord(w.word);
+					// 숫자(핵심 수치)는 데이터라 활성 순간만이 아니라 청크 내내 accent 유지 — 자막에서
+					// 계속 도드라진다. 감탄사·부사 등 다른 강조어는 기존대로 활성일 때만(색 과다 방지).
+					const isNumber = isNumberEmphasisWord(w.word);
 					const baseColor = isActive
 						? activeColor
 						: isPast
 							? "rgba(255,255,255,0.9)"
 							: "rgba(255,255,255,0.72)";
-					const finalColor = emphasized
+					const finalColor = isNumber
+						? accentColor
+						: emphasized
+							? isActive
+								? accentColor
+								: baseColor
+							: baseColor;
+					const finalWeight = isNumber
 						? isActive
-							? accentColor
-							: baseColor
-						: baseColor;
-					const finalWeight = emphasized
-						? isActive
-							? 760
-							: 700
-						: isActive
-							? 690
-							: emphasis
-								? 640
-								: 560;
+							? 820
+							: 760
+						: emphasized
+							? isActive
+								? 760
+								: 700
+							: isActive
+								? 690
+								: emphasis
+									? 640
+									: 560;
 					// emoji 포함된 단어는 line-height 보정 (이모지가 위/아래로 잘리는 문제 방지)
 					const hasEmoji = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(
 						w.word,

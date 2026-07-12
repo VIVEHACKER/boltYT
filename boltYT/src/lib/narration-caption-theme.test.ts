@@ -3,6 +3,7 @@ import {
 	getNarrationCaptionContainerToneStyle,
 	getNarrationCaptionWordToneStyle,
 	isNarrationTimelineCueWord,
+	isNumberEmphasisWord,
 } from "./narration-caption-theme";
 
 describe("narration-caption-theme", () => {
@@ -212,5 +213,30 @@ describe("narration-caption-theme 추가 분기", () => {
 			accentColor: "#ffffff",
 		});
 		expect(wordStyle).toEqual({});
+	});
+});
+
+describe("isNumberEmphasisWord (자막 숫자 지속 강조)", () => {
+	it("퍼센트·단위 숫자를 강조 대상으로 판정", () => {
+		for (const w of [
+			"3.5%",
+			"1,200억",
+			"150명",
+			"2배",
+			"30년",
+			"12만원",
+			"5",
+		]) {
+			expect(isNumberEmphasisWord(w)).toBe(true);
+		}
+	});
+	it("끝 구두점은 무시하고 판정", () => {
+		expect(isNumberEmphasisWord("3.5%,")).toBe(true);
+		expect(isNumberEmphasisWord("2026년.")).toBe(true);
+	});
+	it("숫자 아닌 단어는 제외", () => {
+		for (const w of ["코스피", "상승", "절대", "", "AI"]) {
+			expect(isNumberEmphasisWord(w)).toBe(false);
+		}
 	});
 });
