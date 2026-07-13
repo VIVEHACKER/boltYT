@@ -4,6 +4,7 @@
  */
 
 import { interpolate, useCurrentFrame } from "remotion";
+import { MOTION_TEXT } from "../typography";
 
 export interface ProgressBarParams {
 	/** 0-100 목표 퍼센트 */
@@ -65,19 +66,25 @@ export function ProgressBar({ params, startFrame, duration }: Props) {
 				{params.label && (
 					<div
 						style={{
-							fontSize: 36,
-							fontWeight: 700,
-							color: "#fff",
-							fontFamily: "'Noto Sans KR', sans-serif",
+							fontSize: MOTION_TEXT.progressLabel.fontSize,
+							fontWeight: MOTION_TEXT.progressLabel.fontWeight,
+							color: MOTION_TEXT.progressLabel.color,
+							fontFamily: MOTION_TEXT.progressLabel.fontFamily,
 							marginBottom: 12,
-							textShadow: "0 2px 8px rgba(0,0,0,0.8)",
+							textShadow: MOTION_TEXT.progressLabel.textShadow,
 							display: "flex",
 							justifyContent: "space-between",
 							alignItems: "baseline",
 						}}
 					>
 						<span>{params.label}</span>
-						<span style={{ color, fontSize: 52, fontWeight: 900 }}>
+						<span
+							style={{
+								color,
+								fontSize: MOTION_TEXT.progressValue.fontSize,
+								fontWeight: MOTION_TEXT.progressValue.fontWeight,
+							}}
+						>
 							{currentPct}%
 						</span>
 					</div>

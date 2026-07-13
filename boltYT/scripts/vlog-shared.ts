@@ -1,0 +1,864 @@
+/**
+ * vlog 양산 공유 저수준 유틸 — 장르 무관(history/economy 공용).
+ * make-vlog(역사)·make-economy(경제)가 동일 ComfyUI/TTS/LLM/ffprobe 배선을 쓰도록 추출.
+ * 장르별 워크플로(IPAdapter vs 카툰)·대본·썸네일 구도는 각 CLI 가 별도로 정의한다.
+ */
+import { execFile } from "node:child_process";
+import { readFileSync, rmSync, writeFileSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
+import { join } from "node:path";
+import { promisify } from "node:util";
+import { loadEnv } from "../server/lib/env.ts";
+
+// CLI entry points do not inherit Vite's env loading. Load the project .env
+// before resolving service URLs, model paths, and TTS settings. Explicit shell
+// variables still win because loadEnv() never overwrites an existing value.
+loadEnv();
+
+export const exec = promisify(execFile);
+export const COMFY = process.env.COMFY_URL ?? "http://localhost:8188";
+export const PROXY = process.env.API_PROXY_URL ?? "http://localhost:3459";
+export const COMFY_INPUT =
+	process.env.COMFY_INPUT ?? join(homedir(), "ComfyUI/input");
+/** 썸네일 텍스트 오버레이용(ffmpeg drawtext 부재 대비). ComfyUI venv 의 Pillow 사용. */
+export const COMFY_PYTHON =
+	process.env.COMFY_PYTHON ?? join(homedir(), "ComfyUI/venv/bin/python");
+export const CKPT = process.env.COMFY_CKPT ?? "sd_xl_base_1.0.safetensors";
+
+/** 양의 정수 env 파싱. 잘못된 값(NaN/0/음수/소수)은 기본값 폴백 — ComfyUI 입력은 양의 정수 필수. */
+export function posIntEnv(name: string, def: number): number {
+	const raw = process.env[name];
+	if (raw === undefined || raw === "") return def;
+	const n = Number(raw);
+	return Number.isInteger(n) && n > 0 ? n : def;
+}
+/** ComfyUI 잠재 차원 env — 8의 배수로 반올림 + 최소 64(EmptyLatentImage는 8px 증분). */
+export function latentDimEnv(name: string, def: number): number {
+	return Math.max(64, Math.round(posIntEnv(name, def) / 8) * 8);
+}
+/** 양의 실수 env(0 초과). 잘못된 값은 기본값. */
+export function floatEnv(name: string, def: number): number {
+	const raw = process.env[name];
+	if (raw === undefined || raw === "") return def;
+	const n = Number(raw);
+	return Number.isFinite(n) && n > 0 ? n : def;
+}
+
+export const STEPS = Math.max(8, posIntEnv("COMFY_STEPS", 30));
+// 기본 1344x768(SDXL 1MP 16:9 스위트스폿). FLUX(COMFY_MODEL=flux)로 가면 고해상도가 안전하므로
+// SCENE_W=1920 SCENE_H=1080 으로 올려 업스케일 블러를 없앨 수 있다(롱폼 화질 레버 B).
+export const SCENE_W = latentDimEnv("SCENE_W", 1344);
+export const SCENE_H = latentDimEnv("SCENE_H", 768);
+export const W = 1920;
+export const H = 1080;
+
+// ── 이미지 모델 선택(SDXL 기본 / FLUX 옵트인) ─────────────────────────────────
+// COMFY_MODEL=flux 로 FLUX 경로 활성화. 기본 sdxl 이라 기존 동작 100% 보존.
+// FLUX 는 IPAdapter 미사용 경로(일러스트/카툰)에만 적용 — 포토리얼 IPAdapter 얼굴락은 SDXL 전용 유지.
+export type ImageModel = "sdxl" | "flux" | "zimage";
+function resolveImageModel(raw = process.env.COMFY_MODEL): ImageModel {
+	const v = (raw ?? "sdxl").toLowerCase();
+	if (v === "flux") return "flux";
+	if (v === "zimage" || v === "z-image" || v === "z_image") return "zimage";
+	return "sdxl";
+}
+export const IMAGE_MODEL: ImageModel = resolveImageModel();
+// FLUX 가중치 파일명(표준 ComfyUI 설치 기본값). 설치 위치 다르면 env 로 덮어쓴다.
+export const FLUX_UNET = process.env.FLUX_UNET ?? "flux1-schnell.safetensors";
+export const FLUX_CLIP_L = process.env.FLUX_CLIP_L ?? "clip_l.safetensors";
+export const FLUX_T5 = process.env.FLUX_T5 ?? "t5xxl_fp8_e4m3fn.safetensors";
+export const FLUX_VAE = process.env.FLUX_VAE ?? "ae.safetensors";
+// schnell=4스텝/cfg1(빠름·무료·Mac 적합), dev=20+스텝+guidance. 기본 schnell.
+export const FLUX_STEPS = Math.max(1, posIntEnv("FLUX_STEPS", 4));
+export const FLUX_GUIDANCE = floatEnv("FLUX_GUIDANCE", 3.5); // dev 전용. schnell 은 무시.
+// Z-Image Turbo(6B, Apache) — Comfy-Org 분할 파일. 라이브 검증: 플랫 벡터 카툰 품질 우수하나
+// Mac 워밍 ~95s/장(DreamShaper 27s 대비 ~3.5배 느림) → 빠른 양산 기본 아님, 품질 우선 컷용 옵트인.
+// 그래프(공식 ComfyUI 템플릿): UNETLoader→ModelSamplingAuraFlow(shift)→KSampler(res_multistep/simple/cfg1),
+// CLIPLoader(lumina2 타입)→CLIPTextEncode→ConditioningZeroOut(neg), EmptySD3LatentImage.
+export const ZIMAGE_UNET =
+	process.env.ZIMAGE_UNET ?? "z_image_turbo_bf16.safetensors";
+export const ZIMAGE_CLIP = process.env.ZIMAGE_CLIP ?? "qwen_3_4b.safetensors";
+export const ZIMAGE_VAE = process.env.ZIMAGE_VAE ?? "z_image_ae.safetensors";
+export const ZIMAGE_STEPS = Math.max(1, posIntEnv("ZIMAGE_STEPS", 8));
+export const ZIMAGE_SHIFT = floatEnv("ZIMAGE_SHIFT", 3);
+
+// 속도-품질 프리셋: COMFY_PRESET=fast(=lightning/turbo) → SDXL Lightning/Turbo 체크포인트용 저스텝 설정.
+// DreamShaperXL Turbo/Lightning 등 6~8스텝 파인튠 + cfg2 = base SDXL 30스텝보다 "더 빠르고 더 좋다"
+// (품질은 파인튠이, 속도는 저스텝이 책임). 미설정 시 기존 고품질 기본 보존. FLUX(느림·Mac 부담) 안 켜고 화질↑.
+export const SDXL_FAST = ["fast", "lightning", "turbo"].includes(
+	(process.env.COMFY_PRESET ?? "").toLowerCase(),
+);
+export const SDXL_FAST_STEPS = Math.max(1, posIntEnv("COMFY_FAST_STEPS", 8));
+// fast 샘플러/스케줄러는 체크포인트마다 권장값이 달라 env 오버라이드 허용:
+//   기본 euler+karras = DreamShaper Turbo 등에 빠르고 화질 좋음(라이브 검증: 8스텝 1344x768 ≈ 27s/장).
+//   dpmpp_sde 는 SDE라 스텝당 모델 2회 호출 → ~2배 느림(Mac MPS에서 손해). 품질차 미미해 euler 기본.
+//   ByteDance SDXL-Lightning 쓰면 COMFY_FAST_SCHEDULER=sgm_uniform 로 전환.
+export const SDXL_FAST_SAMPLER = process.env.COMFY_FAST_SAMPLER ?? "euler";
+export const SDXL_FAST_SCHEDULER = process.env.COMFY_FAST_SCHEDULER ?? "karras";
+
+/**
+ * SDXL KSampler 설정 — fast 면 Lightning/Turbo 저스텝(cfg2 + env 샘플러/스케줄러), 아니면 고품질 기본.
+ * 순수 함수로 분리해 프리셋 분기를 env 비결합으로 테스트(IMAGE_MODEL 동형, Codex 패턴).
+ */
+export function sdxlSamplerSettings(
+	fast: boolean,
+	cfg = 7,
+): {
+	steps: number;
+	cfg: number;
+	sampler_name: string;
+	scheduler: string;
+} {
+	return fast
+		? {
+				steps: SDXL_FAST_STEPS,
+				cfg: 2,
+				sampler_name: SDXL_FAST_SAMPLER,
+				scheduler: SDXL_FAST_SCHEDULER,
+			}
+		: { steps: STEPS, cfg, sampler_name: "dpmpp_2m", scheduler: "karras" };
+}
+
+export const log = (m: string) => process.stdout.write(`${m}\n`);
+
+export function parseArgs(argv: string[]): Record<string, string> {
+	const o: Record<string, string> = {};
+	for (let i = 0; i < argv.length; i++) {
+		if (!argv[i].startsWith("--")) continue;
+		const k = argv[i].slice(2);
+		const v = argv[i + 1];
+		if (v === undefined || v.startsWith("--")) o[k] = "true";
+		else {
+			o[k] = v;
+			i++;
+		}
+	}
+	return o;
+}
+
+/** ComfyUI 큐 제출 → 폴링 → 결과 이미지 저장. */
+export async function runComfy(
+	workflow: unknown,
+	outPath: string,
+): Promise<string> {
+	const q = await fetch(`${COMFY}/prompt`, {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({ prompt: workflow }),
+	});
+	if (!q.ok) throw new Error(`ComfyUI queue ${q.status} ${await q.text()}`);
+	const { prompt_id } = (await q.json()) as { prompt_id: string };
+	for (let i = 0; i < 600; i++) {
+		await new Promise((r) => setTimeout(r, 1500));
+		const h = await fetch(`${COMFY}/history/${prompt_id}`);
+		if (!h.ok) continue;
+		const rec = (
+			(await h.json()) as Record<
+				string,
+				{
+					outputs?: Record<
+						string,
+						{ images?: { filename: string; subfolder: string; type: string }[] }
+					>;
+				}
+			>
+		)[prompt_id];
+		const img = rec?.outputs
+			? Object.values(rec.outputs)[0]?.images?.[0]
+			: undefined;
+		if (img) {
+			const v = await fetch(
+				`${COMFY}/view?filename=${img.filename}&subfolder=${img.subfolder}&type=${img.type}`,
+			);
+			writeFileSync(outPath, Buffer.from(await v.arrayBuffer()));
+			return outPath;
+		}
+	}
+	throw new Error(`ComfyUI timeout (${outPath})`);
+}
+
+/**
+ * ComfyUI 모델 언로드(best-effort). 한 잡의 이미지 생성이 "모두 끝난 뒤 렌더 직전"에 1회 호출해
+ * SDXL/IPAdapter 의 상주 VRAM/RAM 을 회수한다 — 렌더러(Remotion)와 확산 모델이 한 프로세스에서
+ * 동시 상주("몰아서")하지 않도록 단계를 분리하는 것이 목적이다. 렌더는 ComfyUI 모델을 쓰지 않으므로 안전.
+ *
+ * /free 는 ComfyUI 표준 라우트. {unload_models,free_memory} 는 모델 가중치 + 실행기 캐시를 모두 비운다.
+ * fire-and-forget(200 즉시 반환, 실제 회수는 워커 idle 시점) 이라 렌더 시작 무렵이면 회수가 끝난다.
+ * 다음 /prompt 는 모델을 자동 재로드하므로 기능상 문제 없다(재로드 지연만 발생).
+ * 서버 부재/네트워크 오류는 삼킨다 — RAM 회수 실패가 렌더를 막아선 안 된다. FREE_COMFY_BEFORE_RENDER=0 로 비활성.
+ *
+ * 5s AbortSignal 타임아웃: ComfyUI 가 TCP 는 받되 응답이 없는 경우(= 이 기능이 노리는 저RAM/스래싱
+ * 상황과 가장 상관된 실패 모드)에도 렌더가 undici headersTimeout(수분)까지 멈추지 않도록 한다.
+ * 주의: "씬 사이"가 아니라 "잡 전체 생성 완료 후"에만 호출할 것 — 사이에 부르면 다음 씬이 재로드 페널티를 문다.
+ */
+export async function freeComfy(): Promise<void> {
+	if (process.env.FREE_COMFY_BEFORE_RENDER === "0") return;
+	try {
+		await fetch(`${COMFY}/free`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ unload_models: true, free_memory: true }),
+			signal: AbortSignal.timeout(5000),
+		});
+	} catch {
+		// ComfyUI 미기동/네트워크 오류/타임아웃 — 무시(렌더는 계속).
+	}
+}
+
+/** 이미지가 사실상 단색/공백인지 — SDXL 흔한 실패(빈 캔버스/솔리드)는 grayscale stddev 가 매우 낮다. */
+export function isDegenerateImageStats(
+	stddev: number,
+	threshold = 12,
+): boolean {
+	return Number.isFinite(stddev) && stddev < threshold;
+}
+
+/** 이미지 grayscale 표준편차(Pillow). 실패 시 null(게이트는 null 을 통과로 처리 — 영상 막지 않음). */
+export async function imageStddev(path: string): Promise<number | null> {
+	const code = [
+		"import sys",
+		"from PIL import Image, ImageStat",
+		'im = Image.open(sys.argv[1]).convert("L")',
+		"print(ImageStat.Stat(im).stddev[0])",
+	].join("\n");
+	try {
+		const { stdout } = await exec(COMFY_PYTHON, ["-c", code, path]);
+		const v = Number.parseFloat(stdout.trim());
+		return Number.isFinite(v) ? v : null;
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * runComfy + degenerate(빈/솔리드) 프레임 게이트. degenerate 면 시드를 바꿔 재생성(최대 retries).
+ * 절대 실패하지 않는다 — stats 못 구하거나 재시도 소진 시 마지막 이미지를 반환(최악=현행 동작).
+ * makeWorkflow: 시드를 받아 워크플로를 만드는 팩토리(재생성 시 다른 시드로 호출).
+ */
+export async function runComfyChecked(
+	makeWorkflow: (seed: number) => unknown,
+	baseSeed: number,
+	outPath: string,
+	retries = 2,
+): Promise<string> {
+	let path = await runComfy(makeWorkflow(baseSeed), outPath);
+	for (let r = 0; r < retries; r++) {
+		const sd = await imageStddev(path);
+		if (sd === null || !isDegenerateImageStats(sd)) break;
+		log(
+			`   ⚠ 씬 이미지 단색/공백 의심(stddev ${sd.toFixed(1)}) → 재생성 ${r + 1}/${retries}`,
+		);
+		// 재생성 실패(타임아웃/큐 오류)는 렌더 전체를 죽이지 말고 직전(최선) 이미지 유지(Codex P2).
+		// 첫 생성 실패는 폴백 이미지가 없어 위에서 그대로 throw.
+		try {
+			path = await runComfy(makeWorkflow(baseSeed + (r + 1) * 9973), outPath);
+		} catch (e) {
+			log(`   ⚠ 재생성 실패(${e}) → 직전 이미지 유지`);
+			break;
+		}
+	}
+	return path;
+}
+
+// 내레이션 재생 속도 — 성장 플레이북 벤치마크(1.1~1.2x)로 페이싱·watch-time 개선.
+// API/프록시 의존 없이 로컬 ffmpeg atempo(피치 보존)로 적용 → dur() 가 가속 후 길이를 측정하므로
+// .srt·챕터·measure-and-extend 가 자동 동기. TTS_SPEED env 로 조정, [0.5,2.0] 클램프.
+export const TTS_SPEED = Math.min(2, Math.max(0.5, floatEnv("TTS_SPEED", 1.1)));
+
+/** TTS_PROVIDER 정규화 → "clova" | "elevenlabs" | "edge" | "melo". 빈값/미지원 값은 elevenlabs(기존 동작 보존).
+ *  melo = 완전 로컬 MeloTTS 한국어 서버(키·쿼터·온라인 의존 없음, setup-melo.sh + melo_server.py).
+ *  edge = Microsoft Edge 무료 뉴럴 TTS(키/쿼터 없지만 온라인). free/local 도 edge 로 본다. */
+export function resolveTtsProvider(
+	raw = process.env.TTS_PROVIDER,
+): "clova" | "elevenlabs" | "edge" | "melo" {
+	const v = (raw ?? "").trim().toLowerCase();
+	if (v === "clova") return "clova";
+	if (v === "melo") return "melo";
+	if (v === "edge" || v === "free" || v === "local") return "edge";
+	return "elevenlabs";
+}
+
+// MeloTTS 로컬 서버(scripts/melo_server.py, ~/melo-venv) — 완전 로컬·무료·MIT 한국어 TTS.
+// 모델 1회 로드 후 POST /tts. edge 의 온라인 의존을 제거하는 완전 로컬 경로. MELO_URL env 로 조정.
+export const MELO_URL = process.env.MELO_URL ?? "http://127.0.0.1:3461";
+/** MeloTTS 서버 합성 → mp3 버퍼. 속도(TTS_SPEED)는 공용 atempo 경로에서 일괄 적용(여기선 정속). */
+async function ttsMelo(text: string): Promise<Buffer> {
+	const res = await fetch(`${MELO_URL}/tts`, {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({ text, speed: 1.0 }),
+	});
+	if (!res.ok) throw new Error(`MeloTTS ${res.status} ${await res.text()}`);
+	return Buffer.from(await res.arrayBuffer());
+}
+
+// edge-tts(Microsoft Edge 무료 뉴럴 TTS) — API 키·쿼터 없음. 로컬 CLI 호출.
+// 한국어 뉴럴: ko-KR-SunHiNeural(여)/ko-KR-InJoonNeural(남). EDGE_TTS_BIN/EDGE_VOICE env 로 조정.
+export const EDGE_TTS_BIN =
+	process.env.EDGE_TTS_BIN ??
+	join(homedir(), "Library/Python/3.9/bin/edge-tts");
+export const EDGE_VOICE = process.env.EDGE_VOICE ?? "ko-KR-SunHiNeural";
+let edgeSeq = 0;
+/** edge-tts CLI → mp3 버퍼. CLI 는 파일 출력만 → tmp 에 쓰고 읽어 반환(타 provider 와 동일 인터페이스).
+ *  속도(TTS_SPEED)는 공용 atempo 경로에서 일괄 적용하므로 여기선 정속 mp3 만 만든다. */
+async function ttsEdge(text: string): Promise<Buffer> {
+	const tmp = join(tmpdir(), `edge_${process.pid}_${++edgeSeq}.mp3`);
+	try {
+		await exec(EDGE_TTS_BIN, [
+			"--voice",
+			EDGE_VOICE,
+			"--text",
+			text,
+			"--write-media",
+			tmp,
+		]);
+		return readFileSync(tmp);
+	} finally {
+		rmSync(tmp, { force: true });
+	}
+}
+
+/** CLOVA Voice(NCP) 합성 → mp3 버퍼. speaker 미지정 시 CLOVA_SPEAKER env / nara.
+ *  speed=0(정속)으로 받고 가속은 공용 atempo 경로에서 일괄 적용 → provider 간 TTS_SPEED 의미 동일.
+ *  NOTE: CLOVA 1요청 텍스트 상한이 있으므로(씬 내레이션 1~2문장은 안전) 긴 단일 텍스트는 호출부에서 분할 전제. */
+async function ttsClova(text: string): Promise<Buffer> {
+	const speaker = process.env.CLOVA_SPEAKER ?? "nara";
+	const res = await fetch(`${PROXY}/api/clova/tts`, {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({ speaker, text, format: "mp3", speed: 0 }),
+	});
+	if (!res.ok) throw new Error(`CLOVA TTS ${res.status} ${await res.text()}`);
+	return Buffer.from(await res.arrayBuffer());
+}
+
+/** ElevenLabs(기본 Bella) 합성 → mp3 버퍼. */
+async function ttsElevenLabs(text: string, voice: string): Promise<Buffer> {
+	const res = await fetch(`${PROXY}/api/elevenlabs/tts/${voice}`, {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({
+			text,
+			model_id: "eleven_multilingual_v2",
+			voice_settings: { stability: 0.5, similarity_boost: 0.75 },
+		}),
+	});
+	if (!res.ok) throw new Error(`TTS ${res.status} ${await res.text()}`);
+	return Buffer.from(await res.arrayBuffer());
+}
+
+/** provider 선택 + 합성. 유료(elevenlabs/clova) 실패(쿼터 소진·401 등) 시 무료 edge-tts 로 자동 폴백
+ *  → 무인 양산이 계정 한도로 죽지 않는다. TTS_FALLBACK=off 로 폴백 비활성(원에러 전파). */
+async function synthTts(text: string, voice: string): Promise<Buffer> {
+	const provider = resolveTtsProvider();
+	if (provider === "edge") return ttsEdge(text);
+	try {
+		if (provider === "melo") return await ttsMelo(text);
+		return provider === "clova"
+			? await ttsClova(text)
+			: await ttsElevenLabs(text, voice);
+	} catch (e) {
+		if ((process.env.TTS_FALLBACK ?? "edge").toLowerCase() === "off") throw e;
+		const msg = e instanceof Error ? e.message.slice(0, 90) : String(e);
+		log(`   ⚠ ${provider} TTS 실패(${msg}) → 무료 edge-tts 폴백`);
+		return ttsEdge(text);
+	}
+}
+
+/** TTS → mp3 파일. TTS_PROVIDER 로 provider 선택(clova|elevenlabs|edge), 유료 실패 시 edge 자동 폴백.
+ *  TTS_SPEED 는 공용 atempo 로 일괄 적용. voice 인자는 ElevenLabs 전용(CLOVA=CLOVA_SPEAKER, edge=EDGE_VOICE). */
+export async function tts(
+	text: string,
+	out: string,
+	voice = process.env.TTS_VOICE ?? "EXAVITQu4vr4xnSDxMaL",
+): Promise<void> {
+	const buf = await synthTts(text, voice);
+	if (TTS_SPEED === 1) {
+		writeFileSync(out, buf);
+		return;
+	}
+	// 가속: 원본을 tmp 에 쓰고 atempo 로 out 생성. 실패하면 원본(정속)으로 폴백 — 영상은 항상 살린다.
+	const raw = `${out}.raw.mp3`;
+	writeFileSync(raw, buf);
+	try {
+		await exec("ffmpeg", [
+			"-y",
+			"-i",
+			raw,
+			"-filter:a",
+			`atempo=${TTS_SPEED}`,
+			"-c:a",
+			"libmp3lame",
+			"-q:a",
+			"2",
+			out,
+		]);
+	} catch {
+		writeFileSync(out, buf);
+	} finally {
+		rmSync(raw, { force: true }); // 중간 원본 정리(디스크 누수 방지, Codex P3)
+	}
+}
+
+/** ffprobe 로 오디오 길이(초). 하한 1.5s. */
+export async function dur(file: string): Promise<number> {
+	const { stdout } = await exec("ffprobe", [
+		"-v",
+		"error",
+		"-show_entries",
+		"format=duration",
+		"-of",
+		"csv=p=0",
+		file,
+	]);
+	return Math.max(1.5, Number.parseFloat(stdout.trim()) || 3);
+}
+
+/**
+ * 초 → SRT 타임스탬프(HH:MM:SS,mmm). 전체 ms 로 먼저 반올림한 뒤 분해 →
+ * 1.9996 같은 경계에서 ms 가 1000 으로 넘쳐 "01,1000" 같은 잘못된 값이 나오는 것 방지(Codex P2).
+ */
+export function srtTime(s: number): string {
+	const total = Math.max(0, Math.round(s * 1000));
+	const ms = total % 1000;
+	const sec = Math.floor(total / 1000) % 60;
+	const m = Math.floor(total / 60000) % 60;
+	const h = Math.floor(total / 3600000);
+	return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")},${String(ms).padStart(3, "0")}`;
+}
+
+/** api-proxy /api/openai/chat (LLM_BACKEND=claude) — JSON 응답 강제 후 파싱. */
+export async function proxyChatJSON(
+	system: string,
+	user: string,
+): Promise<Record<string, unknown>> {
+	// The local proxy enforces a 180s Claude CLI timeout. Keep a slightly larger
+	// client-side deadline so a dropped socket cannot stall an entire episode run.
+	const timeoutMs = posIntEnv("LLM_REQUEST_TIMEOUT_MS", 195_000);
+	const cr = await fetch(`${PROXY}/api/openai/chat`, {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		signal: AbortSignal.timeout(timeoutMs),
+		body: JSON.stringify({
+			messages: [
+				{ role: "system", content: system },
+				{ role: "user", content: user },
+			],
+			response_format: { type: "json_object" },
+		}),
+	});
+	if (!cr.ok)
+		throw new Error(`LLM ${cr.status} (api-proxy LLM_BACKEND=claude 확인)`);
+	const content = (
+		(await cr.json()) as { choices: { message: { content: string } }[] }
+	).choices[0].message.content;
+	return JSON.parse(content) as Record<string, unknown>;
+}
+
+/**
+ * 썸네일 텍스트 오버레이 — 이 ffmpeg 빌드엔 drawtext 가 없어 Pillow(ComfyUI venv)로 인라인 실행.
+ * python -c 로 직접(디스크에 .py 안 남김). 1280x720 크롭 + 좌상단 거대 텍스트.
+ *
+ * 색상 공식(검증된 한국 AI 롱폼 썸네일, 김재민TV 케이스 스터디): 흰색이 아니라 **밝은 노랑 + 두꺼운 검은
+ * 외곽선** 2색 대비가 CTR 을 끌어올린다. 가독성 보강을 위해 텍스트 뒤에 반투명 검은 대비밴드를 깐다.
+ * opts 로 색/밴드를 끌 수 있어 하위호환(기존 호출은 노랑 공식으로 자동 업그레이드).
+ */
+export interface ThumbnailTextOptions {
+	/** 텍스트 채움색. 기본 검증값 = 밝은 노랑. */
+	fill?: string;
+	/** 외곽선 색/두께. */
+	strokeFill?: string;
+	strokeWidth?: number;
+	/** 텍스트 뒤 반투명 대비밴드(가독성). 기본 on. */
+	band?: boolean;
+}
+
+export async function overlayThumbnailText(
+	rawPath: string,
+	outPath: string,
+	text: string,
+	opts: ThumbnailTextOptions = {},
+): Promise<void> {
+	const fill = opts.fill ?? "#FFE000";
+	const strokeFill = opts.strokeFill ?? "black";
+	const strokeWidth = opts.strokeWidth ?? 12;
+	const band = opts.band ?? true;
+	const overlayCode = [
+		"import sys",
+		"from PIL import Image, ImageDraw, ImageFont",
+		"src, out, text = sys.argv[1], sys.argv[2], sys.argv[3]",
+		"fill, stroke_fill, stroke_width, band = sys.argv[4], sys.argv[5], int(sys.argv[6]), sys.argv[7] == '1'",
+		'im = Image.open(src).convert("RGB")',
+		"tw, th = 1280, 720",
+		"w, h = im.size",
+		"s = max(tw / w, th / h)",
+		"im = im.resize((int(w * s), int(h * s)))",
+		"w, h = im.size",
+		"left, top = (w - tw) // 2, (h - th) // 2",
+		"im = im.crop((left, top, left + tw, top + th))",
+		"x, y = 44, 28",
+		'font_path = "/System/Library/Fonts/AppleSDGothicNeo.ttc"',
+		"font_size = 150",
+		"probe = ImageDraw.Draw(im)",
+		"while font_size > 72:",
+		"    f = ImageFont.truetype(font_path, font_size, index=0)",
+		"    bb = probe.textbbox((x, y), text, font=f, stroke_width=stroke_width)",
+		"    if bb[2] - bb[0] <= tw - (x * 2) and bb[3] - bb[1] <= 210:",
+		"        break",
+		"    font_size -= 4",
+		"else:",
+		"    f = ImageFont.truetype(font_path, 72, index=0)",
+		"if band:",
+		"    layer = Image.new('RGBA', im.size, (0, 0, 0, 0))",
+		"    ld = ImageDraw.Draw(layer)",
+		"    bb = ld.textbbox((x, y), text, font=f, stroke_width=stroke_width)",
+		"    ld.rectangle((max(0, bb[0]-28), max(0, bb[1]-18), min(tw, bb[2]+28), min(th, bb[3]+18)), fill=(0, 0, 0, 150))",
+		"    im = Image.alpha_composite(im.convert('RGBA'), layer).convert('RGB')",
+		"d = ImageDraw.Draw(im)",
+		"d.text((x, y), text, font=f, fill=fill, stroke_width=stroke_width, stroke_fill=stroke_fill)",
+		"im.save(out, quality=90)",
+	].join("\n");
+	await exec(COMFY_PYTHON, [
+		"-c",
+		overlayCode,
+		rawPath,
+		outPath,
+		text,
+		fill,
+		strokeFill,
+		String(strokeWidth),
+		band ? "1" : "0",
+	]);
+}
+
+// ── 일러스트 미학(검증된 김재민TV 스타일) ─────────────────────────────────────
+
+/**
+ * 손그림 색연필/수채 "교과서 삽화" 스타일 프롬프트. 케이스 스터디(김재민TV)의 핵심 레버 —
+ * 단일 일관 일러스트체가 캐릭터/장면 일관성을 싸게 풀고, 언캐니밸리를 피하며, "오리지널"로 보인다.
+ * 포토리얼/IPAdapter 얼굴락 없이 스타일만으로 시리즈 일관성 확보. 텍스트/글자 억제.
+ */
+export function buildTextbookIllustrationPrompt(visual: string): string {
+	return `hand-drawn colored pencil and soft watercolor textbook illustration, warm muted palette, clean confident linework, educational explainer diorama, consistent storybook art direction, gentle paper texture, no text no letters no words: ${visual}`;
+}
+
+// ── 공유 text-to-image 워크플로(SDXL/FLUX) ───────────────────────────────────
+// 일러스트(make-vlog)·카툰(make-economy) 모두 동일한 비-IPAdapter t2i 그래프를 쓴다.
+// 한 곳에서 SDXL↔FLUX 를 분기 → 모델 교체가 호출부 수정 없이 IMAGE_MODEL 한 곳으로 끝난다.
+export interface T2IParams {
+	/** 양성 프롬프트(스타일 빌더가 이미 적용된 최종 텍스트). */
+	positive: string;
+	/** SDXL 음성 프롬프트. FLUX 는 cfg=1 이라 무시(빈 conditioning 으로 전달). */
+	negative: string;
+	seed: number;
+	/** 결과 파일 접두사(ComfyUI SaveImage). */
+	filenamePrefix: string;
+	/** 생성 해상도. 미지정 시 SCENE_W/H(가로). 숏폼은 세로 차원을 넘긴다. */
+	width?: number;
+	height?: number;
+	/** SDXL classifier-free guidance(기본 7, 스타일 충실도). FLUX 는 항상 1. */
+	cfg?: number;
+}
+
+/** SDXL t2i 그래프(CheckpointLoaderSimple → EmptyLatentImage → CLIP×2 → KSampler → VAE → Save). */
+function sdxlT2IWorkflow(p: T2IParams, width: number, height: number) {
+	const sampler = sdxlSamplerSettings(SDXL_FAST, p.cfg ?? 7);
+	return {
+		"4": { class_type: "CheckpointLoaderSimple", inputs: { ckpt_name: CKPT } },
+		"5": {
+			class_type: "EmptyLatentImage",
+			inputs: { width, height, batch_size: 1 },
+		},
+		"6": {
+			class_type: "CLIPTextEncode",
+			inputs: { text: p.positive, clip: ["4", 1] },
+		},
+		"7": {
+			class_type: "CLIPTextEncode",
+			inputs: { text: p.negative, clip: ["4", 1] },
+		},
+		"3": {
+			class_type: "KSampler",
+			inputs: {
+				seed: p.seed,
+				steps: sampler.steps,
+				cfg: sampler.cfg,
+				sampler_name: sampler.sampler_name,
+				scheduler: sampler.scheduler,
+				denoise: 1,
+				model: ["4", 0],
+				positive: ["6", 0],
+				negative: ["7", 0],
+				latent_image: ["5", 0],
+			},
+		},
+		"8": {
+			class_type: "VAEDecode",
+			inputs: { samples: ["3", 0], vae: ["4", 2] },
+		},
+		"9": {
+			class_type: "SaveImage",
+			inputs: { filename_prefix: p.filenamePrefix, images: ["8", 0] },
+		},
+	};
+}
+
+/**
+ * FLUX t2i 그래프(표준 ComfyUI 템플릿): UNETLoader + DualCLIPLoader + VAELoader,
+ * cfg=1(distilled), EmptySD3LatentImage(16ch), FluxGuidance(dev용·schnell 무시), euler/simple.
+ * 음성 프롬프트는 cfg=1 에서 무시되지만 KSampler 입력 슬롯이 필요해 빈 conditioning 으로 연결.
+ */
+function fluxWorkflow(p: T2IParams, width: number, height: number) {
+	return {
+		"10": {
+			class_type: "UNETLoader",
+			inputs: { unet_name: FLUX_UNET, weight_dtype: "default" },
+		},
+		"11": {
+			class_type: "DualCLIPLoader",
+			inputs: {
+				clip_name1: FLUX_CLIP_L,
+				clip_name2: FLUX_T5,
+				type: "flux",
+			},
+		},
+		"12": { class_type: "VAELoader", inputs: { vae_name: FLUX_VAE } },
+		"5": {
+			class_type: "EmptySD3LatentImage",
+			inputs: { width, height, batch_size: 1 },
+		},
+		"6": {
+			class_type: "CLIPTextEncode",
+			inputs: { text: p.positive, clip: ["11", 0] },
+		},
+		"13": {
+			class_type: "FluxGuidance",
+			inputs: { conditioning: ["6", 0], guidance: FLUX_GUIDANCE },
+		},
+		"14": {
+			class_type: "CLIPTextEncode",
+			inputs: { text: "", clip: ["11", 0] },
+		},
+		"3": {
+			class_type: "KSampler",
+			inputs: {
+				seed: p.seed,
+				steps: FLUX_STEPS,
+				cfg: 1,
+				sampler_name: "euler",
+				scheduler: "simple",
+				denoise: 1,
+				model: ["10", 0],
+				positive: ["13", 0],
+				negative: ["14", 0],
+				latent_image: ["5", 0],
+			},
+		},
+		"8": {
+			class_type: "VAEDecode",
+			inputs: { samples: ["3", 0], vae: ["12", 0] },
+		},
+		"9": {
+			class_type: "SaveImage",
+			inputs: { filename_prefix: p.filenamePrefix, images: ["8", 0] },
+		},
+	};
+}
+
+/**
+ * Z-Image Turbo 그래프(공식 ComfyUI 템플릿, 라이브 검증). cfg=1(distilled) — 음성 프롬프트는
+ * ConditioningZeroOut 으로 처리(양성 conditioning 제로화)라 p.negative 미사용. res_multistep/simple/8스텝.
+ * Qwen 텍스트인코더(CLIPLoader type="lumina2"), EmptySD3LatentImage, ModelSamplingAuraFlow(shift).
+ */
+function zimageWorkflow(p: T2IParams, width: number, height: number) {
+	return {
+		"1": {
+			class_type: "UNETLoader",
+			inputs: { unet_name: ZIMAGE_UNET, weight_dtype: "default" },
+		},
+		"2": {
+			class_type: "ModelSamplingAuraFlow",
+			inputs: { model: ["1", 0], shift: ZIMAGE_SHIFT },
+		},
+		"3": {
+			class_type: "CLIPLoader",
+			inputs: { clip_name: ZIMAGE_CLIP, type: "lumina2", device: "default" },
+		},
+		"4": { class_type: "VAELoader", inputs: { vae_name: ZIMAGE_VAE } },
+		"5": {
+			class_type: "EmptySD3LatentImage",
+			inputs: { width, height, batch_size: 1 },
+		},
+		"6": {
+			class_type: "CLIPTextEncode",
+			inputs: { text: p.positive, clip: ["3", 0] },
+		},
+		"8": {
+			class_type: "ConditioningZeroOut",
+			inputs: { conditioning: ["6", 0] },
+		},
+		"9": {
+			class_type: "KSampler",
+			inputs: {
+				seed: p.seed,
+				steps: ZIMAGE_STEPS,
+				cfg: 1,
+				sampler_name: "res_multistep",
+				scheduler: "simple",
+				denoise: 1,
+				model: ["2", 0],
+				positive: ["6", 0],
+				negative: ["8", 0],
+				latent_image: ["5", 0],
+			},
+		},
+		"10": {
+			class_type: "VAEDecode",
+			inputs: { samples: ["9", 0], vae: ["4", 0] },
+		},
+		"11": {
+			class_type: "SaveImage",
+			inputs: { filename_prefix: p.filenamePrefix, images: ["10", 0] },
+		},
+	};
+}
+
+/**
+ * SDXL/FLUX/Z-Image 분기 디스패처. 기본은 IMAGE_MODEL(env COMFY_MODEL).
+ * model 인자는 테스트/특수 호출에서 분기를 명시할 때만 사용(런타임 호출부는 생략 → env 따름).
+ * sdxl=빠른 양산 기본(27s), flux/zimage=품질 옵트인(Mac 느림). zimage 는 라이브 검증됨(~95s, 플랫벡터 우수).
+ */
+export function textToImageWorkflow(
+	p: T2IParams,
+	model: ImageModel = IMAGE_MODEL,
+): Record<string, { class_type: string; inputs: Record<string, unknown> }> {
+	const width = p.width ?? SCENE_W;
+	const height = p.height ?? SCENE_H;
+	if (model === "flux") return fluxWorkflow(p, width, height);
+	if (model === "zimage") return zimageWorkflow(p, width, height);
+	return sdxlT2IWorkflow(p, width, height);
+}
+
+/**
+ * 일러스트 워크플로(SDXL/FLUX 공용) — IPAdapter/호스트 레퍼런스 없음(스타일이 일관성을 운반).
+ * make-vlog(--style illustration)·확장 장르 공용. cfg 7 로 스타일 충실도↑.
+ * width/height 미지정 시 가로(SCENE_W/H). 숏폼은 세로 차원을 넘겨 크롭/업스케일 블러를 없앤다.
+ */
+export function illustrationWorkflow(
+	prompt: string,
+	seed: number,
+	width: number = SCENE_W,
+	height: number = SCENE_H,
+) {
+	return textToImageWorkflow({
+		positive: buildTextbookIllustrationPrompt(prompt),
+		negative:
+			"photorealistic, realistic, 3d render, photograph, text, letters, words, watermark, signature, ugly, blurry, jpeg artifacts, deformed, extra fingers",
+		seed,
+		filenamePrefix: "vlog_illus",
+		width,
+		height,
+		cfg: 7,
+	});
+}
+
+// ── 출처 리스트(YouTube 재사용 콘텐츠 비수익화 회피) ──────────────────────────
+
+/** 영상에 인용된 실제 자료 1건. */
+export interface SourceRef {
+	title?: string;
+	/** 매체명(예: 연합뉴스). */
+	source?: string;
+	/** 게재일(원문 그대로). */
+	date?: string;
+	url?: string;
+}
+
+/** 한 줄 truncate(말줄임). */
+function clip(s: string, max: number): string {
+	const t = s.trim();
+	return t.length <= max ? t : `${t.slice(0, Math.max(0, max - 1)).trim()}…`;
+}
+
+/**
+ * 출처 슬라이드용 표시 줄 — "· {날짜} · {매체} — {제목}". 날짜/매체/제목/URL 중 있는 것만 조합.
+ * 케이스 스터디의 "출처 리스트" 슬라이드(실뉴스 + URL)를 화면에 표기해 transformative commentary 로 만든다.
+ */
+export function buildSourceListLines(sources: SourceRef[], max = 14): string[] {
+	const lines: string[] = [];
+	for (const s of sources.slice(0, max)) {
+		const head = [s.date, s.source].filter(Boolean).join(" · ");
+		const title = s.title ?? s.url ?? "";
+		const body = [head, title].filter(Boolean).join(" — ") || (s.url ?? "");
+		if (body) lines.push(`· ${clip(body, 64)}`);
+	}
+	return lines;
+}
+
+/** 출처 리스트의 YouTube 설명란용 블록(URL 포함). */
+export function buildSourceDescription(
+	sources: SourceRef[],
+	header = "출처 / Sources",
+): string {
+	const lines = sources
+		.map((s) => {
+			const head = [s.date, s.source, s.title].filter(Boolean).join(" · ");
+			return [head, s.url].filter(Boolean).join("\n");
+		})
+		.filter(Boolean);
+	return `${header}\n${lines.join("\n")}`;
+}
+
+/**
+ * 출처 리스트 1920x1080 엔드슬라이드(Pillow). 어두운 배경 + 제목 + 줄 목록.
+ * 영상 마지막 씬으로 끼워 어느 렌더 경로에서도 노출되게 한다.
+ */
+export async function renderSourceListSlide(
+	header: string,
+	lines: string[],
+	outPath: string,
+): Promise<string> {
+	const code = [
+		"import sys",
+		"from PIL import Image, ImageDraw, ImageFont",
+		"out, header, body = sys.argv[1], sys.argv[2], sys.argv[3]",
+		"W, Hh = 1920, 1080",
+		'im = Image.new("RGB", (W, Hh), (11, 19, 38))',
+		"d = ImageDraw.Draw(im)",
+		'fp = "/System/Library/Fonts/AppleSDGothicNeo.ttc"',
+		"ftitle = ImageFont.truetype(fp, 72, index=0)",
+		"fline = ImageFont.truetype(fp, 38, index=0)",
+		'd.text((120, 90), header, font=ftitle, fill="#FFE000", stroke_width=2, stroke_fill="black")',
+		"d.line((120, 200, 1800, 200), fill=(120, 130, 160), width=4)",
+		"y = 250",
+		'for ln in [l for l in body.split("\\n") if l.strip()][:14]:',
+		'    d.text((120, y), ln, font=fline, fill="#DDE2FD")',
+		"    y += 56",
+		"im.save(out, quality=92)",
+	].join("\n");
+	await exec(COMFY_PYTHON, ["-c", code, outPath, header, lines.join("\n")]);
+	return outPath;
+}
+
+// ── 챕터 타임스탬프(YouTube 챕터 + 업로드 메타) ───────────────────────────────
+
+/** 초 → YouTube 타임스탬프(m:ss 또는 h:mm:ss). 첫 챕터는 항상 0:00 이어야 한다(YouTube 규칙). */
+export function formatTimestamp(sec: number): string {
+	const t = Math.max(0, Math.floor(sec));
+	const h = Math.floor(t / 3600);
+	const m = Math.floor((t % 3600) / 60);
+	const s = t % 60;
+	return h > 0
+		? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
+		: `${m}:${String(s).padStart(2, "0")}`;
+}
+
+/** {title, startSec}[] → YouTube 챕터 줄 배열("0:00 제목"). 첫 줄은 0:00 으로 강제. */
+export function buildChapterMarkers(
+	chapters: { title: string; startSec: number }[],
+): string[] {
+	return chapters.map((c, i) => {
+		const start = i === 0 ? 0 : c.startSec;
+		return `${formatTimestamp(start)} ${c.title}`;
+	});
+}

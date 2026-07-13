@@ -16,12 +16,17 @@ import {
 	sortReferenceTemplatesByQuality,
 } from "./reference-template-presets";
 
+let generatedReferenceTemplateCache:
+	| ReturnType<typeof sortReferenceTemplatesByQuality>
+	| undefined;
+
 function generatedReferenceTemplates() {
-	return sortReferenceTemplatesByQuality(
+	generatedReferenceTemplateCache ??= sortReferenceTemplatesByQuality(
 		GENERATED_REFERENCE_TEMPLATES.map((template) =>
 			cloneReferenceTemplateInput(template),
 		),
 	);
+	return generatedReferenceTemplateCache;
 }
 
 describe("reference-template-presets", () => {

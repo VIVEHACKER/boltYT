@@ -10,6 +10,7 @@ import {
 	checkLocalPresetExists,
 	clearUserDefaultBgm,
 	getUserDefaultBgm,
+	LOCAL_PRESET_METADATA,
 	LOCAL_PRESETS,
 	PIXABAY_QUERIES,
 	setUserDefaultBgm,
@@ -42,6 +43,10 @@ describe("LOCAL_PRESETS", () => {
 		for (const path of Object.values(LOCAL_PRESETS)) {
 			expect(path).toMatch(/^\/bgm\/.+\.mp3$/);
 		}
+	});
+
+	it("메타데이터 경로가 오디오 프리셋 옆 default.json으로 정의됨", () => {
+		expect(LOCAL_PRESET_METADATA.tense).toBe("/bgm/tense/default.json");
 	});
 });
 

@@ -159,6 +159,171 @@ describe("detectImageProviders", () => {
 	});
 });
 
+// ─── FAL 이미지 제공자 ─────────────────────────────────────────────────────────
+describe("fal image provider", () => {
+	it("detect: status.fal → 'fal' 포함, dalle보다 우선(active 'fal')", async () => {
+		let idx = 0;
+		vi.stubGlobal(
+			"fetch",
+			vi.fn().mockImplementation(() => {
+				const i = idx++;
+				if (i === 0) return Promise.resolve({ ok: false }); // comfyui
+				if (i === 1)
+					return Promise.resolve({
+						ok: false,
+						json: () => Promise.resolve([]),
+					}); // a1111
+				return Promise.resolve({
+					ok: true,
+					json: () => Promise.resolve({ openai: true, fal: true }),
+				});
+			}),
+		);
+		const status = await detectImageProviders();
+		expect(status.available).toContain("fal");
+		expect(status.available.indexOf("fal")).toBeLessThan(
+			status.available.indexOf("dalle"),
+		);
+		expect(status.active).toBe("fal");
+	});
+
+	it("generate: active 'fal' → /api/fal/image-gen 호출 + url fetch, provider 'fal'", async () => {
+		mockStorage.setItem("image_gen_active", "fal");
+		const calls: string[] = [];
+		vi.stubGlobal(
+			"fetch",
+			vi.fn().mockImplementation((u: string) => {
+				calls.push(String(u));
+				if (String(u).includes("/api/fal/image-gen")) {
+					return Promise.resolve({
+						ok: true,
+						json: () =>
+							Promise.resolve({ images: [{ url: "http://fal/img.png" }] }),
+					});
+				}
+				return Promise.resolve({
+					ok: true,
+					arrayBuffer: () => Promise.resolve(new Uint8Array([1, 2, 3]).buffer),
+				});
+			}),
+		);
+		const result = await generateImage("scene-fal", "ancient rome", "fal");
+		expect(result.provider).toBe("fal");
+		expect(result.url).toBe("blob://stored");
+		expect(calls.some((c) => c.includes("/api/fal/image-gen"))).toBe(true);
+	});
+
+	it("generate: fal seed/aspectRatio → body.seed + image_size 전달", async () => {
+		mockStorage.setItem("image_gen_active", "fal");
+		const fetchMock = vi.fn().mockImplementation((u: string) => {
+			if (String(u).includes("/api/fal/image-gen")) {
+				return Promise.resolve({
+					ok: true,
+					json: () =>
+						Promise.resolve({ images: [{ url: "http://fal/i.png" }] }),
+				});
+			}
+			return Promise.resolve({
+				ok: true,
+				arrayBuffer: () => Promise.resolve(new Uint8Array([1]).buffer),
+			});
+		});
+		vi.stubGlobal("fetch", fetchMock);
+		await generateImage("scene-fal", "prompt", "fal", undefined, {
+			seed: 12345,
+			aspectRatio: "9:16",
+		});
+		const falCall = fetchMock.mock.calls.find((c) =>
+			String(c[0]).includes("/api/fal/image-gen"),
+		);
+		const body = JSON.parse(String(falCall?.[1]?.body));
+		expect(body.seed).toBe(12345);
+		expect(body.image_size).toBe("portrait_16_9");
+	});
+
+	it("DALL-E url 응답(b64_json 없음)도 처리 — url fetch (response_format 제거 대응)", async () => {
+		mockStorage.setItem("image_gen_active", "dalle");
+		vi.stubGlobal(
+			"fetch",
+			vi.fn().mockImplementation((u: string) => {
+				if (String(u).includes("/api/openai/images")) {
+					return Promise.resolve({
+						ok: true,
+						json: () => Promise.resolve({ data: [{ url: "http://x/y.png" }] }),
+					});
+				}
+				return Promise.resolve({
+					ok: true,
+					arrayBuffer: () => Promise.resolve(new Uint8Array([5]).buffer),
+				});
+			}),
+		);
+		const result = await generateImage("scene-1", "prompt", "dalle");
+		expect(result.provider).toBe("dalle");
+	});
+});
+
+// ─── ComfyUI IP-Adapter face-lock ─────────────────────────────────────────────
+describe("comfyui IP-Adapter face-lock", () => {
+	it("referenceImagePath 있으면 업로드 + IPAdapterAdvanced 워크플로로 생성", async () => {
+		mockStorage.setItem("image_gen_active", "comfyui");
+		const calls: string[] = [];
+		const fetchMock = vi.fn().mockImplementation((u: string) => {
+			const s = String(u);
+			calls.push(s);
+			if (s.includes("/upload/image"))
+				return Promise.resolve({
+					ok: true,
+					json: () => Promise.resolve({ name: "ipref_x.png" }),
+				});
+			if (s.includes("/prompt"))
+				return Promise.resolve({
+					ok: true,
+					json: () => Promise.resolve({ prompt_id: "pid-ip" }),
+				});
+			if (s.includes("/history/pid-ip"))
+				return Promise.resolve({
+					ok: true,
+					json: () =>
+						Promise.resolve({
+							"pid-ip": {
+								outputs: {
+									"9": {
+										images: [
+											{ filename: "o.png", subfolder: "", type: "output" },
+										],
+									},
+								},
+							},
+						}),
+				});
+			if (s.includes("/view"))
+				return Promise.resolve({
+					ok: true,
+					arrayBuffer: () => Promise.resolve(new Uint8Array([1, 2]).buffer),
+				});
+			return Promise.resolve({ ok: false, status: 404 });
+		});
+		vi.stubGlobal("fetch", fetchMock);
+		const result = await generateImage(
+			"scene-ip",
+			"ancient rome forum",
+			"comfyui",
+			undefined,
+			{
+				referenceImagePath: "channels/c/host/h/reference-sheet.png",
+				aspectRatio: "16:9",
+			},
+		);
+		expect(result.provider).toBe("comfyui");
+		expect(calls.some((c) => c.includes("/upload/image"))).toBe(true);
+		const promptCall = fetchMock.mock.calls.find((c) =>
+			String(c[0]).includes("/prompt"),
+		);
+		expect(String(promptCall?.[1]?.body)).toContain("IPAdapterAdvanced");
+	});
+});
+
 // ─── generateImage / generateImageToPath ─────────────────────────────────────
 describe("generateImage", () => {
 	// 유효한 최소 base64 — atob 테스트용

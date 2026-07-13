@@ -21,52 +21,65 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import TabButton from "../../components/TabButton";
+import { generateResearchScript, generateScript } from "../../lib/ai";
+import { planSceneSourceAssignments, researchTopic } from "../../lib/ai-agents";
 import {
+	type AnimationBible,
+	type AnimationProductionFamily,
+	type AnimationProductionReadinessReport,
 	analyzeAnimationProductionReadiness,
 	applyAnimationPacingRules,
 	ensureAnimationSceneShots,
 	formatAnimationReadinessForPrompt,
 	summarizeAnimationBible,
-	type AnimationBible,
-	type AnimationProductionFamily,
-	type AnimationProductionReadinessReport,
 } from "../../lib/animation-production";
-import { generateResearchScript, generateScript } from "../../lib/ai";
-import { planSceneSourceAssignments, researchTopic } from "../../lib/ai-agents";
 import { snapDurationToBeat } from "../../lib/beat-sync";
+import { collectBenchmarkSamples } from "../../lib/benchmark-reference-adapter";
 import { suggestColorGrade } from "../../lib/color-grades";
-import {
-	type ContentPerformanceSample,
-	type RankedScriptRecommendation,
+import type {
+	ContentPerformanceSample,
+	RankedScriptRecommendation,
 } from "../../lib/content-recommendation-ranker";
+import { resolveEra } from "../../lib/historical-vlog-format";
+import {
+	createStarterHost,
+	type HostCharacter,
+} from "../../lib/host-character";
 import {
 	buildReferenceKnowledgeProfile,
 	compactKnowledgeProfile,
 } from "../../lib/knowledge-system";
 import {
-	assessReferenceApplicationScore,
-	type ReferenceApplicationScoreReport,
-} from "../../lib/reference-application-score";
-import { buildReferenceProductionPlan } from "../../lib/reference-production-orchestrator";
+	classifyBenchmarkGenre,
+	HOST_LED_GENRES,
+	resolveMarketBenchmark,
+} from "../../lib/market-benchmark";
 import { assignMotionGraphicsForScene } from "../../lib/motion-graphics";
-import { referenceToPreset } from "../../lib/reference-bridge";
-import {
-	getReferenceTemplateReadiness,
-	getReferenceTemplateSupportedFormats,
-} from "../../lib/reference-template-presets";
 import {
 	formatNicheHandoffForPrompt,
 	type NicheResearchHandoff,
 } from "../../lib/niche-research";
 import {
+	buildQualityProfile,
+	type QualityProfile,
+	qualityProfileToPromptContext,
+	saveQualityProfile,
+} from "../../lib/quality-profile";
+import {
+	assessReferenceApplicationScore,
+	type ReferenceApplicationScoreReport,
+} from "../../lib/reference-application-score";
+import { referenceToPreset } from "../../lib/reference-bridge";
+import { buildReferenceProductionPlan } from "../../lib/reference-production-orchestrator";
+import {
+	getReferenceTemplateReadiness,
+	getReferenceTemplateSupportedFormats,
+} from "../../lib/reference-template-presets";
+import {
 	applySceneSourcePlan,
 	buildFallbackSceneSourcePlan,
 } from "../../lib/scene-sequence";
 import type { SceneShot } from "../../lib/scene-shot-types";
-import {
-	analyzeSourceSafety,
-	type SourceSafetyReport,
-} from "../../lib/source-safety-gate";
 import {
 	applyLongformVideoRules,
 	applyShortsVideoRules,
@@ -78,7 +91,10 @@ import {
 	type ShotSource,
 	syncSceneMetadataFromSource,
 } from "../../lib/scene-shots";
-import { supabase } from "../../lib/supabase";
+import {
+	analyzeSourceSafety,
+	type SourceSafetyReport,
+} from "../../lib/source-safety-gate";
 import {
 	buildStoryEditDraft,
 	createEmptyStoryEditDraft,
@@ -86,9 +102,10 @@ import {
 	duplicateStoryScene,
 	insertStorySceneAfter,
 	moveStoryScene,
-	summarizeStoryEditDraft,
 	type StoryEditDraft,
+	summarizeStoryEditDraft,
 } from "../../lib/story-editing";
+import { supabase } from "../../lib/supabase";
 import {
 	analyzeTopicProductionReadiness,
 	type TopicProductionReadinessReport,
@@ -99,6 +116,8 @@ import type { CollectedSource, ContentMode } from "./ContentWizardPage";
 
 interface StepScriptProps {
 	briefId: string;
+	/** 채널 스코프 고정 호스트(시간여행 브이로그) 생성을 위해 사용 */
+	channelId?: string;
 	mode?: ContentMode;
 	sources?: CollectedSource[];
 	referenceTemplate?: ReferenceTemplate | null;
@@ -129,6 +148,7 @@ interface SceneData {
 
 export default function StepScript({
 	briefId,
+	channelId = "",
 	mode = "ai",
 	sources = [],
 	referenceTemplate,
@@ -155,7 +175,8 @@ export default function StepScript({
 	const [genError, setGenError] = useState("");
 	const [submitError, setSubmitError] = useState("");
 	const [searchKeywords, setSearchKeywords] = useState<string[]>([]);
-	const [resolvedTopicTitle, setResolvedTopicTitle] = useState(initialTopicTitle);
+	const [resolvedTopicTitle, setResolvedTopicTitle] =
+		useState(initialTopicTitle);
 	const [aligningSources, setAligningSources] = useState(false);
 	const [topicReadiness, setTopicReadiness] =
 		useState<TopicProductionReadinessReport | null>(null);
@@ -213,15 +234,15 @@ export default function StepScript({
 	);
 	const sourceSafetyReport = useMemo<SourceSafetyReport | null>(
 		() =>
-			mode === "research"
-				? analyzeSourceSafety(sources, longformScenes)
-				: null,
+			mode === "research" ? analyzeSourceSafety(sources, longformScenes) : null,
 		[mode, sources, longformScenes],
 	);
 
 	useEffect(() => {
 		if (!effectiveReferenceTemplate) return;
-		const supported = getReferenceTemplateSupportedFormats(effectiveReferenceTemplate);
+		const supported = getReferenceTemplateSupportedFormats(
+			effectiveReferenceTemplate,
+		);
 		if (supported.length !== 1) return;
 		setFormat((current) => (current === supported[0] ? current : supported[0]));
 	}, [effectiveReferenceTemplate]);
@@ -259,7 +280,13 @@ export default function StepScript({
 						)
 					: ensureSceneShots(scene, toShotSources(sources)),
 		}),
-		[animationBible, animationReadiness?.productionFamily, mode, sources, toShotSources],
+		[
+			animationBible,
+			animationReadiness?.productionFamily,
+			mode,
+			sources,
+			toShotSources,
+		],
 	);
 
 	const assignSourceToScene = useCallback(
@@ -415,6 +442,18 @@ export default function StepScript({
 		],
 	);
 
+	// 생성 시점 품질 프로파일 — handleSubmit에서 scriptId 확정 후 저장
+	// format/genre/samples/topic 은 제출 시점 포맷 변경 시 재계산에 사용
+	const qualityProfileRef = useRef<{
+		profile: QualityProfile;
+		format: "shorts" | "longform";
+		genre: ReturnType<typeof classifyBenchmarkGenre>;
+		// 필터된 samples 가 아니라 원본 references 를 보관 — 제출 시점 포맷으로 다시
+		// collectBenchmarkSamples 해야 포맷 변경 시에도 학습 샘플이 누락되지 않는다.
+		references: Parameters<typeof collectBenchmarkSamples>[0];
+		topic: string;
+	} | null>(null);
+
 	const doGenerate = useCallback(async () => {
 		setGenerating(true);
 		setGenError("");
@@ -520,6 +559,64 @@ export default function StepScript({
 					)
 				: undefined;
 
+			// 시장 품질 기준 — 레퍼런스 후보 학습 + 벤치마크 해석을 생성 프롬프트에 병합.
+			// 실패해도 기존 생성 흐름은 그대로 진행한다 (방어적 통합).
+			qualityProfileRef.current = null;
+			let qualityPromptContext = "";
+			try {
+				const benchmarkFormat = format === "shorts" ? "shorts" : "longform";
+				const loadedReferences = [
+					...(effectiveReferenceTemplate ? [effectiveReferenceTemplate] : []),
+					...referenceCandidates,
+				].filter(
+					(template, index, list) =>
+						list.findIndex((t) => t.id === template.id) === index,
+				);
+				const samples = loadedReferences.length
+					? collectBenchmarkSamples(loadedReferences, benchmarkFormat)
+					: undefined;
+				const genre = classifyBenchmarkGenre(
+					currentTopicTitle,
+					effectiveReferenceTemplate?.visual_mood
+						? { visualMood: effectiveReferenceTemplate.visual_mood }
+						: undefined,
+				);
+				const benchmark = resolveMarketBenchmark({
+					genre,
+					format: benchmarkFormat,
+					samples,
+				});
+				const presetDuration = preset?.script.targetDuration;
+				const durationSec =
+					typeof presetDuration === "number" &&
+					Number.isFinite(presetDuration) &&
+					presetDuration > 0
+						? presetDuration
+						: benchmarkFormat === "shorts"
+							? 45
+							: 480;
+				const profile = buildQualityProfile({
+					topic: currentTopicTitle,
+					format: benchmarkFormat,
+					durationSec,
+					benchmark,
+				});
+				qualityProfileRef.current = {
+					profile,
+					format: benchmarkFormat,
+					genre,
+					references: loadedReferences,
+					topic: currentTopicTitle,
+				};
+				qualityPromptContext = qualityProfileToPromptContext(profile);
+			} catch {
+				// 품질 프로파일 산출 실패는 대본 생성을 막지 않음
+			}
+			const strategyContext =
+				[productionPlan.promptContext, qualityPromptContext]
+					.filter((part) => part.trim().length > 0)
+					.join("\n\n") || undefined;
+
 			const script =
 				mode === "research"
 					? await generateResearchScript(
@@ -532,7 +629,7 @@ export default function StepScript({
 							nicheHandoff
 								? formatNicheHandoffForPrompt(nicheHandoff)
 								: undefined,
-							productionPlan.promptContext,
+							strategyContext,
 						)
 					: await generateScript(
 							briefId,
@@ -540,7 +637,7 @@ export default function StepScript({
 							preset,
 							mode === "animation" ? "animation" : "standard",
 							animationGate ?? undefined,
-							productionPlan.promptContext,
+							strategyContext,
 						);
 			setAnimationBible(script.animation_bible);
 			setShortsScript(script.shorts_script || "");
@@ -611,6 +708,7 @@ export default function StepScript({
 		sources,
 		referenceTemplate,
 		effectiveReferenceTemplate,
+		referenceCandidates,
 		nicheHandoff,
 		productionPlan.promptContext,
 	]);
@@ -797,12 +895,34 @@ export default function StepScript({
 							)
 						: buildSceneShots(scene, toShotSources(sources)),
 			})),
-	);
+		);
 	}
 
 	async function handleSubmit() {
 		setSaving(true);
 		setSubmitError("");
+
+		// 시간여행 역사 브이로그: 채널 스코프 고정 호스트를 content_json 에 영속화.
+		// StepMedia 가 이를 읽어 모든 에피소드에 동일 시드/레퍼런스 시트를 적용(에피소드 간 동일 인물).
+		// genre 는 품질 프로파일 산출 실패(try/catch)와 무관하게 직접 분류로 폴백 — 절대 throw 안 함.
+		const vlogTopic = qualityProfileRef.current?.topic || initialTopicTitle;
+		const vlogGenre =
+			qualityProfileRef.current?.genre ?? classifyBenchmarkGenre(vlogTopic);
+		// 고정 호스트는 host-led 장르(HOST_LED_GENRES)에만 자동 생성한다 — 채널 스코프 동일
+		// 인물(시드/레퍼런스 시트)로 에피소드 간 캐릭터 일관성 확보(감사 critical "일관성 장치 전무" 해소).
+		// horror/news/drama/docu/generic 같은 faceless·footage 중심 장르는 진행자를 강제하면 모든
+		// 씬에 인물이 끼어들어 오히려 품질이 떨어지므로 제외(Codex 리뷰 반영). animation 은 자체
+		// continuity manifest, research(documentary)는 mode 로 이미 제외. 비-host-led 장르도 채널이
+		// 캐릭터를 명시 정의하면 character-roster 엔진으로 일관성을 적용할 수 있다(엔진은 장르 무관).
+		// 시대 의상(vlogEra)은 historical_vlog 에서만 — 다른 host-led 장르는 호스트 기본 의상 유지.
+		const recurringHost: HostCharacter | undefined =
+			mode === "ai" && channelId && HOST_LED_GENRES.includes(vlogGenre)
+				? createStarterHost(channelId, "ko")
+				: undefined;
+		const vlogEra =
+			recurringHost && vlogGenre === "historical_vlog"
+				? resolveEra(vlogTopic).id
+				: undefined;
 
 		const { data: script, error: scriptError } = await supabase
 			.from("scripts")
@@ -844,6 +964,12 @@ export default function StepScript({
 								playbook: nicheHandoff.playbook,
 							}
 						: null,
+					...(recurringHost
+						? {
+								host_character: recurringHost,
+								...(vlogEra ? { vlog_era: vlogEra } : {}),
+							}
+						: {}),
 				},
 				status: "approved",
 				reference_template_id: effectiveReferenceTemplate?.id ?? null,
@@ -858,6 +984,39 @@ export default function StepScript({
 			);
 			setSaving(false);
 			return;
+		}
+
+		// 생성 시점 품질 프로파일을 scriptId 키로 영속화 — StepMedia TTS/BGM·판정 단계가 공유
+		// 제출 시점에 format 이 바뀌었으면 해당 포맷으로 재계산 후 저장한다
+		if (qualityProfileRef.current) {
+			try {
+				const submitBenchmarkFormat: "shorts" | "longform" =
+					format === "shorts" ? "shorts" : "longform";
+				const snap = qualityProfileRef.current;
+				let profileToSave = snap.profile;
+				if (submitBenchmarkFormat !== snap.format) {
+					const durationSec = submitBenchmarkFormat === "shorts" ? 45 : 480;
+					// collectBenchmarkSamples 는 포맷으로 필터하므로 제출 포맷으로 다시 수집해야
+					// 새 포맷 레퍼런스 샘플이 살아남는다(옛 samples 재사용 시 전부 탈락→builtin).
+					const resampled = snap.references.length
+						? collectBenchmarkSamples(snap.references, submitBenchmarkFormat)
+						: undefined;
+					const benchmark = resolveMarketBenchmark({
+						genre: snap.genre,
+						format: submitBenchmarkFormat,
+						samples: resampled,
+					});
+					profileToSave = buildQualityProfile({
+						topic: snap.topic,
+						format: submitBenchmarkFormat,
+						durationSec,
+						benchmark,
+					});
+				}
+				saveQualityProfile(script.id, profileToSave);
+			} catch {
+				// 품질 프로파일 저장 실패는 제출 흐름을 막지 않음
+			}
 		}
 
 		if (longformScenes.length > 0) {
@@ -1045,10 +1204,8 @@ export default function StepScript({
 					)}
 					{animationReadiness.requiredActions.length > 0 && (
 						<ul className="mt-1 list-disc pl-4 text-[12px] text-contrast-medium">
-							{animationReadiness.requiredActions
-								.slice(0, 3)
-								.map((action) => (
-									<li key={action}>{action}</li>
+							{animationReadiness.requiredActions.slice(0, 3).map((action) => (
+								<li key={action}>{action}</li>
 							))}
 						</ul>
 					)}
@@ -1070,11 +1227,9 @@ export default function StepScript({
 								레퍼런스 리스크 제어
 							</PText>
 							<ul className="mt-1 list-disc pl-4 text-[12px] text-contrast-medium">
-								{animationReadiness.riskControls
-									.slice(0, 2)
-									.map((control) => (
-										<li key={control}>{control}</li>
-									))}
+								{animationReadiness.riskControls.slice(0, 2).map((control) => (
+									<li key={control}>{control}</li>
+								))}
 							</ul>
 						</div>
 					)}
@@ -1133,13 +1288,16 @@ export default function StepScript({
 							</PTag>
 							{recommendationPlan.performanceFeedback.sampleCount > 0 && (
 								<PTag color="background-surface">
-									성과 {recommendationPlan.performanceFeedback.sampleCount}개 반영
+									성과 {recommendationPlan.performanceFeedback.sampleCount}개
+									반영
 								</PTag>
 							)}
 							{productionPlan.selectedCandidate && (
 								<PTag color="notification-success-soft">
-									{productionPlan.autoSelected ? "자동 레퍼런스" : "선택 레퍼런스"} R
-									{productionPlan.selectedCandidate.score}
+									{productionPlan.autoSelected
+										? "자동 레퍼런스"
+										: "선택 레퍼런스"}{" "}
+									R{productionPlan.selectedCandidate.score}
 								</PTag>
 							)}
 						</div>
@@ -1340,8 +1498,8 @@ export default function StepScript({
 							<ol className="mt-1 list-decimal pl-4">
 								{productionPlan.candidates.slice(0, 5).map((candidate) => (
 									<li key={candidate.template.id}>
-										{candidate.template.name || candidate.template.source_title} · R
-										{candidate.score} · {candidate.categoryLabel}
+										{candidate.template.name || candidate.template.source_title}{" "}
+										· R{candidate.score} · {candidate.categoryLabel}
 									</li>
 								))}
 							</ol>
@@ -1390,7 +1548,9 @@ export default function StepScript({
 
 	const formatChoices: Array<"both" | "shorts" | "longform"> = (() => {
 		if (!effectiveReferenceTemplate) return ["both", "shorts", "longform"];
-		const supported = getReferenceTemplateSupportedFormats(effectiveReferenceTemplate);
+		const supported = getReferenceTemplateSupportedFormats(
+			effectiveReferenceTemplate,
+		);
 		if (supported.length === 1) return [supported[0]];
 		return ["both", ...supported];
 	})();
@@ -1981,7 +2141,9 @@ function StoryEditPanel({
 	);
 }
 
-function scoreColor(score: number):
+function scoreColor(
+	score: number,
+):
 	| "notification-success-soft"
 	| "notification-warning-soft"
 	| "notification-error-soft" {
@@ -2012,7 +2174,8 @@ function ReferenceApplicationPanel({
 						레퍼런스 적용 점수 · 자료 안전 게이트
 					</PText>
 					<PText size="x-small" color="contrast-medium" className="mt-1">
-						훅 시간, 컷 밀도, 씬 수, 출처 앵커, 원본 복제 경계를 저장 전에 점검합니다.
+						훅 시간, 컷 밀도, 씬 수, 출처 앵커, 원본 복제 경계를 저장 전에
+						점검합니다.
 					</PText>
 				</div>
 				<div className="flex flex-wrap gap-static-xs">
@@ -2028,18 +2191,14 @@ function ReferenceApplicationPanel({
 			</div>
 
 			<div className="mt-static-sm grid grid-cols-2 lg:grid-cols-4 gap-static-xs">
-				<PTag color="background-surface">
-					훅 {report.metrics.hookFit}점
-				</PTag>
+				<PTag color="background-surface">훅 {report.metrics.hookFit}점</PTag>
 				<PTag color="background-surface">
 					컷밀도 {report.metrics.cutDensityFit}점
 				</PTag>
 				<PTag color="background-surface">
 					출처 {report.metrics.sourceFit}점
 				</PTag>
-				<PTag color="background-surface">
-					샷 {report.metrics.shotCount}개
-				</PTag>
+				<PTag color="background-surface">샷 {report.metrics.shotCount}개</PTag>
 				{sourceSafetyReport && (
 					<PTag color="background-surface">
 						자료 {sourceSafetyReport.metrics.sourceCount}개
@@ -2047,7 +2206,9 @@ function ReferenceApplicationPanel({
 				)}
 				{sourceSafetyReport && (
 					<PTag color="background-surface">
-						출처씬 {Math.round(sourceSafetyReport.metrics.scenesWithSourceRatio * 100)}%
+						출처씬{" "}
+						{Math.round(sourceSafetyReport.metrics.scenesWithSourceRatio * 100)}
+						%
 					</PTag>
 				)}
 				{sourceSafetyReport?.disclosureRequired && (
@@ -2055,7 +2216,8 @@ function ReferenceApplicationPanel({
 				)}
 			</div>
 
-			{(visibleReferenceIssues.length > 0 || visibleSourceIssues.length > 0) && (
+			{(visibleReferenceIssues.length > 0 ||
+				visibleSourceIssues.length > 0) && (
 				<div className="mt-static-sm grid grid-cols-1 lg:grid-cols-2 gap-static-sm">
 					{visibleReferenceIssues.length > 0 && (
 						<div className="rounded-[10px] bg-[#fff8ea] border border-[#ead9bd] p-static-sm">

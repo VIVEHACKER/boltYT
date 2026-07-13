@@ -4,6 +4,7 @@
  */
 
 import { interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
+import { MOTION_TEXT } from "../typography";
 
 export interface NumberCounterParams {
 	target: number;
@@ -23,6 +24,26 @@ interface Props {
 	duration: number;
 }
 
+/**
+ * 카운트업 표시값 포맷(순수). 목표값의 소수 자릿수를 그대로 유지한다 — 반올림으로 3.5→"4",
+ * 0.25→"0" 처럼 근거 있는 수치를 화면에서 조작하지 않기 위함(YMYL). 정수 목표는 자릿수 0.
+ */
+export function formatCounterValue(
+	value: number,
+	target: number,
+	format?: "comma" | "number",
+): string {
+	const decimals = Number.isInteger(target)
+		? 0
+		: (String(target).split(".")[1]?.length ?? 0);
+	return format === "comma"
+		? value.toLocaleString("ko-KR", {
+				minimumFractionDigits: decimals,
+				maximumFractionDigits: decimals,
+			})
+		: value.toFixed(decimals);
+}
+
 export function NumberCounter({ params, startFrame, duration }: Props) {
 	const frame = useCurrentFrame();
 	const { fps } = useVideoConfig();
@@ -34,7 +55,9 @@ export function NumberCounter({ params, startFrame, duration }: Props) {
 	const countProgress = Math.min(1, localFrame / (duration * 0.8));
 	// Ease-out cubic
 	const eased = 1 - (1 - countProgress) ** 3;
-	const currentValue = Math.round(params.target * eased);
+	// 소수를 반올림하면 "3.5%"→"4%", "0.25%p"→"0%p" 처럼 근거 있는 수치를 화면에서 조작하게 된다(YMYL).
+	// 목표값의 소수 자릿수를 유지해 카운트업 — 정수 목표는 자릿수 0이라 기존 동작 그대로.
+	const currentValue = params.target * eased;
 
 	// Scale pop-in (처음 10프레임)
 	const scale = spring({
@@ -51,10 +74,11 @@ export function NumberCounter({ params, startFrame, duration }: Props) {
 		{ extrapolateLeft: "clamp", extrapolateRight: "clamp" },
 	);
 
-	const formatted =
-		params.format === "comma"
-			? currentValue.toLocaleString("ko-KR")
-			: String(currentValue);
+	const formatted = formatCounterValue(
+		currentValue,
+		params.target,
+		params.format,
+	);
 
 	const justify =
 		params.position === "top"
@@ -77,14 +101,13 @@ export function NumberCounter({ params, startFrame, duration }: Props) {
 		>
 			<div
 				style={{
-					fontSize: params.fontSize ?? 140,
-					fontWeight: 900,
-					color: params.color ?? "#FFD700",
-					fontFamily: "'Noto Sans KR', sans-serif",
+					fontSize: params.fontSize ?? MOTION_TEXT.numberCounter.fontSize,
+					fontWeight: MOTION_TEXT.numberCounter.fontWeight,
+					color: params.color ?? MOTION_TEXT.numberCounter.color,
+					fontFamily: MOTION_TEXT.numberCounter.fontFamily,
 					letterSpacing: "-0.04em",
-					textShadow:
-						"0 4px 16px rgba(0,0,0,0.9), 0 0 24px rgba(255,215,0,0.4)",
-					WebkitTextStroke: "2px rgba(0,0,0,0.9)",
+					textShadow: MOTION_TEXT.numberCounter.textShadow,
+					WebkitTextStroke: MOTION_TEXT.numberCounter.stroke,
 					transform: `scale(${scale})`,
 					opacity,
 					lineHeight: 1,

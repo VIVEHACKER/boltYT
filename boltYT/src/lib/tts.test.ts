@@ -56,6 +56,7 @@ import {
 	type NarrationTtsSignal,
 	OPENAI_VOICES,
 	setDefaultVoice,
+	ttsOverrideForProfile,
 } from "./tts";
 
 // localStorage stub (node 환경에 없으므로 전역 주입)
@@ -185,6 +186,23 @@ describe("inferNarrationTtsOptions", () => {
 	});
 });
 
+describe("ttsOverrideForProfile", () => {
+	it("지원 profile 은 toneKeywords/direction/endingHold 로 변환한다", () => {
+		const override = ttsOverrideForProfile("suspense");
+		expect(override.toneKeywords?.length).toBeGreaterThan(0);
+		expect(typeof override.direction).toBe("string");
+		expect(override.direction?.length ?? 0).toBeGreaterThan(0);
+		expect(typeof override.endingHoldSeconds).toBe("number");
+	});
+
+	it("미지원 profile 과 prototype 상속 키('constructor'/'toString')는 빈 객체", () => {
+		expect(ttsOverrideForProfile("unknown")).toEqual({});
+		expect(ttsOverrideForProfile("constructor")).toEqual({});
+		expect(ttsOverrideForProfile("toString")).toEqual({});
+		expect(ttsOverrideForProfile("__proto__")).toEqual({});
+	});
+});
+
 describe("composeNarrationTtsOptions", () => {
 	it("openai 기본 경로에도 방향 지시와 gpt-4o-mini-tts 모델을 붙인다", () => {
 		const result = composeNarrationTtsOptions([
@@ -306,11 +324,11 @@ describe("inferNarrationEndingHoldSeconds", () => {
 // ─── localStorage TTS 설정 ────────────────────────────────────────────────────
 
 describe("getDefaultVoice / setDefaultVoice / hasStoredTtsSettings", () => {
-	it("localStorage 없을 때 → 기본값 반환", () => {
+	it("localStorage 없을 때 → 기본값(ElevenLabs Bella) 반환", () => {
 		expect(getDefaultVoice()).toEqual({
-			voice: "sage",
-			provider: "openai",
-			speed: 0.97,
+			voice: "EXAVITQu4vr4xnSDxMaL",
+			provider: "elevenlabs",
+			speed: 1.0,
 		});
 	});
 

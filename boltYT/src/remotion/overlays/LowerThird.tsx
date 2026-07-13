@@ -8,6 +8,7 @@ import {
 	getLowerThirdTheme,
 	type NewsSurfaceTone,
 } from "../../lib/news-surface-theme";
+import { LOWER_THIRD_FONT_FAMILY } from "../typography";
 import type { SceneMood } from "../types";
 
 interface Props {
@@ -69,7 +70,7 @@ export function LowerThird({
 				<span style={theme.badge.style}>{theme.badge.text}</span>
 				<span
 					style={{
-						fontFamily: "'Noto Sans KR', sans-serif",
+						fontFamily: LOWER_THIRD_FONT_FAMILY,
 						...theme.source,
 					}}
 				>
@@ -80,7 +81,7 @@ export function LowerThird({
 						<span style={theme.separator}>/</span>
 						<span
 							style={{
-								fontFamily: "'Noto Sans KR', sans-serif",
+								fontFamily: LOWER_THIRD_FONT_FAMILY,
 								...theme.date,
 							}}
 						>

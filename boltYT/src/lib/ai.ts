@@ -6,6 +6,12 @@ import {
 	analyzeAnimationProductionReadiness,
 	formatAnimationReadinessForPrompt,
 } from "./animation-production";
+import {
+	extractTranslatableFields,
+	getMarketProfile,
+	mergeTranslatedFields,
+	type TranslatableFields,
+} from "./market-localization";
 import { getApiProxyUrl } from "./proxy";
 import type { ReferencePreset } from "./reference-bridge";
 import { buildScriptConstraint } from "./reference-bridge";
@@ -32,7 +38,12 @@ interface OpenAICallOptions {
 	timeoutMs?: number;
 }
 
-async function callOpenAI(
+/**
+ * 내부 LLM 호출 진입점.
+ * quality-judge 의 LlmCritic=(system,user,opts?)=>Promise<string> 주입 계약과
+ * 구조적으로 호환된다 (OpenAICallOptions ⊇ {jsonMode, maxTokens, timeoutMs}).
+ */
+export async function callOpenAI(
 	systemPrompt: string,
 	userPrompt: string,
 	opts?: OpenAICallOptions,
@@ -963,6 +974,74 @@ ${topicTitle ? `\n=== 절대 준수: 주제 충실도 (최우선) ===\n이 영�
  * 이미지 생성 — 로컬 모델 우선, API fallback
  * (상세 구현은 image-gen.ts)
  */
+/**
+ * 대본 콘텐츠를 대상 시장 언어로 현지화한다. 영상(visual_prompt)은 건드리지 않고
+ * 텍스트 필드(제목/쇼츠 대본/썸네일 문구/훅/씬 나레이션)만 번역해
+ * "같은 영상, 다른 시장" 차익을 최소 비용으로 얻는다.
+ * 번역 대상 추출/병합은 market-localization 의 순수 함수에 위임(테스트 가능).
+ */
+export async function localizeScriptContent(
+	content: Record<string, unknown>,
+	targetLocale: string,
+): Promise<Record<string, unknown>> {
+	const profile = getMarketProfile(targetLocale);
+	if (!profile) {
+		throw new Error(`알 수 없는 대상 시장 로케일: ${targetLocale}`);
+	}
+	const fields = extractTranslatableFields(content);
+	const hasText =
+		Boolean(fields.title) ||
+		Boolean(fields.shortsScript) ||
+		Boolean(fields.thumbnailText) ||
+		fields.hooks.length > 0 ||
+		fields.sceneNarrations.some((narration) => narration.length > 0);
+	if (!hasText) return { ...content };
+
+	const systemPrompt = `당신은 ${profile.label} 시장을 겨냥한 유튜브 콘텐츠 현지화 전문가입니다. 입력 JSON의 각 텍스트를 ${profile.label}(${profile.language}) 시청자에게 자연스러운 현지 표현으로 옮기세요. 직역이 아니라 현지 시청자가 클릭하고 끝까지 볼 카피로 의역하되, 사실·고유명사·숫자는 보존합니다. 입력과 동일한 JSON 스키마(title, shorts_script, thumbnail_text, hooks, scene_narrations)로만 응답하세요.`;
+	const userPrompt = JSON.stringify({
+		title: fields.title ?? "",
+		shorts_script: fields.shortsScript ?? "",
+		thumbnail_text: fields.thumbnailText ?? "",
+		hooks: fields.hooks,
+		scene_narrations: fields.sceneNarrations,
+	});
+
+	const raw = await callOpenAI(systemPrompt, userPrompt, {
+		jsonMode: true,
+		temperature: 0.4,
+		maxTokens: 8000,
+		timeoutMs: 120_000,
+	});
+	const parsed = parseJSON<{
+		title?: string;
+		shorts_script?: string;
+		thumbnail_text?: string;
+		hooks?: string[];
+		scene_narrations?: string[];
+	}>(raw);
+
+	// 부분 응답 보호: 인덱스로 매핑하고 빠진 슬롯은 원문 유지 — 모델이 일부만 번역해도
+	// 나머지 나레이션/훅을 잃지 않는다.
+	const sceneNarrations =
+		Array.isArray(parsed.scene_narrations) && parsed.scene_narrations.length > 0
+			? fields.sceneNarrations.map(
+					(original, index) => parsed.scene_narrations?.[index] || original,
+				)
+			: fields.sceneNarrations;
+	const hooks =
+		Array.isArray(parsed.hooks) && parsed.hooks.length > 0
+			? fields.hooks.map((original, index) => parsed.hooks?.[index] || original)
+			: fields.hooks;
+	const translated: TranslatableFields = {
+		title: parsed.title || fields.title,
+		shortsScript: parsed.shorts_script || fields.shortsScript,
+		thumbnailText: parsed.thumbnail_text || fields.thumbnailText,
+		hooks,
+		sceneNarrations,
+	};
+	return mergeTranslatedFields(content, translated);
+}
+
 export async function generateImage(
 	sceneId: string,
 	visualPrompt: string,

@@ -277,8 +277,8 @@ export default function ContentWizardPage() {
 							애니메이션 제작
 						</PHeading>
 						<PText size="small" color="contrast-medium">
-							캐릭터 상황극, 스토리타임, 설명형, 인포그래픽, 호러,
-							슬랩스틱 등 포맷을 자동 판별해 쇼츠/롱폼을 만듭니다.
+							캐릭터 상황극, 스토리타임, 설명형, 인포그래픽, 호러, 슬랩스틱 등
+							포맷을 자동 판별해 쇼츠/롱폼을 만듭니다.
 						</PText>
 					</button>
 				</div>
@@ -381,6 +381,7 @@ export default function ContentWizardPage() {
 				{step === 2 && (
 					<StepScript
 						briefId={mode === "research" ? topicId : briefId}
+						channelId={selectedChannelId}
 						mode={mode}
 						sources={sources}
 						referenceTemplate={referenceTemplate}
@@ -448,7 +449,12 @@ function PipelineHealthPanel({
 					<PText size="small" weight="semi-bold">
 						제작 파이프라인 상태
 					</PText>
-					<PButton compact variant="secondary" loading={checking} onClick={onRefresh}>
+					<PButton
+						compact
+						variant="secondary"
+						loading={checking}
+						onClick={onRefresh}
+					>
 						상태 확인
 					</PButton>
 				</div>
@@ -495,7 +501,12 @@ function PipelineHealthPanel({
 							</PTag>
 						))}
 					</div>
-					<PButton compact variant="secondary" loading={checking} onClick={onRefresh}>
+					<PButton
+						compact
+						variant="secondary"
+						loading={checking}
+						onClick={onRefresh}
+					>
 						다시 확인
 					</PButton>
 				</div>
@@ -520,8 +531,9 @@ interface PerformanceUploadRow {
 	published_at?: string | null;
 }
 
-type PerformanceRetentionCurve =
-	NonNullable<ContentPerformanceSample["metrics"]>["retentionCurve"];
+type PerformanceRetentionCurve = NonNullable<
+	ContentPerformanceSample["metrics"]
+>["retentionCurve"];
 
 interface PerformanceAnalyticsRow {
 	upload_id: string;
@@ -541,7 +553,9 @@ interface PerformanceRenderRow {
 	duration_seconds?: number | null;
 }
 
-async function loadContentPerformanceSamples(): Promise<ContentPerformanceSample[]> {
+async function loadContentPerformanceSamples(): Promise<
+	ContentPerformanceSample[]
+> {
 	try {
 		const { data: uploads, error: uploadsError } = await supabase
 			.from("uploads")
@@ -588,7 +602,9 @@ async function loadContentPerformanceSamples(): Promise<ContentPerformanceSample
 		for (const upload of uploadRows) {
 			const analytics = analyticsByUploadId.get(upload.id);
 			if (!analytics) continue;
-			const render = upload.render_id ? rendersById.get(upload.render_id) : undefined;
+			const render = upload.render_id
+				? rendersById.get(upload.render_id)
+				: undefined;
 			samples.push({
 				uploadId: upload.id,
 				title: upload.title,

@@ -24,6 +24,25 @@
     "reference:deep": "npx tsx scripts/reference-deep-promote.ts --target-per-category 1 --limit 5",
     "reference:deep:retry": "npx tsx scripts/reference-deep-promote.ts --target-per-category 9 --limit 45 --retry-deep --timeout-ms 900000",
     "reference:write": "npx tsx scripts/reference-batch-template.ts --offline",
+    "bgm:import": "node scripts/import-bgm-preset.mjs",
+    "set-fal-key": "node scripts/set-fal-key.mjs",
+    "vlog:plan": "npx tsx scripts/historical-vlog-plan.ts",
+    "vlog:make": "npx tsx scripts/make-vlog.ts",
+    "vlog:batch": "npx tsx scripts/vlog-batch.ts",
+    "vlog:economy": "npx tsx scripts/make-economy.ts",
+    "economy:studio": "npx tsx scripts/economy-studio.ts",
+    "economy:pair": "npx tsx scripts/economy-studio.ts --format both",
+    "economy:shorts": "npx tsx scripts/economy-studio.ts --format shorts",
+    "economy:longform": "npx tsx scripts/economy-studio.ts --format longform",
+    "senior:money": "npx tsx scripts/make-senior-money.ts --format both",
+    "senior:money:shorts": "npx tsx scripts/make-senior-money.ts --format shorts",
+    "senior:money:longform": "npx tsx scripts/make-senior-money.ts --format longform",
+    "economy:real": "npx tsx scripts/make-economy-real.ts",
+    "cartoon:money": "npx tsx scripts/make-money-cartoon-short.ts",
+    "reference:shopping": "npx tsx scripts/make-shopping-shorts-interview.ts",
+    "shopping:product": "npx tsx scripts/make-shopping-product-short.ts",
+    "trend:topics": "npx tsx scripts/trend-topics.ts",
+    "verify:output": "npx tsx scripts/verify-output.ts",
     "quality:loop": "npx tsx scripts/post-generation-improvement-loop.ts",
     "quality:loop:fix": "npx tsx scripts/post-generation-improvement-loop.ts --fix",
     "quality:dead-exports": "node scripts/check-dead-exports.mjs",
@@ -37,6 +56,7 @@
   },
   "dependencies": {
     "@porsche-design-system/components-react": "^3.33.0",
+    "@remotion/bundler": "^4.0.448",
     "@remotion/cli": "^4.0.448",
     "@remotion/player": "^4.0.448",
     "@remotion/renderer": "^4.0.448",
@@ -71,5 +91,8 @@
     "typescript-eslint": "^8.57.0",
     "vite": "^8.0.1",
     "vitest": "^4.1.4"
+  },
+  "overrides": {
+    "esbuild": "^0.28.1"
   }
 }

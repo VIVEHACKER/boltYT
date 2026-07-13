@@ -40,6 +40,8 @@ export interface CompositionProps extends Record<string, unknown> {
 		tagline?: string;
 	};
 	bgmUrl?: string;
+	/** 기본 true(기존 렌더 동작 — 짧은 BGM 이 영상 길이를 채우도록 반복). 풀길이 트랙을 1회만 재생하려면 명시적으로 false. */
+	bgmLoop?: boolean;
 	narrationUrl?: string;
 	bgmCuePlan?: BgmCuePlan;
 	subtitleStyle?: SubtitleStyle;
@@ -307,6 +309,7 @@ export function VideoComposition({
 	scenes,
 	brand,
 	bgmUrl,
+	bgmLoop = true,
 	narrationUrl,
 	bgmCuePlan,
 	subtitleStyle,
@@ -366,7 +369,10 @@ export function VideoComposition({
 					Math.max(introFrames + 8, totalFrames - outroFrames - 24),
 					Math.max(introFrames + 9, totalFrames - outroFrames - 1),
 				],
-				[0, 1, 1, 0],
+				// 마스터 헤드룸: 나레이션 피크를 0.9로 둔다. Remotion은 트랙을 선형 합산하고
+				// 마스터 리미터가 없어, 나레이션 1.0 + BGM(덕킹 후 ~0.18)이 0 dBFS를 넘어
+				// 하드클립한다. 0.9로 내려 BGM 헤드룸을 확보(귀로 재확인 권장).
+				[0, 0.9, 0.9, 0],
 				{ extrapolateLeft: "clamp", extrapolateRight: "clamp" },
 			)
 		: 0;
@@ -494,7 +500,7 @@ export function VideoComposition({
 				<Audio
 					src={bgmUrl}
 					volume={bgmVolume}
-					loop
+					loop={bgmLoop}
 					startFrom={bgmCuePlan?.startFromFrame ?? 0}
 				/>
 			)}

@@ -10,7 +10,7 @@ import { supabase } from "./supabase";
 
 // ─── 타입 ───
 
-export type TtsProvider = "openai" | "elevenlabs";
+export type TtsProvider = "openai" | "elevenlabs" | "clova";
 export type OpenAiTtsModel = "tts-1" | "tts-1-hd" | "gpt-4o-mini-tts";
 
 type NarrationProfile = "suspense" | "news" | "warm" | "upbeat" | "neutral";
@@ -59,6 +59,26 @@ const PROFILE_ENDING_HOLD: Record<NarrationProfile, number> = {
 	upbeat: 0.24,
 	neutral: 0.32,
 };
+
+/**
+ * 벤치마크 profile(suspense/news/warm/upbeat/neutral)을 실제 TtsOptions 로 변환한다.
+ * TtsOptions 에는 profile 필드가 없어 provider 가 읽지 못하므로, toneKeywords/endingHold
+ * 로 풀어야 retake 가 실제로 톤을 교정한다. 미지원 profile 은 빈 객체.
+ */
+export function ttsOverrideForProfile(profile: string): Partial<TtsOptions> {
+	// own-key 체크 — profile 은 fix params 의 임의 문자열이라 'constructor'/'toString'
+	// 같은 상속 키가 in 연산자를 통과하는 prototype pollution 을 막는다.
+	if (!Object.hasOwn(PROFILE_TONE_KEYWORDS, profile)) return {};
+	const resolved = profile as NarrationProfile;
+	const toneKeywords = PROFILE_TONE_KEYWORDS[resolved];
+	return {
+		toneKeywords,
+		endingHoldSeconds: PROFILE_ENDING_HOLD[resolved],
+		// generateContinuousNarration 은 options.direction 을 그대로 OpenAI 에 전달하므로
+		// (재합성 안 함) 타깃 profile 의 direction 까지 함께 줘야 톤이 실제로 바뀐다.
+		direction: buildNarrationDirection(resolved, toneKeywords),
+	};
+}
 
 // ─── 음성 목록 ───
 
@@ -172,23 +192,101 @@ export const ELEVENLABS_DEFAULT_VOICES: TtsVoice[] = [
 		description: "성숙한 여성, 차분하고 신뢰감",
 		korean: true,
 	},
+	// ── 한국어 네이티브 보이스(ElevenLabs 라이브러리) ──
+	// 무료 티어는 402(유료 필요). Starter($5/mo+) 전환 시 즉시 선택 가능 — 영어 음색이 아닌 진짜 한국어 발음.
+	{
+		id: "YDseIkMzKtO5bK1Ehnev",
+		name: "Hanabad (한국어)",
+		provider: "elevenlabs",
+		description: "한국어 네이티브 여성, 차분·친근 — 브이로그 추천 (유료)",
+		korean: true,
+	},
+	{
+		id: "uD0jH1cfRqteeku18ODi",
+		name: "Jiana (한국어)",
+		provider: "elevenlabs",
+		description: "한국어 네이티브 여성, 또렷한 — 정보전달 (유료)",
+		korean: true,
+	},
+	{
+		id: "abvGngm3lj2e4QONbyCH",
+		name: "Gogh Lee (한국어)",
+		provider: "elevenlabs",
+		description: "한국어 네이티브 남성, 스토리텔링 (유료)",
+		korean: true,
+	},
+	{
+		id: "cuXUjH0CSJkKipo0Hy9i",
+		name: "Hyunsu (한국어)",
+		provider: "elevenlabs",
+		description: "한국어 네이티브 남성, 팟캐스트 톤 (유료)",
+		korean: true,
+	},
+];
+
+/**
+ * CLOVA Voice(NCP) 한국어 네이티브 보이스 — 한국 유튜버 다수 사용, 발음 자연스러움.
+ * NCP CLOVA Voice 발급 후 CLOVA_API_KEY_ID/CLOVA_API_KEY 설정 시 사용(유료, 무료 크레딧).
+ */
+export const CLOVA_VOICES: TtsVoice[] = [
+	{
+		id: "nara",
+		name: "나라 (CLOVA)",
+		provider: "clova",
+		description: "한국어 여성, 밝고 또렷 — 기본 추천",
+		korean: true,
+	},
+	{
+		id: "nyejin",
+		name: "예진 (CLOVA)",
+		provider: "clova",
+		description: "한국어 여성, 차분·감성 — 브이로그 추천",
+		korean: true,
+	},
+	{
+		id: "nminyoung",
+		name: "민영 (CLOVA)",
+		provider: "clova",
+		description: "한국어 여성, 차분한 안내",
+		korean: true,
+	},
+	{
+		id: "mijin",
+		name: "미진 (CLOVA)",
+		provider: "clova",
+		description: "한국어 여성, 표준",
+		korean: true,
+	},
+	{
+		id: "jinho",
+		name: "진호 (CLOVA)",
+		provider: "clova",
+		description: "한국어 남성, 표준 나레이션",
+		korean: true,
+	},
 ];
 
 /**
  * 사용 가능한 모든 음성 목록
  * — 호출자가 현재 api-proxy의 ElevenLabs 키 활성 여부(useApiKeys)를 넘겨야 함
  */
-export function getAvailableVoices(elevenLabsEnabled = false): TtsVoice[] {
+export function getAvailableVoices(
+	elevenLabsEnabled = false,
+	clovaEnabled = false,
+): TtsVoice[] {
 	const voices = [...OPENAI_VOICES];
 	if (elevenLabsEnabled) {
 		voices.push(...ELEVENLABS_DEFAULT_VOICES);
+	}
+	if (clovaEnabled) {
+		voices.push(...CLOVA_VOICES);
 	}
 	return voices;
 }
 
 /** 특정 음성 찾기 */
 export function findVoice(voiceId: string): TtsVoice | undefined {
-	return [...OPENAI_VOICES, ...ELEVENLABS_DEFAULT_VOICES].find(
+	return [...OPENAI_VOICES, ...ELEVENLABS_DEFAULT_VOICES, ...CLOVA_VOICES].find(
 		(v) => v.id === voiceId,
 	);
 }
@@ -212,9 +310,11 @@ export function getDefaultVoice(): {
 			? localStorage.getItem("tts_speed")
 			: null;
 	return {
-		voice: storedVoice ?? "sage",
-		provider: (storedProvider as TtsProvider) ?? "openai",
-		speed: Number(storedSpeed ?? "0.97"),
+		// 기본 ElevenLabs(유튜버 표준·고품질). 이 환경에선 OpenAI 가 빌링 한도라 ElevenLabs 가 기본.
+		// 무료 티어는 클래식 보이스(Bella)만 — 한국어 네이티브(Hanabad 등)는 유료 플랜에서 선택.
+		voice: storedVoice ?? "EXAVITQu4vr4xnSDxMaL",
+		provider: (storedProvider as TtsProvider) ?? "elevenlabs",
+		speed: Number(storedSpeed ?? "1.0"),
 	};
 }
 
@@ -245,7 +345,9 @@ function countMatches(text: string, patterns: RegExp[]): number {
 }
 
 function uniqueToneKeywords(groups: Array<string[] | undefined>): string[] {
-	const merged = groups.flatMap((group) => group ?? []).map((item) => item.trim());
+	const merged = groups
+		.flatMap((group) => group ?? [])
+		.map((item) => item.trim());
 	return [...new Set(merged.filter(Boolean))].slice(0, 6);
 }
 
@@ -356,10 +458,7 @@ function buildNarrationDirection(
 }
 
 function inferProfileFromOptions(options?: TtsOptions): NarrationProfile {
-	const hints = [
-		options?.direction,
-		(options?.toneKeywords ?? []).join(" "),
-	]
+	const hints = [options?.direction, (options?.toneKeywords ?? []).join(" ")]
 		.filter(Boolean)
 		.join(" ")
 		.toLowerCase();
@@ -693,6 +792,31 @@ async function callElevenLabsTts(
 	return res.arrayBuffer();
 }
 
+async function callClovaTts(
+	text: string,
+	voice: string,
+	speed: number,
+): Promise<ArrayBuffer> {
+	const proxy = getApiProxyUrl();
+	// CLOVA speed: -5(빠름)~5(느림), 0=기본. 앱 배속(1.0=기본)을 반전 매핑.
+	const clovaSpeed = Math.max(-5, Math.min(5, Math.round((1 - speed) * 10)));
+	const res = await fetch(`${proxy}/api/clova/tts`, {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({
+			speaker: voice,
+			text,
+			speed: clovaSpeed,
+			format: "mp3",
+		}),
+	});
+	if (!res.ok) {
+		const err = await res.text();
+		throw new Error(`CLOVA TTS 오류: ${res.status} ${err}`);
+	}
+	return res.arrayBuffer();
+}
+
 /** 통합 TTS 단일 청크 생성 */
 export async function generateTtsChunk(
 	text: string,
@@ -703,6 +827,9 @@ export async function generateTtsChunk(
 	const voice = options?.voice ?? defaults.voice;
 	const speed = options?.speed ?? defaults.speed;
 
+	if (provider === "clova") {
+		return callClovaTts(text, voice, speed);
+	}
 	if (provider === "elevenlabs") {
 		return callElevenLabsTts(text, voice, speed, options);
 	}

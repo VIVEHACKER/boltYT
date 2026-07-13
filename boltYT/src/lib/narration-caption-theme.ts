@@ -45,6 +45,20 @@ export function isEmphasisWord(word: string): boolean {
 	return false;
 }
 
+/**
+ * 숫자 강조 단어(백분율·만/억/천/명/원 등 단위 포함)만 판정 — 순수.
+ * 자막에서 핵심 수치를 청크 내내 지속 하이라이트하려고 isEmphasisWord 의 숫자 분기를 별도로 노출한다.
+ * 감탄사·부사 같은 다른 강조어와 달리 숫자는 데이터라 활성 순간만이 아니라 계속 도드라지게 한다.
+ */
+export function isNumberEmphasisWord(word: string): boolean {
+	if (!word) return false;
+	const w = word.trim().replace(/[!?.,。！？，、…]+$/, "");
+	// 단위는 0개 이상 — "12만원"(만+원) 같은 복합 단위도 하나의 수치로 인정.
+	return /^\d+([.,]\d+)?(?:%|배|개|명|만|억|천|회|초|분|시간|일|년|원)*$/.test(
+		w,
+	);
+}
+
 export function getNarrationCaptionContainerToneStyle(params: {
 	tone?: NewsSurfaceTone;
 	accentColor: string;

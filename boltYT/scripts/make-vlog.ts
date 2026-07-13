@@ -1,0 +1,1150 @@
+/**
+ * 무료 스택 시간여행 브이로그 영상 양산 CLI.
+ *   대본(Claude 구독) → ComfyUI IP-Adapter 호스트 face-lock 이미지 → ElevenLabs 내레이션
+ *   → ffmpeg(Ken Burns + 소프트 한글자막) → MP4 + .srt
+ *
+ * 핵심: 호스트 레퍼런스 포트레이트를 *채널당 1회* 생성·캐시 → 모든 에피소드 동일 인물(시리즈 일관성).
+ *
+ * 전제: ComfyUI(8188, SDXL+IP-Adapter) + api-proxy(3459, LLM_BACKEND=claude + ELEVENLABS) 가 떠 있어야 함.
+ *
+ * 사용:
+ *   npm run vlog:make -- --era "고대 로마" --scenes 5
+ *   npm run vlog:make -- --era titanic-1912 --channel my-history --out renders/
+ *   COMFY_INPUT=~/ComfyUI/input npm run vlog:make -- --era 조선
+ */
+import { execFile } from "node:child_process";
+import { copyFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
+// 카메라무빙 — 컷별 결정적 배정(시드=era 식별자) → Remotion 모션 근사 + i2v 프롬프트 아티팩트.
+import {
+	assignCameraMoves,
+	i2vPromptFor,
+	remotionMotionFor,
+} from "../src/lib/camera-movements.ts";
+import {
+	buildHistoricalChapters,
+	buildHistoricalThumbnail,
+	buildHistoricalTitle,
+	buildPovVisualPrompt,
+	type HistoricalEra,
+	resolveEra,
+} from "../src/lib/historical-vlog-format.ts";
+import {
+	buildHostIdentity,
+	buildHostReferencePrompt,
+	createStarterHost,
+	type HostCharacter,
+} from "../src/lib/host-character.ts";
+// 플랫폼 4종(youtube/tiktok/reels/naver_clip) 업로드 메타 변환 — 순수 함수.
+import { buildPlatformMeta } from "../src/lib/platform-meta.ts";
+// reference-ai-drama-codex-pipeline 보강 — shot-plan + story-sync 게이트(기본 ON).
+import {
+	auditStorySync,
+	budgetNarrationChars,
+	buildShotPlan,
+	cutId,
+	estimateSpeakingSeconds,
+	planRebudget,
+	summarizeAudit,
+	targetSecondsPerCut,
+} from "../src/lib/shot-plan.ts";
+import {
+	END_CARD_FRAMES,
+	TITLE_CARD_FRAMES,
+} from "../src/remotion/cards/card-frames.ts";
+import { renderVlogRemotion } from "./remotion-vlog-render.ts";
+// 최종 산출물 검수(ffprobe 실측 + srt 정합 + contact sheet) — 실패 시 exit 1(fail-closed).
+import { runVerifyOutput, WARN_CHECKS } from "./verify-output.ts";
+import {
+	buildChapterMarkers,
+	illustrationWorkflow,
+	overlayThumbnailText,
+	tts,
+} from "./vlog-shared.ts";
+
+/** boltYT 루트(public/ + src/remotion/index.ts). scripts/ 의 부모. */
+const PROJECT_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+
+const exec = promisify(execFile);
+const COMFY = process.env.COMFY_URL ?? "http://localhost:8188";
+const PROXY = process.env.API_PROXY_URL ?? "http://localhost:3459";
+const COMFY_INPUT = process.env.COMFY_INPUT ?? join(homedir(), "ComfyUI/input");
+const CKPT = process.env.COMFY_CKPT ?? "sd_xl_base_1.0.safetensors";
+// 메모리/속도 튜닝(제약 하드웨어용). 기본은 고품질. 메모리 부족 시 낮춰서 SDXL 활성화 메모리·시간 절감.
+// 예: SCENE_W=1024 SCENE_H=576 COMFY_STEPS=20 npm run vlog:make ...
+/** 양의 정수 env 파싱. 잘못된 값(NaN/0/음수/소수)은 기본값 폴백 — ComfyUI 입력은 양의 정수 필수. */
+function posIntEnv(name: string, def: number): number {
+	const raw = process.env[name];
+	if (raw === undefined || raw === "") return def;
+	const n = Number(raw);
+	return Number.isInteger(n) && n > 0 ? n : def;
+}
+/** ComfyUI 잠재 차원 env — 8의 배수로 반올림 + 최소 64(EmptyLatentImage는 8px 증분, 너무 작으면 큐 실패). */
+function latentDimEnv(name: string, def: number): number {
+	return Math.max(64, Math.round(posIntEnv(name, def) / 8) * 8);
+}
+const STEPS = Math.max(8, posIntEnv("COMFY_STEPS", 30));
+const SCENE_W = latentDimEnv("SCENE_W", 1344);
+const SCENE_H = latentDimEnv("SCENE_H", 768);
+// 숏폼(--shorts true)은 세로 9:16 로 생성 → Remotion YouTubeShorts(1080x1920)가 가로 이미지를
+// 크롭/업스케일하던 화질 붕괴를 제거(레버 A). 기본 768x1344 = SDXL 1MP 9:16 버킷. FLUX 면 1080x1920 권장.
+const SHORTS_W = latentDimEnv("SHORTS_W", 768);
+const SHORTS_H = latentDimEnv("SHORTS_H", 1344);
+/** 양의 실수 env(0 초과). 잘못된 값은 기본값. */
+function floatEnv(name: string, def: number): number {
+	const raw = process.env[name];
+	if (raw === undefined || raw === "") return def;
+	const n = Number(raw);
+	return Number.isFinite(n) && n > 0 ? n : def;
+}
+/**
+ * 비유럽 강문화 era 판정 — SDXL 이 강한 문화 프롬프트(조선/이집트 등)에서 호스트 ethnicity 를
+ * 덮어써 드리프트가 나는 era. 이 경우 IPAdapter weight/end_at 를 올려 유럽계 호스트 얼굴을 고정한다.
+ * (서구 era 는 낮은 weight 로 배경/군중을 더 살림.) env(IPA_WEIGHT/IPA_END_AT)가 항상 우선.
+ */
+function needsStrongIdentityLock(era: HistoricalEra): boolean {
+	const t =
+		`${era.settingKeywords} ${era.wardrobeKeywords} ${era.subjectEn}`.toLowerCase();
+	// ASCII 마커: 선행 \b 경계로 부분매칭 차단(예: "looming"→ming, "tuxedo"→edo 오탐 방지).
+	// 모호한 단편(ming/qing/tang/edo)은 제외 — china/japan 이 해당 왕조를 커버. 어미는 base 가 흡수
+	// (korea→korean, japan→japanese, india→indian, africa→african, thai→thailand).
+	const ascii =
+		/\b(korea|joseon|hanok|hanbok|china|chinese|japan|samurai|mughal|india|persia|ottoman|egypt|pharaoh|nubian|aztec|maya|inca|africa|mongol|thai|vietnam)/;
+	// 한글 마커(한글 era 명은 resolveEra 가 Hangul 을 settingKeywords 에 복사 — Codex). 다중자만.
+	const hangul =
+		/조선|한국|고려|신라|백제|고구려|중국|청나라|명나라|일본|사무라이|인도|무굴|페르시아|이집트|파라오|몽골|아즈텍|잉카|아프리카|베트남|태국|오스만/;
+	return ascii.test(t) || hangul.test(t);
+}
+const W = 1920,
+	H = 1080;
+// 빈 배경 → 살아있는 장면. 레퍼런스(Chloe) 대비 최대 격차였던 "텅 빈 배경" 보정.
+// (sceneWorkflow negative 에서 "multiple people" 제거와 짝 — 안 그러면 군중이 억제됨)
+const CROWD =
+	"bustling background crowd of period-accurate people going about daily life, lively populated scene, sense of depth";
+const log = (m: string) => process.stdout.write(`${m}\n`);
+const photoreal = (p: string) =>
+	`Photorealistic cinematic still frame, 35mm film look, shallow depth of field, professional color grading, natural lighting, sharp focus, high detail, 8K: ${p}`;
+
+function parseArgs(argv: string[]): Record<string, string> {
+	const o: Record<string, string> = {};
+	for (let i = 0; i < argv.length; i++) {
+		if (!argv[i].startsWith("--")) continue;
+		const k = argv[i].slice(2);
+		const v = argv[i + 1];
+		if (v === undefined || v.startsWith("--")) o[k] = "true";
+		else {
+			o[k] = v;
+			i++;
+		}
+	}
+	return o;
+}
+
+async function runComfy(workflow: unknown, outPath: string): Promise<string> {
+	const q = await fetch(`${COMFY}/prompt`, {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({ prompt: workflow }),
+	});
+	if (!q.ok) throw new Error(`ComfyUI queue ${q.status} ${await q.text()}`);
+	const { prompt_id } = (await q.json()) as { prompt_id: string };
+	for (let i = 0; i < 600; i++) {
+		await new Promise((r) => setTimeout(r, 1500));
+		const h = await fetch(`${COMFY}/history/${prompt_id}`);
+		if (!h.ok) continue;
+		const rec = (
+			(await h.json()) as Record<
+				string,
+				{
+					outputs?: Record<
+						string,
+						{ images?: { filename: string; subfolder: string; type: string }[] }
+					>;
+				}
+			>
+		)[prompt_id];
+		const img = rec?.outputs
+			? Object.values(rec.outputs)[0]?.images?.[0]
+			: undefined;
+		if (img) {
+			const v = await fetch(
+				`${COMFY}/view?filename=${img.filename}&subfolder=${img.subfolder}&type=${img.type}`,
+			);
+			writeFileSync(outPath, Buffer.from(await v.arrayBuffer()));
+			return outPath;
+		}
+	}
+	throw new Error(`ComfyUI timeout (${outPath})`);
+}
+
+function portraitWorkflow(prompt: string, seed: number) {
+	return {
+		"3": {
+			class_type: "KSampler",
+			inputs: {
+				seed,
+				steps: STEPS,
+				cfg: 6.5,
+				sampler_name: "dpmpp_2m",
+				scheduler: "karras",
+				denoise: 1,
+				model: ["4", 0],
+				positive: ["6", 0],
+				negative: ["7", 0],
+				latent_image: ["5", 0],
+			},
+		},
+		"4": { class_type: "CheckpointLoaderSimple", inputs: { ckpt_name: CKPT } },
+		"5": {
+			class_type: "EmptyLatentImage",
+			inputs: { width: 832, height: 1024, batch_size: 1 },
+		},
+		"6": {
+			class_type: "CLIPTextEncode",
+			inputs: { text: prompt, clip: ["4", 1] },
+		},
+		"7": {
+			class_type: "CLIPTextEncode",
+			inputs: {
+				text: "ugly, blurry, low quality, deformed, multiple people, cartoon, text, watermark",
+				clip: ["4", 1],
+			},
+		},
+		"8": {
+			class_type: "VAEDecode",
+			inputs: { samples: ["3", 0], vae: ["4", 2] },
+		},
+		"9": {
+			class_type: "SaveImage",
+			inputs: { filename_prefix: "vlog_host", images: ["8", 0] },
+		},
+	};
+}
+
+// weight: IPAdapter 얼굴 영향력. 높을수록 얼굴 고정↑ 배경/표정↓. 셀카/썸네일은 낮춰 배경·표정 살림.
+function sceneWorkflow(
+	prompt: string,
+	seed: number,
+	ref: string,
+	weight = 0.6,
+	endAt = 0.7,
+	width = SCENE_W,
+	height = SCENE_H,
+) {
+	return {
+		"4": { class_type: "CheckpointLoaderSimple", inputs: { ckpt_name: CKPT } },
+		"10": {
+			class_type: "IPAdapterModelLoader",
+			inputs: {
+				ipadapter_file: "sdxl_models/ip-adapter-plus_sdxl_vit-h.safetensors",
+			},
+		},
+		"11": {
+			class_type: "CLIPVisionLoader",
+			inputs: { clip_name: "CLIP-ViT-H-14-laion2B-s32B-b79K.safetensors" },
+		},
+		"12": { class_type: "LoadImage", inputs: { image: ref } },
+		"13": {
+			class_type: "IPAdapterAdvanced",
+			inputs: {
+				model: ["4", 0],
+				ipadapter: ["10", 0],
+				image: ["12", 0],
+				clip_vision: ["11", 0],
+				weight,
+				weight_type: "ease in-out",
+				combine_embeds: "concat",
+				start_at: 0,
+				end_at: endAt,
+				embeds_scaling: "V only",
+			},
+		},
+		"5": {
+			class_type: "EmptyLatentImage",
+			inputs: { width, height, batch_size: 1 },
+		},
+		"6": {
+			class_type: "CLIPTextEncode",
+			inputs: { text: prompt, clip: ["4", 1] },
+		},
+		"7": {
+			class_type: "CLIPTextEncode",
+			inputs: {
+				text: "ugly, blurry, low quality, deformed, different face, cartoon, text, watermark, cropped face",
+				clip: ["4", 1],
+			},
+		},
+		"3": {
+			class_type: "KSampler",
+			inputs: {
+				seed,
+				steps: STEPS,
+				cfg: 6.5,
+				sampler_name: "dpmpp_2m",
+				scheduler: "karras",
+				denoise: 1,
+				model: ["13", 0],
+				positive: ["6", 0],
+				negative: ["7", 0],
+				latent_image: ["5", 0],
+			},
+		},
+		"8": {
+			class_type: "VAEDecode",
+			inputs: { samples: ["3", 0], vae: ["4", 2] },
+		},
+		"9": {
+			class_type: "SaveImage",
+			inputs: { filename_prefix: "vlog_scene", images: ["8", 0] },
+		},
+	};
+}
+
+/** 와이드 환경샷 — 호스트 얼굴 없이 "그들이 보는 것"(군중·장소). 셀카 단조로움 깨기. */
+function wideWorkflow(
+	prompt: string,
+	seed: number,
+	width = SCENE_W,
+	height = SCENE_H,
+) {
+	return {
+		"3": {
+			class_type: "KSampler",
+			inputs: {
+				seed,
+				steps: STEPS,
+				cfg: 6.5,
+				sampler_name: "dpmpp_2m",
+				scheduler: "karras",
+				denoise: 1,
+				model: ["4", 0],
+				positive: ["6", 0],
+				negative: ["7", 0],
+				latent_image: ["5", 0],
+			},
+		},
+		"4": { class_type: "CheckpointLoaderSimple", inputs: { ckpt_name: CKPT } },
+		"5": {
+			class_type: "EmptyLatentImage",
+			inputs: { width, height, batch_size: 1 },
+		},
+		"6": {
+			class_type: "CLIPTextEncode",
+			inputs: { text: prompt, clip: ["4", 1] },
+		},
+		"7": {
+			class_type: "CLIPTextEncode",
+			inputs: {
+				text: "ugly, blurry, low quality, deformed, cartoon, text, watermark, selfie, close-up face, empty deserted",
+				clip: ["4", 1],
+			},
+		},
+		"8": {
+			class_type: "VAEDecode",
+			inputs: { samples: ["3", 0], vae: ["4", 2] },
+		},
+		"9": {
+			class_type: "SaveImage",
+			inputs: { filename_prefix: "vlog_wide", images: ["8", 0] },
+		},
+	};
+}
+
+async function dur(file: string): Promise<number> {
+	const { stdout } = await exec("ffprobe", [
+		"-v",
+		"error",
+		"-show_entries",
+		"format=duration",
+		"-of",
+		"csv=p=0",
+		file,
+	]);
+	return Math.max(1.5, Number.parseFloat(stdout.trim()) || 3);
+}
+
+function srtTime(s: number): string {
+	// 전체 ms 로 반올림 후 분해 → 1.9996 같은 경계에서 ms 1000 오버플로("01,1000") 방지(Codex P2).
+	const total = Math.max(0, Math.round(s * 1000));
+	const ms = total % 1000;
+	const sec = Math.floor(total / 1000) % 60;
+	const m = Math.floor(total / 60000) % 60;
+	const h = Math.floor(total / 3600000);
+	return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")},${String(ms).padStart(3, "0")}`;
+}
+
+/**
+ * 채널당 1회 호스트 포트레이트 생성·캐시 → 얼굴 크롭 → ComfyUI input. 재실행 시 재사용.
+ * opts.shocked: 동일 styleSeed(동일 인물) + 놀란 표정 변형(썸네일용, 별도 캐시).
+ */
+async function ensureHostReference(
+	host: HostCharacter,
+	dir: string,
+	opts: { shocked?: boolean } = {},
+): Promise<string> {
+	const id = buildHostIdentity(host);
+	const suffix = opts.shocked ? "_shocked" : "";
+	// 채널별 전체 styleSeed 를 키에 포함 — 같은 host.id 라도 채널 다르면 캐시 충돌 방지(Codex).
+	// (생성 seed 는 ComfyUI 한도로 mod 하지만, 캐시 키는 절단하면 충돌하므로 전체 seed 사용)
+	const refName = `vloghost_${host.id}_${id.styleSeed}${suffix}.png`;
+	const refInInput = join(COMFY_INPUT, refName);
+	if (existsSync(refInInput)) {
+		log(`   호스트 레퍼런스 재사용: ${refName} (동일 인물 유지)`);
+		return refName;
+	}
+	log(
+		`   호스트 레퍼런스 최초 생성(채널당 1회)${opts.shocked ? " — 놀란 표정" : ""}...`,
+	);
+	// shocked 는 기본 프롬프트의 "neutral friendly expression" 을 치환(append 시 표정 충돌→중립으로 묻힘).
+	const basePrompt = buildHostReferencePrompt(id);
+	const prompt = opts.shocked
+		? basePrompt.replace(
+				"neutral friendly expression",
+				"shocked surprised open-mouth wide-eyed expression",
+			)
+		: basePrompt;
+	const portrait = await runComfy(
+		portraitWorkflow(photoreal(prompt), id.styleSeed % 1_000_000),
+		join(dir, `host${suffix}.png`),
+	);
+	const face = join(dir, `host_face${suffix}.png`);
+	await exec("sips", [
+		"-c",
+		"620",
+		"560",
+		"--cropOffset",
+		"0",
+		"120",
+		portrait,
+		"--out",
+		face,
+	]);
+	copyFileSync(face, refInInput);
+	return refName;
+}
+
+interface VlogScene {
+	narration: string;
+	visual: string;
+}
+
+/** 단일 LLM 호출 → 씬 배열. 숏폼 1회 / 롱폼 챕터별 호출에서 공용. */
+async function genScenes(userPrompt: string): Promise<VlogScene[]> {
+	const cr = await fetch(`${PROXY}/api/openai/chat`, {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({
+			messages: [
+				{
+					role: "system",
+					content: "한국 유튜브 시간여행 역사 브이로그 작가. JSON만 출력.",
+				},
+				{ role: "user", content: userPrompt },
+			],
+			response_format: { type: "json_object" },
+		}),
+	});
+	if (!cr.ok)
+		throw new Error(`대본 ${cr.status} (api-proxy LLM_BACKEND=claude 확인)`);
+	const parsed = JSON.parse((await cr.json()).choices[0].message.content);
+	return (Array.isArray(parsed.scenes) ? parsed.scenes : []) as VlogScene[];
+}
+
+/**
+ * 단일 narration 을 목표 문자수에 맞게 재작성(액티브 rebudget) — 의미·시대·1인칭 톤 보존.
+ * 실패/빈 응답 시 원문 유지(비파괴). SHOTPLAN_REBUDGET 경로 전용.
+ */
+async function rewriteNarration(
+	narration: string,
+	targetChars: number,
+	direction: "expand" | "trim",
+	era: HistoricalEra,
+): Promise<string> {
+	// expand=환각/시대오류 방지, trim=사실 보존. 원문 문장 수(1~2) 유지로 의미 손실/런온 방지.
+	const guide =
+		direction === "expand"
+			? "기존 내용만 더 생생하게 풀어 써라(새 사실·고유명사·연도를 지어내지 마라)"
+			: "군더더기만 덜어 핵심 의미·사실을 보존하라";
+	const cr = await fetch(`${PROXY}/api/openai/chat`, {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({
+			messages: [
+				{
+					role: "system",
+					content: "한국 유튜브 시간여행 역사 브이로그 작가. JSON만 출력.",
+				},
+				{
+					role: "user",
+					content: `${era.subjectKo} 1인칭 브이로그 내레이션을 의미·톤 유지하며 약 ${targetChars}자(±15%)로 다시 써라. ${guide}. 원문 문장 수(1~2문장) 유지, 생생·몰입·한국어. JSON: {"narration":"..."}\n원문: ${narration}`,
+				},
+			],
+			response_format: { type: "json_object" },
+		}),
+	});
+	if (!cr.ok) throw new Error(`rebudget ${cr.status}`);
+	const parsed = JSON.parse((await cr.json()).choices[0].message.content);
+	const out =
+		typeof parsed.narration === "string" ? parsed.narration.trim() : "";
+	return out || narration;
+}
+
+/**
+ * visual 프롬프트 복구 — empty-visual/forbidden-location 은 비트맵이 아니라 visual *텍스트* 문제라,
+ * 같은 문자열로 이미지만 재생성하면 재감사가 동일 에러를 다시 잡는다(무의미 재시도). 텍스트 자체를 고친다.
+ * 실패/빈 응답 시 fallback(내레이션 기반 최소 묘사) — 절대 빈 문자열 반환 안 함(감사 통과 보장 시도).
+ */
+async function rewriteVisual(
+	scene: VlogScene,
+	forbidden: string[],
+	era: HistoricalEra,
+): Promise<string> {
+	const avoid = forbidden.length
+		? ` 다음 장소는 절대 등장/언급 금지: ${forbidden.join(", ")}.`
+		: "";
+	try {
+		const cr = await fetch(`${PROXY}/api/openai/chat`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				messages: [
+					{
+						role: "system",
+						content:
+							"AI 이미지 생성용 장면 묘사 작가(영어 시각 프롬프트). JSON만 출력.",
+					},
+					{
+						role: "user",
+						content: `${era.subjectKo} 시대의 이 브이로그 컷을 위한 구체적 시각 묘사를 영어 1문장으로 써라(인물/배경/조명/분위기).${avoid} 내레이션: ${scene.narration}\nJSON: {"visual":"..."}`,
+					},
+				],
+				response_format: { type: "json_object" },
+			}),
+		});
+		if (cr.ok) {
+			const parsed = JSON.parse((await cr.json()).choices[0].message.content);
+			const out = typeof parsed.visual === "string" ? parsed.visual.trim() : "";
+			if (out) return out;
+		}
+	} catch {
+		// 폴백으로 진행
+	}
+	// LLM 실패 시에도 빈 값은 금지 — 내레이션 앞부분으로 최소 묘사 생성(empty-visual 은 최소 해소).
+	const base = (scene.narration || era.subjectKo).slice(0, 80);
+	return `${era.subjectKo} scene: ${base}`;
+}
+
+// 6-비트 챕터별 분량 가중치(Chloe Rome 아크 기반: 훅 짧게→클라이맥스 최장→아웃트로 짧게).
+const CHAPTER_WEIGHTS: Record<string, number> = {
+	hook: 0.6,
+	arrival: 1.0,
+	immersion: 1.2,
+	conflict: 1.4,
+	revelation: 1.1,
+	farewell: 0.7,
+};
+
+/**
+ * 롱폼 대본 — buildHistoricalChapters 6역할별 개별 호출(truncation 회피 + 챕터 구조 + 페이싱).
+ * chapterStarts[i] = scenes 배열에서 챕터 i 가 시작하는 인덱스(YouTube 챕터 타임스탬프용).
+ */
+async function generateLongformScript(
+	era: HistoricalEra,
+	minutes: number,
+): Promise<{ scenes: VlogScene[]; chapterStarts: number[]; roles: string[] }> {
+	const chapters = buildHistoricalChapters(era, "ko"); // [{ role, note }]
+	const totalScenes = Math.max(12, Math.round(minutes * 5)); // ~5 씬/분
+	const sumW = chapters.reduce((s, c) => s + (CHAPTER_WEIGHTS[c.role] ?? 1), 0);
+	const all: VlogScene[] = [];
+	const chapterStarts: number[] = [];
+	const roles: string[] = [];
+	for (let i = 0; i < chapters.length; i++) {
+		const ch = chapters[i];
+		chapterStarts.push(all.length);
+		roles.push(ch.role);
+		const n = Math.max(
+			2,
+			Math.round((totalScenes * (CHAPTER_WEIGHTS[ch.role] ?? 1)) / sumW),
+		);
+		const guide =
+			ch.role === "hook"
+				? " 첫 씬은 0-3초 강력한 패턴 인터럽트 훅(시청자를 멈추게). 느리고 몰입감 있게."
+				: i === chapters.length - 1
+					? " 마지막은 현재로 귀환 + 다음 시대 티저(시리즈 훅)."
+					: " 챕터 끝은 다음으로 이어지는 궁금증(open loop)으로.";
+		const usr = `${era.subjectKo} 시간여행 1인칭 한국어 브이로그의 "${ch.role}" 챕터. 연출 의도: ${ch.note}. 정확히 ${n}개 씬.${guide} 각 씬: narration(한국어 1-2문장, 1인칭·몰입·생생), visual(영어, 그 장면 시각 묘사). 직전 흐름과 자연스럽게 연결. JSON: {"scenes":[{"narration":"...","visual":"..."}]}`;
+		log(`   챕터 ${i + 1}/${chapters.length} (${ch.role}, ${n}씬)...`);
+		// 챕터당 n 으로 캡 — LLM 초과 반환 시 이미지/TTS 비용 폭증 방지(Codex).
+		all.push(...(await genScenes(usr)).slice(0, n));
+	}
+	return { scenes: all, chapterStarts, roles };
+}
+
+async function main(): Promise<void> {
+	const args = parseArgs(process.argv.slice(2));
+	const era: HistoricalEra = resolveEra(args.era ?? "고대 로마");
+	// 비서구 강문화 era 는 IPAdapter 를 강하게(호스트 ethnicity 드리프트 방지). env 가 항상 우선.
+	const strongLock = needsStrongIdentityLock(era);
+	// 서양 셀카 0.72: A/B 검증값(0.5=씬 간 호스트 드리프트, 0.72=신원 고정+배경 유지, 0.85=배경 과압축).
+	// 비서양 0.85: ethnicity 드리프트(강문화 프롬프트가 유럽계 얼굴을 덮어씀) 방어용 — 더 강해야 함.
+	const ipaWeight = Math.min(
+		1,
+		floatEnv("IPA_WEIGHT", strongLock ? 0.85 : 0.72),
+	);
+	const ipaEndAt = Math.min(1, floatEnv("IPA_END_AT", strongLock ? 0.9 : 0.7));
+	const sceneCount = Math.max(2, Math.min(8, Number(args.scenes ?? "4")));
+	// 롱폼 모드: --minutes N → 6챕터 구조. 미지정 시 숏폼(--scenes).
+	const minutes = args.minutes ? Math.max(1, Number(args.minutes)) : 0;
+	// 아트 스타일: illustration(기본, 케이스 스터디 검증 — 단일 일관 일러스트체로 일관성/언캐니밸리/오리지널 동시 해결)
+	// vs photoreal(레거시 — IPAdapter 호스트 face-lock). --style photoreal 로 옛 경로 유지.
+	const illustration = args.style !== "photoreal";
+	// 숏폼이면 씬 이미지를 세로(9:16)로 생성 → YouTubeShorts 컴포지션의 크롭/업스케일 블러 제거(레버 A).
+	// 썸네일은 16:9 유지(YouTube 썸네일 규격)라 이 차원을 안 쓴다.
+	const isShorts = args.shorts === "true";
+	const imgW = isShorts ? SHORTS_W : SCENE_W;
+	const imgH = isShorts ? SHORTS_H : SCENE_H;
+	// ffmpeg 폴백 렌더 차원 — 숏폼이면 세로(1080x1920)로 렌더해야 9:16 소스가 안 잘림(Codex P2).
+	// (Remotion 경로는 YouTubeShorts 컴포지션이 알아서 세로. ffmpeg 폴백은 여기서 명시.)
+	const renderW = isShorts ? H : W;
+	const renderH = isShorts ? W : H;
+	const channel = args.channel ?? "my-history";
+	const stamp =
+		Number(process.env.SOURCE_DATE_EPOCH) || Math.floor(Date.now() / 1000);
+	const outDir = args.out ?? join(process.cwd(), "renders");
+	mkdirSync(outDir, { recursive: true });
+	const work = join(outDir, `vlog_${era.id}_${stamp}`);
+	mkdirSync(work, { recursive: true });
+	log(
+		`▶ ${era.subjectKo} 시간여행 브이로그 (${minutes ? `롱폼 ~${minutes}분` : `${sceneCount}씬`}, ${illustration ? "일러스트" : "포토리얼"}) — 채널 ${channel}`,
+	);
+
+	// 1) 대본 (Claude)
+	let scenes: VlogScene[];
+	let chapterStarts: number[] = [];
+	let chapterRoles: string[] = [];
+	if (minutes) {
+		log(`1) 롱폼 대본 — 6챕터 구조 (목표 ~${minutes}분)...`);
+		const lf = await generateLongformScript(era, minutes);
+		scenes = lf.scenes;
+		chapterStarts = lf.chapterStarts;
+		chapterRoles = lf.roles;
+	} else {
+		log("1) 대본(Claude)...");
+		const usr = `${era.subjectKo}로 시간여행한 1인칭 한국어 브이로그. 정확히 ${sceneCount}개 씬. 각 씬: narration(한국어 1문장, 1인칭·몰입·생생), visual(영어, 그 장면 시각 묘사). JSON: {"scenes":[{"narration":"...","visual":"..."}]}`;
+		scenes = (await genScenes(usr)).slice(0, sceneCount);
+	}
+	if (scenes.length === 0) throw new Error("대본 생성 실패 (씬 0개)");
+	log(
+		`   ${scenes.length}씬 생성${minutes ? " (6챕터)" : ""}: ${scenes
+			.map((s) => s.narration.slice(0, 12))
+			.join(" / ")
+			.slice(0, 110)}`,
+	);
+
+	// 1.b) 액티브 rebudget(visual-length→script-length, 기본 ON) — reference-ai-drama-codex-pipeline.
+	//      컷 목표 길이에 맞춰 대본 분량을 LLM 으로 재작성 → TTS 자연 속도(컷 과속/늘어짐 방지).
+	//      opt-out: SHOTPLAN_REBUDGET=0. 재작성 실패 컷은 원문 유지(비파괴). SHOTPLAN_TARGET_SEC=컷당 목표초.
+	if (process.env.SHOTPLAN_REBUDGET !== "0") {
+		const totalTargetSec = minutes
+			? minutes * 60
+			: scenes.length * Number(process.env.SHOTPLAN_TARGET_SEC ?? 10);
+		const targets = targetSecondsPerCut(totalTargetSec, scenes.length);
+		const cap = Number(process.env.SHOTPLAN_REBUDGET_MAX ?? 24);
+		// tolerance 0.25(계약 확정치 — 모듈 기본 0.35 보다 빡빡). SHOTPLAN_TOLERANCE 로 채널별 오버라이드.
+		const tolRaw = Number(process.env.SHOTPLAN_TOLERANCE);
+		const tolerance = Number.isFinite(tolRaw) && tolRaw > 0 ? tolRaw : 0.25;
+		const plan = planRebudget(
+			scenes.map((s) => s.narration),
+			targets,
+			{ tolerance },
+		)
+			// 롱폼 훅(챕터0 = 의도적 0~3초 패턴인터럽트)은 제외 — 의도된 짧은 페이싱 보존.
+			.filter((p) => !(minutes && p.index === (chapterStarts[0] ?? 0)))
+			.slice(0, Number.isFinite(cap) && cap > 0 ? cap : 24);
+		if (plan.length) {
+			log(
+				`1.b) 액티브 rebudget: ${plan.length}컷 대본 길이 재조정(목표 ~${targets[0]}s/컷)...`,
+			);
+			for (const p of plan) {
+				try {
+					const rewritten = await rewriteNarration(
+						scenes[p.index].narration,
+						p.targetChars,
+						p.direction,
+						era,
+					);
+					// 재작성이 목표에 더 가까울 때만 채택 — 과확장/길이폭주로 더 어긋나면 원문 유지.
+					const before = Math.abs(
+						estimateSpeakingSeconds(scenes[p.index].narration) - p.targetSec,
+					);
+					const after = Math.abs(
+						estimateSpeakingSeconds(rewritten) - p.targetSec,
+					);
+					if (after <= before)
+						scenes[p.index] = { ...scenes[p.index], narration: rewritten };
+					else log(`   컷${p.index + 1} rebudget 무시(재작성이 더 어긋남)`);
+				} catch (e) {
+					log(`   컷${p.index + 1} rebudget 생략(${e})`);
+				}
+			}
+		}
+	}
+
+	// 2) 호스트 레퍼런스(채널 캐시) — 포토리얼 모드만. 일러스트는 스타일이 일관성을 운반하므로 불필요.
+	const host = createStarterHost(channel, "ko");
+	let ref = "";
+	if (!illustration) {
+		log("2) 호스트 레퍼런스...");
+		ref = await ensureHostReference(host, work);
+	}
+
+	// 3) 씬별 이미지 + 내레이션 (메타 수집 — 렌더는 4단계)
+	const made: { img: string; mp3: string; narration: string; d: number }[] = [];
+	// 카드는 롱폼 Remotion(YouTubeVideo) 전용 — Shorts/ffmpeg 경로엔 미적용(Codex P2).
+	const useCards =
+		!!minutes && args.shorts !== "true" && args.ffmpeg !== "true";
+	// 인트로 카드가 씬 블록을 TITLE_CARD_FRAMES(90f@30fps=3s)만큼 뒤로 민다 → .srt 도 동일 오프셋
+	// (Codex P2: 안 그러면 업로드 자막이 3초 빠름). 씬0 전치=none(overlap 0)이라 강체 이동만 보정하면 충분.
+	const introOffsetSec = useCards ? TITLE_CARD_FRAMES / 30 : 0;
+	/**
+	 * 씬 i 이미지 생성 — 본문 루프·3.a 감사 재생성 루프 공용. seedOffset: 재생성 시 결정적 seed 변경.
+	 * 정지 이미지 프롬프트에는 카메라 무빙 문구를 넣지 않는다 — 정지컷 생성엔 무의미한 노이즈(모션은 Remotion 담당).
+	 */
+	const genSceneImage = (i: number, seedOffset = 0): Promise<string> => {
+		// 셀카(호스트 face-lock) ↔ 와이드(환경+군중) 교차. 0=셀카 훅, 1=와이드, 2=셀카 ...
+		const isWide = i % 2 === 1;
+		const seed = 1000 + i * 137 + seedOffset;
+		// 일러스트 모드: IPAdapter 없이 일관 일러스트체. era.settingKeywords 의 "photorealistic" 은 제거(스타일 충돌).
+		const povBase = buildPovVisualPrompt(scenes[i].visual, era);
+		const illusPrompt = isWide
+			? `${scenes[i].visual}, ${era.settingKeywords}, wide establishing shot, ${CROWD}`.replace(
+					/photo-?realistic,?\s*/gi,
+					"",
+				)
+			: `${povBase}, first-person POV close perspective, expansive detailed background with ${CROWD}`.replace(
+					/photo-?realistic,?\s*/gi,
+					"",
+				);
+		return runComfy(
+			illustration
+				? illustrationWorkflow(illusPrompt, seed, imgW, imgH)
+				: isWide
+					? wideWorkflow(
+							photoreal(
+								`${scenes[i].visual}, ${era.settingKeywords}, wide establishing shot, ${CROWD}`,
+							),
+							seed,
+							imgW,
+							imgH,
+						)
+					: sceneWorkflow(
+							// medium 셀카(허리 위) + 중간 weight(서양 0.72/비서양 0.85) → 호스트 신원 고정하며 배경/군중 유지
+							photoreal(
+								`${buildPovVisualPrompt(scenes[i].visual, era)}, medium selfie shot waist-up, host positioned to one side, expansive detailed background with ${CROWD} clearly visible`,
+							),
+							seed,
+							ref,
+							ipaWeight,
+							ipaEndAt,
+							imgW,
+							imgH,
+						),
+			join(work, `scene${i}.png`),
+		);
+	};
+	for (let i = 0; i < scenes.length; i++) {
+		log(
+			`3.${i + 1}) ${i % 2 === 1 ? "와이드 환경샷(군중)" : "셀카 face-lock"} + 내레이션...`,
+		);
+		const img = await genSceneImage(i);
+		const mp3 = join(work, `scene${i}.mp3`);
+		await tts(scenes[i].narration, mp3);
+		const d = await dur(mp3);
+		made.push({ img, mp3, narration: scenes[i].narration, d });
+	}
+
+	// 3.a) Shot-plan 스토리 싱크 게이트(기본 ON, opt-out: SHOTPLAN_AUDIT=0) — reference-ai-drama-codex-pipeline.
+	//      TTS 실측 후 감사 → error 컷은 재생성 루프 *정확히 1회*(내레이션 재작성+TTS 재생성+길이 재실측,
+	//      visual 이슈 컷은 이미지 seed 변경 재생성) → 재감사. 그래도 error>0 이면 audit.json 기록 후 throw
+	//      (main catch 가 exit 1) — cron/batch 가 실패 산출물을 업로드 라인에서 격리하는 근거.
+	//      SHOTPLAN_FORBIDDEN="장소1,장소2" 로 금지장소 지정.
+	if (process.env.SHOTPLAN_AUDIT !== "0") {
+		const forbidden = (process.env.SHOTPLAN_FORBIDDEN ?? "")
+			.split(",")
+			.map((s) => s.trim())
+			.filter(Boolean);
+		// 감사 스냅샷 — 재생성 후 재감사에서도 동일 기준(항상 현재 scenes/made 기준).
+		const auditNow = () =>
+			auditStorySync(
+				scenes.map((sc, i) => ({
+					cutId: cutId(i + 1),
+					narration: made[i]?.narration ?? sc.narration,
+					visual: sc.visual,
+					expectedSec: estimateSpeakingSeconds(
+						made[i]?.narration ?? sc.narration,
+					),
+					measuredSec: made[i]?.d,
+					forbiddenLocations: forbidden,
+				})),
+			);
+		let issues = auditNow();
+		let sum = summarizeAudit(issues);
+		log(`3.a) sync audit: ${sum.errors} error / ${sum.warns} warn`);
+		if (sum.errors > 0) {
+			log(`   재생성 루프(1회): ${sum.regenCuts.join(", ")}`);
+			// 목표 컷 길이는 1.b rebudget 과 동일 산식 — 재작성 방향/문자수 가이드용.
+			const targets = targetSecondsPerCut(
+				minutes
+					? minutes * 60
+					: scenes.length * Number(process.env.SHOTPLAN_TARGET_SEC ?? 10),
+				scenes.length,
+			);
+			const regen = new Set(sum.regenCuts);
+			for (let i = 0; i < scenes.length; i++) {
+				if (!regen.has(cutId(i + 1))) continue;
+				const targetSec = targets[i] ?? 10;
+				// (1) 내레이션 재작성(rewriteNarration 패턴) — 실패 시 원문 유지(비파괴).
+				try {
+					scenes[i] = {
+						...scenes[i],
+						narration: await rewriteNarration(
+							scenes[i].narration,
+							budgetNarrationChars(targetSec),
+							estimateSpeakingSeconds(scenes[i].narration) > targetSec
+								? "trim"
+								: "expand",
+							era,
+						),
+					};
+				} catch (e) {
+					log(`   컷${i + 1} 내레이션 재작성 실패 — 원문 유지(${e})`);
+				}
+				// (2) visual 이슈(error) 컷 — visual *텍스트* 를 먼저 복구한 뒤 이미지 재생성.
+				//     텍스트를 안 고치면 재감사가 같은 empty/forbidden 을 다시 잡아 재시도가 무의미.
+				const hasVisualError = issues.some(
+					(it) =>
+						it.cutId === cutId(i + 1) &&
+						it.severity === "error" &&
+						(it.code === "empty-visual" || it.code === "forbidden-location"),
+				);
+				if (hasVisualError) {
+					try {
+						scenes[i] = {
+							...scenes[i],
+							visual: await rewriteVisual(scenes[i], forbidden, era),
+						};
+					} catch (e) {
+						log(`   컷${i + 1} visual 복구 실패 — 원문 유지(${e})`);
+					}
+					made[i].img = await genSceneImage(i, 104729);
+				}
+				// (3) TTS 재생성 + 길이 재실측 → made[] 갱신(같은 mp3 경로 덮어쓰기).
+				await tts(scenes[i].narration, made[i].mp3);
+				made[i] = {
+					...made[i],
+					narration: scenes[i].narration,
+					d: await dur(made[i].mp3),
+				};
+			}
+			issues = auditNow();
+			sum = summarizeAudit(issues);
+			log(`   재감사: ${sum.errors} error / ${sum.warns} warn`);
+		}
+		// 아티팩트는 재생성 반영 후의 최종 상태로 기록.
+		const shotPlan = buildShotPlan(scenes, {
+			blockStarts: chapterStarts,
+			blockLabels: chapterRoles,
+			forbiddenLocations: forbidden,
+		});
+		const auditDir = join(work, "story_sync_audit");
+		mkdirSync(auditDir, { recursive: true });
+		const auditPath = join(auditDir, "audit.json");
+		writeFileSync(
+			auditPath,
+			JSON.stringify({ summary: sum, shotPlan, issues }, null, 2),
+		);
+		if (sum.errors > 0)
+			throw new Error(
+				`스토리 싱크 감사 실패(재생성 후에도 error ${sum.errors}건: ${sum.regenCuts.join(", ")}) — ${auditPath} 참고`,
+			);
+	}
+
+	// .srt 타임라인은 감사·재생성 *완료 후* 의 made[] 기준으로 계산 — 재생성으로 길이가 바뀌어도 정합.
+	const srt: string[] = [];
+	const sceneStart: number[] = []; // 씬 i 의 시작초(챕터 타임스탬프용)
+	let cursor = introOffsetSec;
+	for (let i = 0; i < made.length; i++) {
+		sceneStart.push(cursor);
+		srt.push(
+			`${i + 1}\n${srtTime(cursor)} --> ${srtTime(cursor + made[i].d)}\n${made[i].narration}\n`,
+		);
+		cursor += made[i].d;
+	}
+
+	// 3.b) 카메라무빙(기본 ON, opt-out: CAMERA_MOVES=0) — 컷 구조 기반 결정적 배정.
+	//      seed 는 era 식별자 문자열(타임스탬프 금지) → 같은 토픽 재실행 시 동일 배정(재현성).
+	//      산출: (a) Remotion 입력 cameraMove(정지컷 모션 근사) (b) shot_plan.json(무빙 id +
+	//      i2v 프롬프트 전문 — 향후 i2v 전환 시 그대로 사용).
+	let cameraMoves: string[] = [];
+	if (process.env.CAMERA_MOVES !== "0") {
+		const cuts = buildShotPlan(scenes, {
+			blockStarts: chapterStarts,
+			blockLabels: chapterRoles,
+		});
+		cameraMoves = assignCameraMoves(
+			cuts.map((c) => ({ purpose: c.purpose, expectedSec: c.expectedSec })),
+			// 훅=punchy 무빙: 숏폼 훅(첫 컷)·롱폼 hook 챕터 시작 컷 모두 index 0.
+			{ seed: `vlog_${era.id}`, hookIndex: chapterStarts[0] ?? 0 },
+		);
+		writeFileSync(
+			join(work, "shot_plan.json"),
+			JSON.stringify(
+				cuts.map((c, i) => ({
+					...c,
+					cameraMove: cameraMoves[i],
+					i2vPrompt: i2vPromptFor(cameraMoves[i]),
+				})),
+				null,
+				2,
+			),
+		);
+		log(
+			`3.b) 카메라무빙 배정: ${cameraMoves.slice(0, 8).join(", ")}${cameraMoves.length > 8 ? " …" : ""} → shot_plan.json`,
+		);
+	}
+
+	// 썸네일 — 공식(놀란 표정 + 거대 텍스트 + 시대 배경). CTR 자산. 실패해도 영상엔 무영향.
+	const thumbPath = join(outDir, `vlog_${era.id}_${stamp}_thumb.jpg`);
+	try {
+		log("3.t) 썸네일(놀란 표정 + 거대 텍스트)...");
+		const thumb = buildHistoricalThumbnail(era, "ko");
+		// 일러스트: 동일 일러스트체로 놀란 표정 씬(호스트 ref 불필요). 포토리얼: 놀란 표정 IPAdapter 레퍼런스.
+		const thumbRaw = illustration
+			? await runComfy(
+					illustrationWorkflow(
+						`${era.settingKeywords.replace(/photo-?realistic,?\s*/gi, "")}, ${CROWD}, a person reacting with a ${thumb.expression} shocked surprised open mouth, dramatic, vivid high-contrast`,
+						777,
+					),
+					join(work, "thumb_raw.png"),
+				)
+			: await runComfy(
+					sceneWorkflow(
+						photoreal(
+							`${era.settingKeywords}, ${CROWD}, the host reacting with a ${thumb.expression} shocked surprised open mouth, medium selfie shot waist-up, dramatic cinematic lighting, vivid high-contrast YouTube thumbnail`,
+						),
+						777,
+						await ensureHostReference(host, work, { shocked: true }),
+						Math.max(0.6, ipaWeight),
+						ipaEndAt,
+					),
+					join(work, "thumb_raw.png"),
+				);
+		// 검증된 2색(노랑+검은외곽선) 썸네일 공식(공유 overlayThumbnailText). 1280x720 크롭 + 거대 텍스트.
+		await overlayThumbnailText(thumbRaw, thumbPath, thumb.bigText);
+		log(`   썸네일: ${thumbPath}`);
+	} catch (e) {
+		log(`   썸네일 생략(${e})`);
+	}
+
+	// .srt 는 어느 렌더 경로든 YouTube 업로드용으로 항상 출력
+	const srtPath = join(outDir, `vlog_${era.id}_${stamp}.srt`);
+	writeFileSync(srtPath, srt.join("\n"));
+	const finalPath = join(outDir, `vlog_${era.id}_${stamp}.mp4`);
+
+	if (args.ffmpeg === "true") {
+		// 4a) 폴백: ffmpeg 슬라이드쇼(Ken Burns + 소프트 자막만). 동적 자막/전환/BGM 없음.
+		log("4) 합성(ffmpeg 폴백)...");
+		const clips: string[] = [];
+		for (let i = 0; i < made.length; i++) {
+			const { img, mp3, d } = made[i];
+			const clip = join(work, `clip${i}.mp4`);
+			await exec("ffmpeg", [
+				"-y",
+				"-loop",
+				"1",
+				"-i",
+				img,
+				"-i",
+				mp3,
+				"-filter_complex",
+				`[0:v]scale=${renderW}:${renderH}:force_original_aspect_ratio=increase,crop=${renderW}:${renderH},zoompan=z='min(zoom+0.0004,1.07)':d=${Math.round(d * 30)}:s=${renderW}x${renderH}:fps=30,setsar=1[v]`,
+				"-map",
+				"[v]",
+				"-map",
+				"1:a",
+				"-t",
+				String(d),
+				"-c:v",
+				"libx264",
+				"-pix_fmt",
+				"yuv420p",
+				"-c:a",
+				"aac",
+				"-b:a",
+				"128k",
+				clip,
+			]);
+			clips.push(clip);
+		}
+		writeFileSync(
+			join(work, "concat.txt"),
+			clips.map((c) => `file '${c}'`).join("\n"),
+		);
+		const merged = join(work, "merged.mp4");
+		await exec("ffmpeg", [
+			"-y",
+			"-f",
+			"concat",
+			"-safe",
+			"0",
+			"-i",
+			join(work, "concat.txt"),
+			"-c",
+			"copy",
+			merged,
+		]);
+		try {
+			await exec("ffmpeg", [
+				"-y",
+				"-i",
+				merged,
+				"-i",
+				srtPath,
+				"-map",
+				"0:v",
+				"-map",
+				"0:a",
+				"-map",
+				"1",
+				"-c:v",
+				"copy",
+				"-c:a",
+				"copy",
+				"-c:s",
+				"mov_text",
+				"-metadata:s:s:0",
+				"language=kor",
+				finalPath,
+			]);
+		} catch {
+			copyFileSync(merged, finalPath);
+		}
+	} else {
+		// 4b) 기본: Remotion 렌더 — 동적 자막(chunked) + 전환 + BGM 덕킹 + Ken Burns.
+		log("4) Remotion 렌더(동적 자막 + 전환 + BGM)...");
+		await renderVlogRemotion({
+			scenes: made.map((m, i) => ({
+				imageUrl: m.img,
+				audioUrl: m.mp3,
+				narration: m.narration,
+				durationSec: m.d,
+				// 카메라무빙 → 정지컷 렌더러 근사 모션(remotionMotionFor). 미배정 씬은 기존 Ken Burns 휴리스틱.
+				...(cameraMoves[i]
+					? { cameraMove: remotionMotionFor(cameraMoves[i]) }
+					: {}),
+			})),
+			outPath: finalPath,
+			projectRoot: PROJECT_ROOT,
+			compositionId: args.shorts === "true" ? "YouTubeShorts" : "YouTubeVideo",
+			runId: `${era.id}_${stamp}`,
+			// 롱폼 Remotion 경로만 인트로/아웃트로 카드(숏폼은 8s 오버헤드 과함 + Shorts 컴포지션 미지원).
+			intro: useCards
+				? { title: buildHistoricalTitle(era, "ko"), channelName: channel }
+				: undefined,
+			outro: useCards
+				? { channelName: channel, ctaText: "다음 시대도 곧 공개!" }
+				: undefined,
+			onProgress: (pct) => process.stdout.write(`\r   렌더: ${pct}%`),
+		});
+		log("");
+	}
+
+	// 업로드 메타데이터(title/description/chapters) — 롱폼 history. 그동안 미출력이던 업로드 자산을 채운다.
+	const ROLE_KO: Record<string, string> = {
+		hook: "도입",
+		arrival: "도착",
+		immersion: "몰입",
+		conflict: "갈등",
+		revelation: "반전",
+		farewell: "마무리",
+	};
+	const videoTitle = buildHistoricalTitle(era, "ko");
+	const metaBase = join(outDir, `vlog_${era.id}_${stamp}`);
+	writeFileSync(`${metaBase}.title.txt`, videoTitle);
+	const AI_DISCLOSURE = "※ 본 영상은 AI로 제작된 가상의 시간여행 연출입니다.";
+	let uploadChapters: { title: string; startSec: number }[] = [];
+	if (minutes && chapterStarts.length > 0) {
+		const seenStart = new Set<number>();
+		uploadChapters = chapterStarts
+			.map((s, i) => ({
+				title: ROLE_KO[chapterRoles[i]] ?? chapterRoles[i],
+				start: sceneStart[s],
+			}))
+			.filter((c) => {
+				if (typeof c.start !== "number" || seenStart.has(c.start)) return false;
+				seenStart.add(c.start);
+				return true;
+			})
+			.map((c) => ({ title: c.title, startSec: c.start as number }));
+		const chapterLines = buildChapterMarkers(uploadChapters);
+		const description = [
+			videoTitle,
+			"",
+			"챕터",
+			...chapterLines,
+			"",
+			AI_DISCLOSURE,
+		].join("\n");
+		writeFileSync(`${metaBase}.description.txt`, description);
+		writeFileSync(`${metaBase}.chapters.txt`, chapterLines.join("\n"));
+	}
+	// 플랫폼 4종(youtube/tiktok/reels/naver_clip) 업로드 메타 — 기존 txt 는 하위호환 유지, JSON 은 업로더 자동화용.
+	// isShorts = --minutes 부재(계약 확정치). 면책 문구는 disclosure 필드로 — 캡션 절삭 시에도 우선 생존.
+	const platformMeta = buildPlatformMeta({
+		title: videoTitle,
+		description: videoTitle,
+		tags: [era.subjectKo, "시간여행", "역사", "브이로그", "AI"],
+		hashtags: ["시간여행", era.subjectKo, "역사브이로그", "AI브이로그"],
+		chapters: uploadChapters.map((c) => ({ sec: c.startSec, label: c.title })),
+		isShorts: !minutes,
+		disclosure: AI_DISCLOSURE,
+	});
+	writeFileSync(
+		`${metaBase}.platform_meta.json`,
+		JSON.stringify(platformMeta, null, 2),
+	);
+
+	// 5) 최종 검수 게이트(fail-closed) — 렌더 실측 길이/.srt 정합/컷수 + contact sheet.
+	//    카드 보정치(인트로/아웃트로 초)를 전달 — 전환 오버랩은 렌더러 패딩이 상쇄(verify-output 헤더 참조).
+	//    실패 시 throw → main catch 가 exit 1: cron/batch 가 결함 산출물을 업로드 라인에서 걸러낸다.
+	log("5) 최종 검수(verify-output)...");
+	const report = await runVerifyOutput({
+		videoPath: finalPath,
+		srtPath,
+		audioSecTotal: made.reduce((s, m) => s + m.d, 0),
+		cutCount: made.length,
+		introOffsetSec,
+		outroSec: useCards ? END_CARD_FRAMES / 30 : 0,
+		contactSheet: true,
+	});
+	for (const c of report.checks)
+		if (!c.ok)
+			log(
+				`   ${WARN_CHECKS.has(c.name) ? "⚠" : "✗"} ${c.name}: ${c.detail ?? `기대=${c.expected} 실측=${c.actual}`}`,
+			);
+	if (!report.ok) throw new Error(`최종 검수 실패 — ${report.reportPath} 확인`);
+
+	// cursor = 인트로오프셋 + Σ씬오디오. 아웃트로 카드 길이를 더해 실제 영상 총길이 보고.
+	const totalSec = cursor + (useCards ? END_CARD_FRAMES / 30 : 0);
+	log(
+		`\n✅ 완성: ${finalPath} (${Math.round(totalSec)}초, 검수 통과)\n   자막: ${srtPath} (YouTube 업로드용) · 메타: ${metaBase}.title.txt`,
+	);
+}
+
+main().catch((e) => {
+	process.stderr.write(`ERROR: ${e}\n`);
+	process.exit(1);
+});

@@ -90,6 +90,34 @@ describe("reference-production-orchestrator", () => {
 		expect(result.promptContext).toContain("핵심 시청자 질문");
 	});
 
+	it("시장 벤치마크 바가 market-bar directive와 promptContext 요약 줄로 들어간다", () => {
+		const result = plan();
+
+		const marketBar = result.directives.find((d) => d.id === "market-bar");
+		expect(marketBar).toBeDefined();
+		expect(marketBar?.priority).toBe("high");
+		expect(marketBar?.directive).toContain("컷 ");
+		expect(marketBar?.directive).toContain("훅 ");
+		expect(result.promptContext).toContain("시장 벤치마크 바:");
+		// 쇼츠 판정(both + 짧은 레퍼런스)에서는 챕터 바가 없다
+		expect(result.promptContext).toContain("챕터 분할 없음");
+	});
+
+	it("롱폼 요청이면 시장 벤치마크 바에 챕터 간격 기준이 들어간다", () => {
+		const result = plan({
+			referenceTemplate: getBuiltInReferenceTemplate(
+				"builtin-drama-recap-longform",
+			),
+			topicTitle: "결말을 알고 다시 보면 달라지는 드라마 복선",
+			selectedFormat: "longform",
+		});
+
+		const marketBar = result.directives.find((d) => d.id === "market-bar");
+		expect(marketBar?.directive).toContain("챕터");
+		expect(marketBar?.directive).toContain("초 간격");
+		expect(result.promptContext).toContain("longform");
+	});
+
 	it("scoreTopicFit이 같은 카테고리 안에서 주제 어휘와 겹치는 레퍼런스를 변별한다", () => {
 		// 주제 토큰이 레퍼런스 식별 텍스트와 겹치면 topicFit이 카테고리 베이스보다 높아야 함
 		const result = plan();

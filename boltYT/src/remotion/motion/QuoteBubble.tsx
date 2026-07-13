@@ -4,6 +4,7 @@
  */
 
 import { interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
+import { MOTION_TEXT } from "../typography";
 
 export interface QuoteBubbleParams {
 	text: string;
@@ -82,10 +83,10 @@ export function QuoteBubble({ params, startFrame, duration }: Props) {
 				>
 					<div
 						style={{
-							fontSize: 42,
-							fontWeight: 700,
-							color: "#111",
-							fontFamily: "'Noto Sans KR', serif",
+							fontSize: MOTION_TEXT.quote.fontSize,
+							fontWeight: MOTION_TEXT.quote.fontWeight,
+							color: MOTION_TEXT.quote.color,
+							fontFamily: MOTION_TEXT.quote.fontFamily,
 							lineHeight: 1.35,
 							fontStyle: "italic",
 							letterSpacing: "-0.01em",
@@ -97,10 +98,10 @@ export function QuoteBubble({ params, startFrame, duration }: Props) {
 						<div
 							style={{
 								marginTop: 12,
-								fontSize: 22,
-								fontWeight: 600,
-								color: "#666",
-								fontFamily: "'Noto Sans KR', sans-serif",
+								fontSize: MOTION_TEXT.quoteSpeaker.fontSize,
+								fontWeight: MOTION_TEXT.quoteSpeaker.fontWeight,
+								color: MOTION_TEXT.quoteSpeaker.color,
+								fontFamily: MOTION_TEXT.quoteSpeaker.fontFamily,
 								textAlign: "right",
 							}}
 						>

@@ -1,18 +1,19 @@
 import { describe, expect, it } from "vitest";
-import type { SceneShot } from "./scene-shot-types";
 import {
+	type AnimationSceneInput,
 	analyzeAnimationProductionReadiness,
 	applyAnimationContinuityToShots,
 	applyAnimationPacingRules,
 	buildAnimationAssetManifest,
 	buildAnimationCharacterReferencePrompt,
 	buildAnimationSceneShots,
+	enrichAnimationPromptWithContinuity,
 	formatAnimationReadinessForPrompt,
 	inferAnimationProductionFamily,
 	repairAnimationScenesForQuality,
 	scoreAnimationProductionQuality,
-	type AnimationSceneInput,
 } from "./animation-production";
+import type { SceneShot } from "./scene-shot-types";
 
 describe("animation-production", () => {
 	it("주제가 없으면 애니메이션 제작을 차단한다", () => {
@@ -100,10 +101,9 @@ describe("animation-production", () => {
 		expect(shots[0].visual_prompt).toContain("yellow raincoat");
 		expect(shots[0].visual_prompt).toContain("animation rig");
 		expect(shots[0].source_title).toBeTruthy();
-		expect(shots.reduce((sum, shot) => sum + shot.duration_seconds, 0)).toBeCloseTo(
-			6,
-			1,
-		);
+		expect(
+			shots.reduce((sum, shot) => sum + shot.duration_seconds, 0),
+		).toBeCloseTo(6, 1);
 	});
 
 	it("설명형 애니메이션은 다이어그램/데이터 샷 문법을 반영한다", () => {
@@ -123,6 +123,119 @@ describe("animation-production", () => {
 		expect(shots.every((shot) => shot.selection_provider === "animation")).toBe(
 			true,
 		);
+	});
+
+	it("다중 캐릭터 bible 이면 전체 출연진 고정 지시문을 매니페스트에 넣는다", () => {
+		const manifest = buildAnimationAssetManifest({
+			scriptId: "script-cast",
+			productionFamily: "character_micro_sitcom",
+			bible: {
+				style: "clean 2D animation",
+				world: "tiny moon town",
+				characters: [
+					{
+						name: "루",
+						role: "hero",
+						appearance: "round robot, yellow raincoat",
+						personality: "curious",
+						voice_tone: "soft",
+					},
+					{
+						name: "냥",
+						role: "sidekick",
+						appearance: "black cat, red scarf",
+						personality: "sly",
+						voice_tone: "low",
+					},
+				],
+				recurring_props: [],
+				color_palette: ["yellow"],
+			},
+			scenes: [{ narration_text: "루와 냥", visual_prompt: "two friends" }],
+			now: "2026-05-01T00:00:00.000Z",
+		});
+		const cast = manifest.castDirective ?? "";
+		expect(cast).toContain("루 — round robot, yellow raincoat");
+		expect(cast).toContain("냥 — black cat, red scarf");
+	});
+
+	it("큰 다중 캐릭터 bible 에서도 enrich 출력이 핵심 잠금을 유지한다(cast 가 잠금을 밀어내지 않음)", () => {
+		const manifest = buildAnimationAssetManifest({
+			scriptId: "script-big-cast",
+			productionFamily: "character_micro_sitcom",
+			bible: {
+				style: "clean 2D animation",
+				world: "tiny moon town",
+				characters: Array.from({ length: 15 }, (_, i) => ({
+					name: `C${i}`,
+					role: "ensemble",
+					appearance:
+						"a long detailed character appearance description ".repeat(3),
+					personality: "distinct",
+					voice_tone: "varied",
+				})),
+				recurring_props: [],
+				color_palette: ["yellow"],
+			},
+			now: "2026-05-01T00:00:00.000Z",
+		});
+		const shot = buildAnimationSceneShots(
+			{
+				narration: "앙상블 등장",
+				type: "image",
+				visualPrompt: "the whole cast on screen",
+				duration: 4,
+			},
+			undefined,
+			"character_micro_sitcom",
+		)[0];
+		const prompt = "x".repeat(380);
+		const withCast = enrichAnimationPromptWithContinuity(
+			prompt,
+			manifest,
+			shot,
+		);
+		const withoutCast = enrichAnimationPromptWithContinuity(
+			prompt,
+			{ ...manifest, castDirective: undefined },
+			shot,
+		);
+		// 불변식: cast 가 없을 때 들어가던 잠금은 cast(최후순위)가 있어도 모두 유지돼야 한다.
+		// (cast 는 trailing 예산만 쓰므로 앞선 매니페스트/샷 잠금을 절대 밀어내지 않는다.)
+		for (const lock of [
+			"Reference sheet path",
+			"Identity lock",
+			"Stable style seed",
+			"Continuity key",
+			"Rig lock",
+			"Do not change",
+		]) {
+			if (withoutCast.includes(lock)) expect(withCast).toContain(lock);
+		}
+	});
+
+	it("단일 캐릭터 bible 은 전체 출연진 지시문을 넣지 않는다", () => {
+		const manifest = buildAnimationAssetManifest({
+			scriptId: "script-solo",
+			productionFamily: "character_micro_sitcom",
+			bible: {
+				style: "clean 2D animation",
+				world: "tiny moon town",
+				characters: [
+					{
+						name: "루",
+						role: "hero",
+						appearance: "round robot",
+						personality: "curious",
+						voice_tone: "soft",
+					},
+				],
+				recurring_props: [],
+				color_palette: ["yellow"],
+			},
+			now: "2026-05-01T00:00:00.000Z",
+		});
+		expect(manifest.castDirective).toBeFalsy();
 	});
 
 	it("캐릭터 레퍼런스 시트와 연속성 태그를 샷에 주입한다", () => {
@@ -257,19 +370,19 @@ describe("animation-production", () => {
 
 	it("애니메이션 페이싱은 video 씬을 image 키포즈로 바꾼다", () => {
 		const scenes: AnimationSceneInput[] = [
-				{
-					narration: "첫 장면",
-					type: "video",
-					visualPrompt: "animated hero runs",
-					duration: 8,
-				},
-				{
-					narration: "반전",
-					type: "text_emphasis",
-					visualPrompt: "reveal text",
-					duration: 5,
-				},
-			];
+			{
+				narration: "첫 장면",
+				type: "video",
+				visualPrompt: "animated hero runs",
+				duration: 8,
+			},
+			{
+				narration: "반전",
+				type: "text_emphasis",
+				visualPrompt: "reveal text",
+				duration: 5,
+			},
+		];
 		const result = applyAnimationPacingRules(scenes, "shorts");
 
 		expect(result[0].type).toBe("image");

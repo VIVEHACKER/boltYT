@@ -2,10 +2,11 @@
  * render-options 순수 함수 단위 테스트.
  */
 
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
 	crfRangeFor,
 	DEFAULT_PRESET,
+	resolveMemoryRenderOptions,
 	resolveRenderOptions,
 	toRemotionCliArgs,
 	toRenderMediaOptions,
@@ -148,5 +149,52 @@ describe("hardware acceleration", () => {
 			hardwareAccel: "disable",
 		});
 		expect(r.hardwareAccel).toBe("disable");
+	});
+});
+
+describe("resolveMemoryRenderOptions", () => {
+	const KEYS = [
+		"REMOTION_CONCURRENCY",
+		"REMOTION_OFFTHREAD_CACHE_MB",
+		"REMOTION_MEDIA_CACHE_MB",
+	];
+	const saved: Record<string, string | undefined> = {};
+	const MB = 1024 * 1024;
+
+	beforeEach(() => {
+		for (const k of KEYS) {
+			saved[k] = process.env[k];
+			delete process.env[k];
+		}
+	});
+	afterEach(() => {
+		for (const k of KEYS) {
+			if (saved[k] === undefined) delete process.env[k];
+			else process.env[k] = saved[k];
+		}
+	});
+
+	it("defaults to RAM-conservative values (concurrency 2, 512MB caches)", () => {
+		const m = resolveMemoryRenderOptions();
+		expect(m.concurrency).toBe(2);
+		expect(m.offthreadVideoCacheSizeInBytes).toBe(512 * MB);
+		expect(m.mediaCacheSizeInBytes).toBe(512 * MB);
+	});
+
+	it("honors positive-integer env overrides (MB → bytes)", () => {
+		process.env.REMOTION_CONCURRENCY = "6";
+		process.env.REMOTION_OFFTHREAD_CACHE_MB = "256";
+		process.env.REMOTION_MEDIA_CACHE_MB = "128";
+		const m = resolveMemoryRenderOptions();
+		expect(m.concurrency).toBe(6);
+		expect(m.offthreadVideoCacheSizeInBytes).toBe(256 * MB);
+		expect(m.mediaCacheSizeInBytes).toBe(128 * MB);
+	});
+
+	it("falls back to defaults on invalid concurrency (non-int / 0 / negative / float / empty)", () => {
+		for (const bad of ["abc", "0", "-1", "2.5", ""]) {
+			process.env.REMOTION_CONCURRENCY = bad;
+			expect(resolveMemoryRenderOptions().concurrency).toBe(2);
+		}
 	});
 });

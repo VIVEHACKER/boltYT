@@ -42,6 +42,11 @@
       "reason": "Channel hooks remain reusable page-level surfaces."
     },
     {
+      "file": "src/lib/ai.ts",
+      "exports": ["callOpenAI", "localizeScriptContent"],
+      "reason": "wave5-cleanup: callOpenAI is the LlmCritic injection surface for quality-judge; localizeScriptContent is the market-localization entrypoint pending orchestrator wiring."
+    },
+    {
       "file": "src/lib/animation-production.ts",
       "exports": [
         "ANIMATION_PRODUCTION_FAMILY_PROFILES",
@@ -79,6 +84,11 @@
       "file": "src/lib/channel-strategy-ranker.ts",
       "exports": ["CHANNEL_STRATEGY_EVIDENCE_SOURCES"],
       "reason": "Evidence source catalog is exposed for growth UI and reporting."
+    },
+    {
+      "file": "src/lib/clip-remix-policy.ts",
+      "exports": ["scoreClipRemixTransformation"],
+      "reason": "wave5-cleanup: clip remix transformation scorer from the monetization wave, pending pipeline wiring."
     },
     {
       "file": "src/lib/color-grades.ts",
@@ -136,6 +146,11 @@
       "file": "src/lib/local-db.ts",
       "exports": ["releaseAllBlobUrls", "getLocalBlobUrl"],
       "reason": "Local asset URL lifecycle helpers are intentionally exposed."
+    },
+    {
+      "file": "src/lib/market-localization.ts",
+      "exports": ["MARKET_PROFILES"],
+      "reason": "wave5-cleanup: market profile catalog from the monetization wave, pending channel-factory wiring."
     },
     {
       "file": "src/lib/narration-normalize.ts",
@@ -251,16 +266,6 @@
       "file": "src/remotion/cards/TitleCard.tsx",
       "exports": ["HOOK_CARD_FRAMES"],
       "reason": "Title card timing constant is exposed for composition tuning."
-    },
-    {
-      "file": "src/remotion/overlays/FilmGrain.tsx",
-      "exports": ["FilmGrain"],
-      "reason": "Overlay component is part of the Remotion visual toolkit."
-    },
-    {
-      "file": "src/remotion/overlays/Vignette.tsx",
-      "exports": ["Vignette"],
-      "reason": "Overlay component is part of the Remotion visual toolkit."
     },
     {
       "file": "src/remotion/shot-timing.ts",

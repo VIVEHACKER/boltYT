@@ -1,9 +1,11 @@
 /**
  * BGM 라이브러리 — Pixabay Music API + 무료 음원 검색 + Curated Library
  *
- * Pixabay Music: 무료, CC0 라이선스, 속성 표시 불필요
+ * Pixabay Music: 무료 사용 가능하지만 CC0가 아니라 Pixabay Content License 적용.
+ * 속성 표시는 기본적으로 필수는 아니지만, 상업 업로드 감사용으로 트랙/작성자/URL 기록을 유지한다.
  */
 
+import type { BgmLicense } from "./bgm-import";
 import {
 	pickProfessionalBgmTrack,
 	rankBgmTracks,
@@ -24,10 +26,12 @@ export interface BgmTrack {
 	/** 다운로드 URL */
 	downloadUrl: string;
 	tags: string[];
-	source: "pixabay" | "builtin";
+	source: "pixabay" | "builtin" | "ai-generated" | "imported";
 	qualityScore?: number;
 	qualityReasons?: string[];
 	qualityWarnings?: string[];
+	/** AI 생성/유료 import 트랙의 라이선스·Content ID claim 메타데이터 (Pixabay/builtin은 미설정) */
+	license?: BgmLicense;
 }
 
 export type BgmMood =
@@ -312,10 +316,38 @@ export interface AutoPickResult {
 	/** 로컬 blob URL 또는 public static 경로 */
 	url: string;
 	storagePath: string;
-	source: "user_default" | "local_preset" | "curated_pixabay" | "search";
+	source:
+		| "ai_generated"
+		| "user_default"
+		| "local_preset"
+		| "curated_pixabay"
+		| "search";
 	track?: BgmTrack;
 	qualityScore?: number;
 	qualityWarnings?: string[];
+}
+
+export type BgmSourceMode = "library" | "ai";
+
+const BGM_SOURCE_MODE_KEY = "bgm_source_mode";
+
+/** BGM 소스 모드 — "library"(Pixabay 검색, 기본) 또는 "ai"(Stable Audio 생성 우선). */
+export function getBgmSourceMode(): BgmSourceMode {
+	try {
+		return localStorage.getItem(BGM_SOURCE_MODE_KEY) === "ai"
+			? "ai"
+			: "library";
+	} catch {
+		return "library";
+	}
+}
+
+export function setBgmSourceMode(mode: BgmSourceMode): void {
+	try {
+		localStorage.setItem(BGM_SOURCE_MODE_KEY, mode);
+	} catch {
+		// localStorage 불가 환경 무시
+	}
 }
 
 export interface AutoBgmSceneHint {
@@ -385,8 +417,31 @@ export async function autoPickBgm(
 		keywords: string[];
 		tempo: "slow" | "mid" | "fast";
 	},
+	opts?: {
+		/** AI 생성을 우선 시도(실패 시 라이브러리 폴백). 미지정 시 사용자 소스 모드 설정을 따름. */
+		preferAiGeneration?: boolean;
+		/** 생성할 BGM 길이(초). */
+		durationSeconds?: number;
+	},
 ): Promise<AutoPickResult | null> {
 	const mood = preset.mood;
+
+	// 0. AI 생성 우선 (opt-in). mood가 있을 때만. 실패하면 기존 라이브러리 체인으로 폴백 →
+	//    무회귀 보장(생성 실패가 BGM 누락으로 이어지지 않음).
+	const preferAi =
+		mood !== "" && (opts?.preferAiGeneration ?? getBgmSourceMode() === "ai");
+	if (preferAi && mood) {
+		try {
+			const { generateBgmTrack } = await import("./bgm-ai-generation");
+			const { track } = await generateBgmTrack(mood, {
+				durationSeconds: opts?.durationSeconds,
+			});
+			return await downloadAndStore(track, scriptId, "ai_generated");
+		} catch (e) {
+			console.warn("AI BGM 생성 실패 — 라이브러리로 폴백:", e);
+		}
+	}
+
 	if (!mood) {
 		// mood 없으면 키워드 검색만
 		const tracks = await searchBgmFromPreset(preset);

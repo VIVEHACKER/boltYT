@@ -4,9 +4,9 @@
  * 실행: npx tsx server/api-proxy.ts
  */
 
-import { createServer } from "node:http";
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
+import { createServer } from "node:http";
 import { join } from "node:path";
 import { Readable } from "node:stream";
 import { promisify } from "node:util";
@@ -33,8 +33,11 @@ import {
 	recordError,
 } from "./lib/errors-buffer.ts";
 import {
+	FAL_AUDIO_ENDPOINTS,
 	FAL_ENDPOINTS,
+	type FalAudioProvider,
 	type FalProvider,
+	submitFalAudio,
 	submitFalVideo,
 } from "./lib/fal-client.ts";
 import { fetchWithRetry } from "./lib/fetch-retry.ts";
@@ -45,8 +48,8 @@ import {
 	snapshot as metricsSnapshot,
 } from "./lib/metrics.ts";
 import {
-	getOpenAiSkipReason,
 	getOpenAiRuntimeHealth,
+	getOpenAiSkipReason,
 	isOpenAiQuotaError,
 	markOpenAiOk,
 	markOpenAiQuotaBlocked,
@@ -66,6 +69,9 @@ const execFileP = promisify(execFile);
 loadEnv();
 
 const PORT = Number(process.env.API_PROXY_PORT ?? 3459);
+// 미인증 로컬 프록시(유료 LLM/TTS)를 기본으로 루프백에만 바인딩한다. 네트워크
+// 노출이 필요하면 API_PROXY_HOST=0.0.0.0 으로 명시 opt-in.
+const HOST = process.env.API_PROXY_HOST?.trim() || "127.0.0.1";
 
 validateEnv(["OPENAI_API_KEY"], SERVICE);
 
@@ -85,6 +91,8 @@ const KEYS = {
 	naverClientId: "",
 	naverClientSecret: "",
 	fal: "",
+	clovaId: "",
+	clovaSecret: "",
 };
 
 function reloadKeys() {
@@ -97,6 +105,68 @@ function reloadKeys() {
 	KEYS.naverClientId = process.env.NAVER_CLIENT_ID ?? "";
 	KEYS.naverClientSecret = process.env.NAVER_CLIENT_SECRET ?? "";
 	KEYS.fal = process.env.FAL_KEY ?? "";
+	// CLOVA Voice(NCP) — 한국어 네이티브 TTS. NCP API Gateway 키(검색용 NAVER 키와 별개).
+	KEYS.clovaId = process.env.CLOVA_API_KEY_ID ?? "";
+	KEYS.clovaSecret = process.env.CLOVA_API_KEY ?? "";
+}
+
+// ─── 구독(Claude) LLM 백엔드 ───
+// LLM_BACKEND=claude 면 /api/openai/chat 을 OpenAI API 대신 로컬 `claude` CLI 로 처리.
+// Claude Max 구독으로 대본 생성을 종량제 비용 0원으로 구동(API 키 불필요).
+function llmBackend(): string {
+	return (process.env.LLM_BACKEND ?? "").trim().toLowerCase();
+}
+
+/** ```json ... ``` 펜스 제거 → 순수 JSON 텍스트. */
+function stripJsonFences(text: string): string {
+	const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+	return (fenced ? fenced[1] : text).trim();
+}
+
+/**
+ * 로컬 claude CLI 한 방 질의(print 모드). 프롬프트는 인자로 전달(spawn, no-shell → 인젝션 안전).
+ * 속도: 사용자 전역 훅(SessionStart 등)이 ~120s 행을 유발 → `--setting-sources project` 로 스킵(~3s).
+ *       MCP 서버도 `--strict-mcp-config --mcp-config {}` 로 비활성(불필요한 연결 제거). OAuth 구독 인증은 유지.
+ */
+function runClaudeCli(prompt: string, model: string): Promise<string> {
+	return new Promise((resolve, reject) => {
+		const child = spawn(
+			"claude",
+			[
+				"--setting-sources",
+				"project",
+				"--strict-mcp-config",
+				"--mcp-config",
+				'{"mcpServers":{}}',
+				"--model",
+				model,
+				"-p",
+				prompt,
+			],
+			{ stdio: ["ignore", "pipe", "pipe"] },
+		);
+		let out = "";
+		let err = "";
+		const timer = setTimeout(() => {
+			child.kill("SIGKILL");
+			reject(new Error("claude CLI timeout (180s)"));
+		}, 180_000);
+		child.stdout.on("data", (d) => {
+			out += d.toString();
+		});
+		child.stderr.on("data", (d) => {
+			err += d.toString();
+		});
+		child.on("error", (e) => {
+			clearTimeout(timer);
+			reject(e);
+		});
+		child.on("close", (code) => {
+			clearTimeout(timer);
+			if (code === 0) resolve(out.trim());
+			else reject(new Error(`claude CLI exit ${code}: ${err.slice(0, 300)}`));
+		});
+	});
 }
 
 function publicOpenAiRuntimeHealth() {
@@ -125,6 +195,7 @@ function keyStatusPayload() {
 	return {
 		openai: Boolean(KEYS.openai),
 		elevenlabs: Boolean(KEYS.elevenlabs),
+		clova: Boolean(KEYS.clovaId && KEYS.clovaSecret),
 		pexels: Boolean(KEYS.pexels),
 		pixabay: Boolean(KEYS.pixabay),
 		youtube: Boolean(KEYS.youtube),
@@ -1265,8 +1336,7 @@ function extractArticleMedia(
 
 	const imageUrls: string[] = [];
 	const imgRegex = /<img[^>]+src=["']([^"']+)["'][^>]*>/gi;
-	let match: RegExpExecArray | null;
-	while ((match = imgRegex.exec(html)) !== null) {
+	for (const match of html.matchAll(imgRegex)) {
 		const abs = absolutize(match[1]);
 		if (!abs) continue;
 		if (
@@ -1442,13 +1512,62 @@ const server = createServer(async (req, res) => {
 
 	// ─── OpenAI Chat Completions ───
 	if (url.pathname === "/api/openai/chat" && req.method === "POST") {
-		if (!requireKey(req, res, KEYS.openai, "OpenAI")) return;
-		if (rejectOpenAiCooldown(req, res, "api-proxy:chat")) return;
 		const body = await parseBody(req);
 		if (body === null) {
 			json(req, res, 413, { error: "요청 본문이 너무 큽니다 (최대 1MB)" });
 			return;
 		}
+
+		// 구독(Claude Max) 백엔드 — 종량제 OpenAI API 대신 로컬 claude CLI(비용 0원).
+		if (llmBackend() === "claude") {
+			try {
+				const messages = Array.isArray(body.messages)
+					? (body.messages as Array<{ role?: string; content?: string }>)
+					: [];
+				const system = messages
+					.filter((m) => m.role === "system")
+					.map((m) => m.content ?? "")
+					.join("\n\n");
+				const user = messages
+					.filter((m) => m.role !== "system")
+					.map((m) => m.content ?? "")
+					.join("\n\n");
+				const wantJson =
+					(body.response_format as { type?: string } | undefined)?.type ===
+					"json_object";
+				const prompt = [
+					system,
+					user,
+					wantJson
+						? "Output ONLY valid JSON matching the request. No markdown code fences, no commentary."
+						: "",
+				]
+					.filter((p) => p.trim().length > 0)
+					.join("\n\n");
+				const model = process.env.CLAUDE_MODEL?.trim() || "sonnet";
+				const raw = await runClaudeCli(prompt, model);
+				const content = wantJson ? stripJsonFences(raw) : raw;
+				json(req, res, 200, {
+					model: `claude-${model}`,
+					choices: [
+						{
+							index: 0,
+							message: { role: "assistant", content },
+							finish_reason: "stop",
+						},
+					],
+				});
+			} catch (e) {
+				log.error("claude chat exception", { error: (e as Error).message });
+				json(req, res, 500, {
+					error: e instanceof Error ? e.message : "claude backend error",
+				});
+			}
+			return;
+		}
+
+		if (!requireKey(req, res, KEYS.openai, "OpenAI")) return;
+		if (rejectOpenAiCooldown(req, res, "api-proxy:chat")) return;
 
 		try {
 			const upstream = await fetchWithRetry(
@@ -1524,6 +1643,44 @@ const server = createServer(async (req, res) => {
 			log.error("DALL-E exception", { error: (e as Error).message });
 			json(req, res, 500, {
 				error: e instanceof Error ? e.message : "DALL-E proxy error",
+			});
+		}
+		return;
+	}
+
+	// ─── FAL 이미지 생성 (flux, 동기 fal.run) ───
+	if (url.pathname === "/api/fal/image-gen" && req.method === "POST") {
+		if (!requireKey(req, res, KEYS.fal, "FAL")) return;
+		const body = await parseBody(req);
+		if (body === null) {
+			json(req, res, 413, { error: "요청 본문이 너무 큽니다 (최대 1MB)" });
+			return;
+		}
+		try {
+			const upstream = await fetchWithRetry(
+				"https://fal.run/fal-ai/flux/dev",
+				{
+					method: "POST",
+					headers: {
+						Authorization: `Key ${KEYS.fal}`,
+						"Content-Type": "application/json",
+					},
+					body: JSON.stringify(body),
+				},
+				{ timeout: 120_000 },
+			);
+			if (!upstream.ok) {
+				const err = await upstream.text();
+				log.error("FAL image error", { status: upstream.status });
+				json(req, res, upstream.status, { error: err });
+				return;
+			}
+			const data = await upstream.json();
+			json(req, res, 200, data);
+		} catch (e) {
+			log.error("FAL image exception", { error: (e as Error).message });
+			json(req, res, 500, {
+				error: e instanceof Error ? e.message : "FAL image proxy error",
 			});
 		}
 		return;
@@ -1684,6 +1841,66 @@ const server = createServer(async (req, res) => {
 		return;
 	}
 
+	// ─── CLOVA Voice (NCP) TTS — 한국어 네이티브 ───
+	if (url.pathname === "/api/clova/tts" && req.method === "POST") {
+		if (!KEYS.clovaId || !KEYS.clovaSecret) {
+			json(req, res, 401, {
+				error:
+					"CLOVA Voice 키 없음 — NCP CLOVA Voice 발급 후 CLOVA_API_KEY_ID / CLOVA_API_KEY 설정 필요",
+			});
+			return;
+		}
+		const body = await parseBody(req);
+		if (body === null) {
+			json(req, res, 413, { error: "요청 본문이 너무 큽니다 (최대 1MB)" });
+			return;
+		}
+		try {
+			const b = body as {
+				speaker?: string;
+				text?: string;
+				speed?: number;
+				volume?: number;
+				pitch?: number;
+				format?: string;
+			};
+			const form = new URLSearchParams({
+				speaker: b.speaker || "nara",
+				text: String(b.text ?? ""),
+				volume: String(b.volume ?? 0),
+				speed: String(b.speed ?? 0),
+				pitch: String(b.pitch ?? 0),
+				format: b.format || "mp3",
+			});
+			const upstream = await fetchWithRetry(
+				"https://naveropenapi.apigw.ntruss.com/tts-premium/v1/tts",
+				{
+					method: "POST",
+					headers: {
+						"X-NCP-APIGW-API-KEY-ID": KEYS.clovaId,
+						"X-NCP-APIGW-API-KEY": KEYS.clovaSecret,
+						"Content-Type": "application/x-www-form-urlencoded",
+					},
+					body: form.toString(),
+				},
+				{ timeout: 60_000 },
+			);
+			if (!upstream.ok) {
+				const err = await upstream.text();
+				log.error("CLOVA TTS error", { status: upstream.status });
+				json(req, res, upstream.status, { error: err });
+				return;
+			}
+			streamUpstreamBody(req, res, upstream, "audio/mpeg");
+		} catch (e) {
+			log.error("CLOVA TTS exception", { error: (e as Error).message });
+			json(req, res, 500, {
+				error: e instanceof Error ? e.message : "CLOVA proxy error",
+			});
+		}
+		return;
+	}
+
 	// ─── fal.ai 영상 생성 (T2V / I2V) ───
 	if (url.pathname === "/api/fal/video-gen" && req.method === "POST") {
 		if (!requireKey(req, res, KEYS.fal, "fal.ai")) return;
@@ -1743,7 +1960,80 @@ const server = createServer(async (req, res) => {
 				message: maskSecrets(msg),
 				context: { route: "/api/fal/video-gen", provider },
 			});
-			log.error("fal video-gen exception", { provider, error: msg });
+			log.error("fal video-gen exception", {
+				provider,
+				error: maskSecrets(msg),
+			});
+			json(req, res, 500, { error: maskSecrets(msg) });
+		}
+		return;
+	}
+
+	if (url.pathname === "/api/fal/audio-gen" && req.method === "POST") {
+		if (!requireKey(req, res, KEYS.fal, "fal.ai")) return;
+		const body = await parseBody(req);
+		if (body === null) {
+			json(req, res, 413, { error: "요청 본문이 너무 큽니다 (최대 1MB)" });
+			return;
+		}
+
+		const providerStr = sanitizeString(body.provider, 48) || "stableAudio25";
+		if (!(providerStr in FAL_AUDIO_ENDPOINTS)) {
+			json(req, res, 400, {
+				error: `provider 잘못됨. 허용: ${Object.keys(FAL_AUDIO_ENDPOINTS).join(", ")}`,
+			});
+			return;
+		}
+		const provider = providerStr as FalAudioProvider;
+
+		const input = (body.input ?? {}) as Record<string, unknown>;
+		const prompt = sanitizeString(input.prompt, 2000);
+		if (!input || typeof input !== "object" || !prompt) {
+			json(req, res, 400, { error: "input.prompt 가 필요합니다" });
+			return;
+		}
+		// 길이 제한된 프롬프트로 교체해 과도한 업스트림 요청 방지
+		input.prompt = prompt;
+
+		const timeoutMs = sanitizeInt(body.timeout_ms, 10_000, 600_000, 300_000);
+
+		try {
+			recordAudit({
+				actor: actorFromReq(req),
+				action: "fal.audio-gen.submit",
+				resource: provider,
+				outcome: "ok",
+				service: SERVICE,
+				details: { promptLen: String(input.prompt ?? "").length },
+			});
+			const result = await submitFalAudio({
+				apiKey: KEYS.fal,
+				provider,
+				input,
+				timeoutMs,
+				onLog: (m) => log.info("fal audio status", { provider, m }),
+			});
+			metricCounter("fal_audio_gen_total", { provider, outcome: "ok" });
+			json(req, res, 200, {
+				audio_url: result.audio_url,
+				request_id: result.request_id,
+				provider: result.provider,
+				endpoint: result.endpoint,
+			});
+		} catch (e) {
+			metricCounter("fal_audio_gen_total", { provider, outcome: "error" });
+			const msg = e instanceof Error ? e.message : "fal proxy error";
+			recordError({
+				service: SERVICE,
+				source: "server",
+				level: "error",
+				message: maskSecrets(msg),
+				context: { route: "/api/fal/audio-gen", provider },
+			});
+			log.error("fal audio-gen exception", {
+				provider,
+				error: maskSecrets(msg),
+			});
 			json(req, res, 500, { error: maskSecrets(msg) });
 		}
 		return;
@@ -2509,9 +2799,10 @@ const server = createServer(async (req, res) => {
 	json(req, res, 404, { error: "Not found" });
 });
 
-server.listen(PORT, () => {
+server.listen(PORT, HOST, () => {
 	log.info("Server started", {
 		port: PORT,
+		host: HOST,
 		configured: Object.entries(KEYS)
 			.filter(([, v]) => Boolean(v))
 			.map(([k]) => k),

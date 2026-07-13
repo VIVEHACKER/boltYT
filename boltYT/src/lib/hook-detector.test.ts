@@ -3,7 +3,11 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { buildHookFlags, detectHookPattern } from "./hook-detector";
+import {
+	buildHookFlags,
+	detectEmpathyHook,
+	detectHookPattern,
+} from "./hook-detector";
 
 // ─── detectHookPattern ────────────────────────────────────────────────────────
 
@@ -122,6 +126,31 @@ describe("detectHookPattern — confidence", () => {
 
 	it("패턴 없는 평범한 문장 → pattern ''", () => {
 		expect(detectHookPattern("오늘 날씨는 맑습니다").pattern).toBe("");
+	});
+});
+
+describe("detectEmpathyHook — 도입부 감정 공감", () => {
+	it("빈 입력 → 0", () => {
+		expect(detectEmpathyHook("")).toBe(0);
+		expect(detectEmpathyHook("   ")).toBe(0);
+	});
+
+	it("공감 신호 없는 평범한 정보 문장 → 0", () => {
+		expect(detectEmpathyHook("로마 제국은 기원전 27년에 세워졌습니다")).toBe(0);
+	});
+
+	it("2인칭 호명/보편 동질감 → 공감 점수 상승", () => {
+		// "당신도", "혹시", "느껴본" 3신호 → 1.0
+		expect(
+			detectEmpathyHook("당신도 혹시 이런 막막함을 느껴본 적 있나요"),
+		).toBe(1);
+	});
+
+	it("신호 1개 → 0.4, 결정론적", () => {
+		const a = detectEmpathyHook("우리 모두 겪는 일입니다만 정보만 전달");
+		const b = detectEmpathyHook("우리 모두 겪는 일입니다만 정보만 전달");
+		expect(a).toBe(b);
+		expect(a).toBeGreaterThan(0);
 	});
 });
 

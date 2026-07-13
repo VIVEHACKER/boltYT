@@ -7,6 +7,10 @@
 
 import type { ReferenceTemplate } from "../types/database";
 import {
+	BENCHMARK_OBSERVATION_KEY,
+	buildBenchmarkObservation,
+} from "./benchmark-reference-adapter";
+import {
 	readRenderKnowledgeEvent,
 	type RenderKnowledgeEvent,
 } from "./knowledge-system";
@@ -208,6 +212,9 @@ export async function saveReferenceTemplate(
 		updated_at: "",
 	};
 	const thumbnailDna = finalizeReferenceThumbnailDna(templateForThumbnailDna);
+	// 저장 시점 관측치 다이제스트 — 판정 시 production_dna 재파싱 없이 판독한다.
+	// null(관측 신호 없음)이면 키 자체를 저장하지 않는다.
+	const benchmarkObservation = buildBenchmarkObservation(result);
 	const payload = {
 		channel_id: channelId,
 		name,
@@ -250,6 +257,9 @@ export async function saveReferenceTemplate(
 		frame_urls: result.frame_urls,
 		raw_analysis: {
 			...result.raw_analysis,
+			...(benchmarkObservation
+				? { [BENCHMARK_OBSERVATION_KEY]: benchmarkObservation }
+				: {}),
 			thumbnail_dna: thumbnailDna,
 		},
 
@@ -286,8 +296,12 @@ export async function listReferenceTemplates(
 		...generated,
 		...((data ?? []) as ReferenceTemplate[]),
 	];
-	const events = await loadReferenceKnowledgeEvents(templates.map((item) => item.id));
-	return sortReferenceTemplatesByQuality(attachKnowledgeEvents(templates, events));
+	const events = await loadReferenceKnowledgeEvents(
+		templates.map((item) => item.id),
+	);
+	return sortReferenceTemplatesByQuality(
+		attachKnowledgeEvents(templates, events),
+	);
 }
 
 export async function getReferenceTemplate(

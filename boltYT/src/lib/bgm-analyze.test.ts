@@ -89,9 +89,14 @@ describe("analyzeBgmFromUrl", () => {
 	});
 
 	it("네트워크 오류 → 기본값 반환 (throw 없음)", async () => {
+		const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
 		vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("net fail")));
 		const result = await analyzeBgmFromUrl("https://example.com/bgm.mp3");
 		expect(result).toEqual({ bpm: 0, beats: [], confidence: 0 });
+		expect(warnSpy).toHaveBeenCalledWith(
+			"BGM analysis failed:",
+			expect.any(Error),
+		);
 	});
 
 	it("AudioContext 성공 경로 → analyzeAudioBuffer 결과 반환", async () => {

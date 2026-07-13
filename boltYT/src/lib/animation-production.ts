@@ -1,6 +1,10 @@
+import { buildCastDirective } from "./character-roster";
 import type { SceneShot } from "./scene-shot-types";
 
-export type AnimationProductionStatus = "ready" | "needs_development" | "blocked";
+export type AnimationProductionStatus =
+	| "ready"
+	| "needs_development"
+	| "blocked";
 
 export type AnimationProductionFamily =
 	| "character_micro_sitcom"
@@ -89,7 +93,8 @@ export const ANIMATION_PRODUCTION_FAMILY_PROFILES: Record<
 		formatFit: ["shorts", "longform"],
 		visualGrammar:
 			"simple recurring character, expressive face changes, clean background, reaction cuts",
-		storyFormula: "주인공 욕망 -> 방해물 -> 오해/실패 -> 표정 리액션 -> 펀치라인",
+		storyFormula:
+			"주인공 욕망 -> 방해물 -> 오해/실패 -> 표정 리액션 -> 펀치라인",
 		shotIntents: [
 			"hook pose",
 			"goal pose",
@@ -119,7 +124,8 @@ export const ANIMATION_PRODUCTION_FAMILY_PROFILES: Record<
 		formatFit: ["shorts", "longform"],
 		visualGrammar:
 			"simple avatar narrator, memory reenactment, exaggerated expression, cutaway gags",
-		storyFormula: "개인적 문제 -> 이상한 선택 -> 점점 커지는 상황 -> 깨달음/농담",
+		storyFormula:
+			"개인적 문제 -> 이상한 선택 -> 점점 커지는 상황 -> 깨달음/농담",
 		shotIntents: [
 			"avatar confession",
 			"memory setup",
@@ -329,7 +335,8 @@ export const ANIMATION_PRODUCTION_FAMILY_PROFILES: Record<
 		formatFit: ["shorts"],
 		visualGrammar:
 			"fast setup, absurd escalation, expressive poses, impact captions used sparingly",
-		storyFormula: "익숙한 상황 -> 과장된 해석 -> 말도 안 되는 상승 -> 한 컷 반전",
+		storyFormula:
+			"익숙한 상황 -> 과장된 해석 -> 말도 안 되는 상승 -> 한 컷 반전",
 		shotIntents: [
 			"recognizable setup",
 			"absurd escalation",
@@ -392,8 +399,7 @@ export function isAnimationProductionFamily(
 	value: unknown,
 ): value is AnimationProductionFamily {
 	return (
-		typeof value === "string" &&
-		value in ANIMATION_PRODUCTION_FAMILY_PROFILES
+		typeof value === "string" && value in ANIMATION_PRODUCTION_FAMILY_PROFILES
 	);
 }
 
@@ -601,10 +607,13 @@ function inferAnimationStyle(
 	family: AnimationProductionFamily,
 ): string {
 	if (family === "whiteboard_lesson") return "clean whiteboard animation";
-	if (family === "infographic_motion") return "flat motion infographic animation";
+	if (family === "infographic_motion")
+		return "flat motion infographic animation";
 	if (family === "history_comedy") return "simplified cutout history animation";
-	if (family === "storytime_animation") return "simple avatar storytime animation";
-	if (family === "slapstick_no_dialogue") return "expressive silent cartoon animation";
+	if (family === "storytime_animation")
+		return "simple avatar storytime animation";
+	if (family === "slapstick_no_dialogue")
+		return "expressive silent cartoon animation";
 	if (family === "meme_original") return "fast expressive 2D meme animation";
 	if (hasAny(topicTitle, ["공포", "미스터리", "괴담", "악몽"])) {
 		return "2D dark storybook animation";
@@ -689,7 +698,10 @@ export function analyzeAnimationProductionReadiness(input: {
 			code: "weak_character_anchor",
 			message: "주인공 단서가 약해 캐릭터 일관성이 흔들릴 수 있습니다.",
 		});
-		pushUnique(actions, "주인공의 정체, 성격, 외형 단서를 제목이나 브리프에 넣으세요.");
+		pushUnique(
+			actions,
+			"주인공의 정체, 성격, 외형 단서를 제목이나 브리프에 넣으세요.",
+		);
 		score -= 10;
 	}
 
@@ -707,9 +719,13 @@ export function analyzeAnimationProductionReadiness(input: {
 		issues.push({
 			severity: "warning",
 			code: "longform_story_bible_needed",
-			message: "롱폼 애니메이션은 캐릭터 목표, 갈등, 중반 전환이 없으면 유지력이 떨어집니다.",
+			message:
+				"롱폼 애니메이션은 캐릭터 목표, 갈등, 중반 전환이 없으면 유지력이 떨어집니다.",
 		});
-		pushUnique(actions, "롱폼은 최소 3막 구조와 반복 등장 소품/배경을 정하세요.");
+		pushUnique(
+			actions,
+			"롱폼은 최소 3막 구조와 반복 등장 소품/배경을 정하세요.",
+		);
 		score -= 10;
 	}
 
@@ -731,7 +747,8 @@ export function analyzeAnimationProductionReadiness(input: {
 
 	const normalizedScore = clamp(Math.round(score), 0, 100);
 	const status: AnimationProductionStatus =
-		issues.some((issue) => issue.severity === "critical") || normalizedScore < 45
+		issues.some((issue) => issue.severity === "critical") ||
+		normalizedScore < 45
 			? "blocked"
 			: normalizedScore < 78
 				? "needs_development"
@@ -747,7 +764,7 @@ export function analyzeAnimationProductionReadiness(input: {
 		hasConflictCue &&
 		familyProfile.formatFit.includes("longform")
 			? "both"
-			: familyProfile.formatFit[0] ?? "shorts";
+			: (familyProfile.formatFit[0] ?? "shorts");
 	const promptDirectives = [
 		`제작 포맷 패밀리는 "${familyProfile.label}"입니다. ${familyProfile.storyFormula}`,
 		`애니메이션 스타일은 "${recommendedAnimationStyle}"로 고정하세요.`,
@@ -783,7 +800,9 @@ export function formatAnimationReadinessForPrompt(
 	const issues = report.issues
 		.map((issue) => `- [${issue.severity}] ${issue.message}`)
 		.join("\n");
-	const actions = report.requiredActions.map((action) => `- ${action}`).join("\n");
+	const actions = report.requiredActions
+		.map((action) => `- ${action}`)
+		.join("\n");
 	const directives = report.promptDirectives
 		.map((directive) => `- ${directive}`)
 		.join("\n");
@@ -901,9 +920,12 @@ function animationVisualRole(
 	kind: SceneShot["kind"],
 ): SceneShot["visual_role"] {
 	if (kind === "punch") return "ending";
-	if (family === "infographic_motion") return kind === "evidence" ? "data" : "context";
-	if (family === "history_comedy") return kind === "evidence" ? "map" : "context";
-	if (family === "whiteboard_lesson") return kind === "evidence" ? "data" : "context";
+	if (family === "infographic_motion")
+		return kind === "evidence" ? "data" : "context";
+	if (family === "history_comedy")
+		return kind === "evidence" ? "map" : "context";
+	if (family === "whiteboard_lesson")
+		return kind === "evidence" ? "data" : "context";
 	return kind === "evidence" ? "data" : "reconstruction";
 }
 
@@ -964,7 +986,8 @@ function animationSfxCue(
 		return {
 			category: kind === "punch" ? "suspense_hit" : "drone",
 			intensity: kind === "punch" ? 0.9 : 0.45,
-			reason: kind === "punch" ? "shadow reveal hit" : "sustained horror tension",
+			reason:
+				kind === "punch" ? "shadow reveal hit" : "sustained horror tension",
 		};
 	}
 	if (family === "slapstick_no_dialogue" || family === "meme_original") {
@@ -988,7 +1011,8 @@ function animationSfxCue(
 	return {
 		category: kind === "punch" ? "impact" : "reveal",
 		intensity: kind === "punch" ? 0.82 : 0.5,
-		reason: kind === "punch" ? "character reaction payoff" : "pose change accent",
+		reason:
+			kind === "punch" ? "character reaction payoff" : "pose change accent",
 	};
 }
 
@@ -1031,7 +1055,8 @@ function shotPrompt(
 		? `${character.name}, ${character.appearance}, ${character.personality}`
 		: "same main character, consistent outfit, consistent face shape";
 	const shotIntent =
-		profile.shotIntents[index % profile.shotIntents.length] ?? "clear action pose";
+		profile.shotIntents[index % profile.shotIntents.length] ??
+		"clear action pose";
 	const promptParts = [
 		style,
 		world,
@@ -1050,8 +1075,12 @@ function shotPrompt(
 	return promptParts.filter(Boolean).join(", ").slice(0, 420);
 }
 
-function shotCaption(scene: AnimationSceneInput, kind: SceneShot["kind"]): string {
-	const firstSentence = normalizeText(scene.narration).split(/[.!?\n]/)[0] ?? "";
+function shotCaption(
+	scene: AnimationSceneInput,
+	kind: SceneShot["kind"],
+): string {
+	const firstSentence =
+		normalizeText(scene.narration).split(/[.!?\n]/)[0] ?? "";
 	if (kind === "establishing") return firstSentence || "장면 시작";
 	if (kind === "detail") return "행동 비트";
 	if (kind === "quote") return "리액션";
@@ -1119,7 +1148,10 @@ export function ensureAnimationSceneShots(
 	const family = resolveSceneFamily(scene, productionFamily);
 	const profile = getAnimationProductionFamilyProfile(family);
 	if (scene.shots && scene.shots.length > 0) {
-		const total = scene.shots.reduce((sum, shot) => sum + shot.duration_seconds, 0);
+		const total = scene.shots.reduce(
+			(sum, shot) => sum + shot.duration_seconds,
+			0,
+		);
 		if (total > 0) {
 			const scale = Math.max(scene.duration, 1.5) / total;
 			return scene.shots.map((shot) => ({
@@ -1152,6 +1184,8 @@ export interface AnimationAssetManifest {
 	recurringProps: string[];
 	colorPalette: string[];
 	continuityDirectives: string[];
+	/** 다중 캐릭터 전체 출연진 고정 지시문(2명+일 때만). 핵심 잠금 뒤에 주입돼 cap 시 먼저 잘린다. */
+	castDirective?: string;
 	sceneContinuityKeys: string[];
 	createdAt: string;
 }
@@ -1193,7 +1227,9 @@ export interface AnimationQualitySceneInput {
 	shots?: SceneShot[];
 }
 
-function defaultAnimationBible(family: AnimationProductionFamily): AnimationBible {
+function defaultAnimationBible(
+	family: AnimationProductionFamily,
+): AnimationBible {
 	const profile = getAnimationProductionFamilyProfile(family);
 	return {
 		style: profile.visualGrammar,
@@ -1241,12 +1277,18 @@ export function buildAnimationAssetManifest(input: {
 		inferAnimationProductionFamily({
 			topicTitle:
 				input.scenes
-					?.map((scene) => `${scene.narration_text ?? ""} ${scene.visual_prompt ?? ""}`)
+					?.map(
+						(scene) =>
+							`${scene.narration_text ?? ""} ${scene.visual_prompt ?? ""}`,
+					)
 					.join(" ") ?? "",
 		});
 	const profile = getAnimationProductionFamilyProfile(productionFamily);
 	const bible = resolveAnimationBible(input.bible, productionFamily);
 	const mainCharacter = bible.characters[0];
+	// 다중 캐릭터(조연 포함) bible 이면 전체 출연진 고정 지시문 — 기존엔 main(characters[0])만
+	// 잠가 조연이 컷마다 드리프트했다. buildCastDirective 는 캐릭터 0~1명이면 ""(무영향).
+	const castDirective = buildCastDirective(bible.characters);
 	const fixedAppearance = normalizeText(
 		[
 			mainCharacter?.name,
@@ -1285,12 +1327,15 @@ export function buildAnimationAssetManifest(input: {
 		mainCharacterName: mainCharacter?.name ?? "Main character",
 		recurringProps: bible.recurring_props ?? [],
 		colorPalette: bible.color_palette ?? [],
+		castDirective: castDirective || undefined,
 		continuityDirectives: [
 			`Use the same main character in every shot: ${fixedAppearance}.`,
 			`Keep the world consistent: ${bible.world}.`,
 			`Use the production family grammar: ${profile.label} - ${profile.visualGrammar}.`,
 			...(bible.recurring_props?.length
-				? [`Reuse recurring props when relevant: ${bible.recurring_props.join(", ")}.`]
+				? [
+						`Reuse recurring props when relevant: ${bible.recurring_props.join(", ")}.`,
+					]
 				: []),
 			...(bible.color_palette?.length
 				? [`Keep this palette consistent: ${bible.color_palette.join(", ")}.`]
@@ -1342,6 +1387,9 @@ export function enrichAnimationPromptWithContinuity(
 			? `Sound timing intent: ${shot.sfx_cue.category} at ${shot.sfx_cue.intensity.toFixed(2)} intensity for ${shot.sfx_cue.reason}.`
 			: "",
 		"Do not change the character age, outfit, face shape, palette, or silhouette between shots.",
+		// 다중 캐릭터 전체 출연진 앵커는 신규 추가분이라 truncation 최우선(맨 끝) — 기존 매니페스트/
+		// 샷 잠금(시트·식별·시드·rig·sfx)을 절대 밀어내지 않는다. 예산이 남을 때만 들어간다.
+		manifest.castDirective ? manifest.castDirective : "",
 	];
 	return parts.filter(Boolean).join(" ").slice(0, 1400);
 }
@@ -1354,7 +1402,9 @@ export function applyAnimationContinuityToShots(
 		if (shot.selection_provider !== "animation") return shot;
 		const continuityKey =
 			shot.continuity_key ??
-			manifest.sceneContinuityKeys[index % manifest.sceneContinuityKeys.length] ??
+			manifest.sceneContinuityKeys[
+				index % manifest.sceneContinuityKeys.length
+			] ??
 			`shot-${index + 1}`;
 		return {
 			...shot,
@@ -1362,8 +1412,10 @@ export function applyAnimationContinuityToShots(
 			continuity_key: continuityKey,
 			reference_image_path: manifest.referenceSheetPath,
 			animation_rig:
-				shot.animation_rig ?? animationRig(manifest.productionFamily, shot.kind),
-			sfx_cue: shot.sfx_cue ?? animationSfxCue(manifest.productionFamily, shot.kind),
+				shot.animation_rig ??
+				animationRig(manifest.productionFamily, shot.kind),
+			sfx_cue:
+				shot.sfx_cue ?? animationSfxCue(manifest.productionFamily, shot.kind),
 			source_title: shot.source_title ?? manifest.productionFamilyLabel,
 			source_confidence: Math.max(shot.source_confidence ?? 0, 84),
 			visual_prompt: enrichAnimationPromptWithContinuity(
@@ -1481,7 +1533,9 @@ export function scoreAnimationProductionQuality(input: {
 }): AnimationProductionQualityReport {
 	const scenes = input.scenes ?? [];
 	const shots = scenes.flatMap((scene) => scene.shots ?? []);
-	const animationShots = shots.filter((shot) => shot.selection_provider === "animation");
+	const animationShots = shots.filter(
+		(shot) => shot.selection_provider === "animation",
+	);
 	const issues: AnimationProductionQualityIssue[] = [];
 	const actions: string[] = [];
 	const totalShots = shots.length;
@@ -1490,7 +1544,10 @@ export function scoreAnimationProductionQuality(input: {
 		input.productionFamily ??
 		inferAnimationProductionFamily({
 			topicTitle: scenes
-				.map((scene) => `${scene.narration_text ?? ""} ${scene.visual_prompt ?? ""}`)
+				.map(
+					(scene) =>
+						`${scene.narration_text ?? ""} ${scene.visual_prompt ?? ""}`,
+				)
 				.join(" "),
 		});
 
@@ -1511,7 +1568,8 @@ export function scoreAnimationProductionQuality(input: {
 		animationShotCount,
 	);
 	const motionCoverageRatio = ratio(
-		animationShots.filter((shot) => shot.motion && shot.motion !== "static").length,
+		animationShots.filter((shot) => shot.motion && shot.motion !== "static")
+			.length,
 		animationShotCount,
 	);
 	const rigCoverageRatio = ratio(
@@ -1546,16 +1604,20 @@ export function scoreAnimationProductionQuality(input: {
 		issues.push({
 			severity: "critical",
 			code: "missing_reference_sheet",
-			message: "캐릭터 레퍼런스 시트가 없어 샷 간 외형 일관성을 보장하기 어렵습니다.",
+			message:
+				"캐릭터 레퍼런스 시트가 없어 샷 간 외형 일관성을 보장하기 어렵습니다.",
 		});
-		actions.push("캐릭터 레퍼런스 시트를 먼저 생성하고 모든 샷에 reference_image_path를 연결하세요.");
+		actions.push(
+			"캐릭터 레퍼런스 시트를 먼저 생성하고 모든 샷에 reference_image_path를 연결하세요.",
+		);
 	}
 	if (!input.bible?.characters?.length) {
 		score -= 14;
 		issues.push({
 			severity: "warning",
 			code: "weak_animation_bible",
-			message: "캐릭터 바이블이 약해 장기 시리즈/롱폼에서 일관성이 흔들릴 수 있습니다.",
+			message:
+				"캐릭터 바이블이 약해 장기 시리즈/롱폼에서 일관성이 흔들릴 수 있습니다.",
 		});
 		actions.push("주인공 외형, 성격, 목소리, 반복 소품, 팔레트를 명시하세요.");
 	}
@@ -1566,16 +1628,21 @@ export function scoreAnimationProductionQuality(input: {
 			code: "no_animation_shots",
 			message: "애니메이션 전용 샷이 없습니다.",
 		});
-		actions.push("애니메이션 모드에서는 selection_provider가 animation인 키포즈 샷을 생성하세요.");
+		actions.push(
+			"애니메이션 모드에서는 selection_provider가 animation인 키포즈 샷을 생성하세요.",
+		);
 	}
 	if (continuityTaggedRatio < 0.95) {
 		score -= Math.round((0.95 - continuityTaggedRatio) * 24);
 		issues.push({
 			severity: continuityTaggedRatio < 0.6 ? "critical" : "warning",
 			code: "weak_continuity_tagging",
-			message: "일부 샷에 continuity_key/reference_image_path가 없어 연속성이 약합니다.",
+			message:
+				"일부 샷에 continuity_key/reference_image_path가 없어 연속성이 약합니다.",
 		});
-		actions.push("모든 애니메이션 샷에 continuity_key와 reference_image_path를 저장하세요.");
+		actions.push(
+			"모든 애니메이션 샷에 continuity_key와 reference_image_path를 저장하세요.",
+		);
 	}
 	if (familyTaggedRatio < 0.95) {
 		score -= Math.round((0.95 - familyTaggedRatio) * 16);
@@ -1584,7 +1651,9 @@ export function scoreAnimationProductionQuality(input: {
 			code: "family_mismatch",
 			message: "일부 샷의 제작 패밀리 태그가 스크립트 포맷과 맞지 않습니다.",
 		});
-		actions.push("샷 생성 전 production_family를 고정하고 모든 샷에 같은 패밀리를 주입하세요.");
+		actions.push(
+			"샷 생성 전 production_family를 고정하고 모든 샷에 같은 패밀리를 주입하세요.",
+		);
 	}
 	if (sourceResolvedRatio < 1) {
 		score -= Math.round((1 - sourceResolvedRatio) * 18);
@@ -1612,7 +1681,9 @@ export function scoreAnimationProductionQuality(input: {
 			message:
 				"일부 샷에 표정/입/포즈 리깅 지시가 없어 캐릭터 연기가 평면적으로 보일 수 있습니다.",
 		});
-		actions.push("모든 애니메이션 샷에 expression, mouthCue, pose, actionIntensity를 넣으세요.");
+		actions.push(
+			"모든 애니메이션 샷에 expression, mouthCue, pose, actionIntensity를 넣으세요.",
+		);
 	}
 	if (sfxCueCoverageRatio < 0.9) {
 		score -= Math.round((0.9 - sfxCueCoverageRatio) * 10);
@@ -1622,7 +1693,9 @@ export function scoreAnimationProductionQuality(input: {
 			message:
 				"일부 샷에 SFX 의도가 없어 컷/액션 타이밍이 영상처럼 묶이지 않을 수 있습니다.",
 		});
-		actions.push("액션/리액션/정보 공개 샷에 SFX 카테고리와 강도 큐를 저장하세요.");
+		actions.push(
+			"액션/리액션/정보 공개 샷에 SFX 카테고리와 강도 큐를 저장하세요.",
+		);
 	}
 	if (uniquePromptRatio < 0.7 && animationShotCount >= 4) {
 		score -= Math.round((0.7 - uniquePromptRatio) * 18);
@@ -1640,7 +1713,9 @@ export function scoreAnimationProductionQuality(input: {
 			code: "weak_animation_ending",
 			message: "마지막 샷이 펀치라인/루프/여운 역할로 명확하지 않습니다.",
 		});
-		actions.push("마지막 샷을 punch/ending 역할로 바꾸고 결말 반응 또는 여운을 넣으세요.");
+		actions.push(
+			"마지막 샷을 punch/ending 역할로 바꾸고 결말 반응 또는 여운을 넣으세요.",
+		);
 	}
 
 	const normalizedScore = clamp(Math.round(score), 0, 100);
@@ -1726,7 +1801,8 @@ export function applyAnimationPacingRules<
 							? "serious"
 							: "warm",
 			textEffect:
-				scene.type === "text_emphasis" && (!scene.textEffect || scene.textEffect === "none")
+				scene.type === "text_emphasis" &&
+				(!scene.textEffect || scene.textEffect === "none")
 					? "scale_in"
 					: scene.textEffect,
 		};
