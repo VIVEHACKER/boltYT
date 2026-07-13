@@ -418,9 +418,21 @@ export async function assertGroundedClaimsForPlan(
 	plan: Pick<EconomyRealGenerationPlan, "mode" | "grounding">,
 	narrations: string[],
 	assertFn: typeof assertGroundedEconomyClaims = assertGroundedEconomyClaims,
+	articleGroundedIndices?: ReadonlySet<number>,
 ): Promise<void> {
 	if (plan.mode === "sample") return;
-	await assertFn(plan.grounding, narrations);
+	if (!articleGroundedIndices) {
+		await assertFn(plan.grounding, narrations);
+		return;
+	}
+	// 차트 씬은 기사 본문 대조 대상이 아니므로 미대조 판정에서 제외한다.
+	const unsupported = (
+		await auditGroundedEconomyClaims(plan.grounding, narrations)
+	).filter((index) => articleGroundedIndices.has(index));
+	if (unsupported.length > 0)
+		throw new Error(
+			`최종 출처 대조 실패(씬 ${unsupported.map((index) => index + 1).join(", ")})`,
+		);
 }
 
 function compactText(value: string, maxCodePoints: number): string {
@@ -1000,6 +1012,33 @@ async function realSamsungArticleUrl(): Promise<string> {
  */
 const MAX_GROUNDED_ATTEMPTS = 3;
 
+/**
+ * 기사 본문으로 근거화할 씬 index 집합. 차트 씬(KOSPI/KOSDAQ 지수 화면)은 개별 종목
+ * 기사가 아니라 화면의 실제 지수 차트가 근거이므로 기사-본문 게이트(확실성·숫자·LLM
+ * 대조)에서 제외한다. 투자조언 금지는 이 집합과 무관하게 모든 씬에 적용된다.
+ */
+export function articleGroundedSceneIndices(): Set<number> {
+	return new Set(
+		GROUNDED_PLAN.map((beat, index) =>
+			beat.asset.kind === "chart" ? -1 : index,
+		).filter((index) => index >= 0),
+	);
+}
+
+/**
+ * 차트 씬은 기사-본문 대조에서 제외되지만 검증 없이 통과시키면 안 된다. 기사로도 차트
+ * 데이터로도 검증할 수 없는 '구체 수치'를 조작할 위험이 있으므로, 차트 씬 나레이션에
+ * 숫자가 들어가면 위반으로 본다(중립 프레이밍만 허용). 투자조언 금지는 별도 게이트가 담당.
+ */
+export function chartSceneFigureViolations(narrations: string[]): number[] {
+	const grounded = articleGroundedSceneIndices();
+	return narrations
+		.map((line, index) =>
+			!grounded.has(index) && /\d/.test(line) ? index : -1,
+		)
+		.filter((index) => index >= 0);
+}
+
 export interface GroundedNarrationDeps {
 	/** 프롬프트 → 나레이션 배열(기본: api-proxy Claude). 테스트 주입용. */
 	generate?: (prompt: string) => Promise<string[]>;
@@ -1020,7 +1059,7 @@ export async function groundedNarrations(
 	deps: GroundedNarrationDeps = {},
 ): Promise<string[]> {
 	const roles = GROUNDED_PLAN.map((b, i) => `${i + 1}. ${b.role}`).join("\n");
-	const usr = `${groundingContext(g)}\n\n위 자료의 '사실에만' 근거해, 세로 숏폼 경제 뉴스 해설의 ${GROUNDED_PLAN.length}개 씬 나레이션을 쓴다. 각 씬은 한국어 1문장, 35~55자(약 8~10초), 짧고 임팩트 있는 구어체로 쓴다. 전체 음성은 45~60초가 되게 하고 아래 역할·순서를 그대로 따르며 각 항목 1문장씩 작성한다:\n${roles}\n기사에서 기대·전망·예정·추진·가능성으로 표현한 기업 이벤트는 나레이션에서도 같은 불확실성 수준과 표현을 반드시 유지한다. 예: '40조 조달 추진'을 '40조를 조달합니다'로 확정하지 말고 '40조 조달을 추진합니다'로 쓴다.\n투자 조언·종목 추천·매수매도 권유·가격 예측·기사에 없는 수치 창작 절대 금지(YMYL).\nJSON: {"beats":[{"narration":"..."}]}`;
+	const usr = `${groundingContext(g)}\n\n위 자료의 '사실에만' 근거해, 세로 숏폼 경제 뉴스 해설의 ${GROUNDED_PLAN.length}개 씬 나레이션을 쓴다. 각 씬은 한국어 1문장, 35~55자(약 8~10초), 짧고 임팩트 있는 구어체로 쓴다. 전체 음성은 45~60초가 되게 하고 아래 역할·순서를 그대로 따르며 각 항목 1문장씩 작성한다:\n${roles}\n기사에서 기대·전망·예정·추진·가능성으로 표현한 기업 이벤트는 나레이션에서도 같은 불확실성 수준과 표현을 반드시 유지한다. 예: '40조 조달 추진'을 '40조를 조달합니다'로 확정하지 말고 '40조 조달을 추진합니다'로 쓴다.\n투자 조언·종목 추천·매수매도 권유·가격 예측·기사에 없는 수치 창작 절대 금지(YMYL).\n코스피·코스닥 지수 차트 씬(위 역할 중 지수 화면 항목)은 화면의 지수 흐름을 가리키는 중립 문장으로 쓰고, 숫자(구체 수치)를 넣지 않으며 등락 방향을 단정하지 않는다.\nJSON: {"beats":[{"narration":"..."}]}`;
 	const generate =
 		deps.generate ??
 		(async (prompt: string): Promise<string[]> => {
@@ -1035,12 +1074,19 @@ export async function groundedNarrations(
 	const maxAttempts = Math.max(1, deps.maxAttempts ?? MAX_GROUNDED_ATTEMPTS);
 	const log = deps.log ?? ((msg: string) => process.stdout.write(msg));
 
+	const articleGrounded = articleGroundedSceneIndices();
 	/** 결정적(로컬) 게이트 위반 사유. 빈 배열이면 통과. */
 	const deterministicReasons = (lines: string[]): string[] => {
 		const selected = lines.slice(0, GROUNDED_PLAN.length);
+		// 투자조언 금지는 모든 씬. 확실성·숫자 대조는 기사-근거 씬만(차트 씬 제외).
 		const adviceIndex = selected.findIndex(looksLikeAdvice);
-		const modality = findGroundingModalityViolations(g, selected);
-		const numbers = findUngroundedNumberViolations(g, selected);
+		const modality = findGroundingModalityViolations(g, selected).filter((i) =>
+			articleGrounded.has(i),
+		);
+		const numbers = findUngroundedNumberViolations(g, selected).filter((i) =>
+			articleGrounded.has(i),
+		);
+		const chartFigures = chartSceneFigureViolations(selected);
 		return [
 			lines.length < GROUNDED_PLAN.length ? "씬 개수 미달" : "",
 			adviceIndex >= 0 ? `투자조언 씬 ${adviceIndex + 1}` : "",
@@ -1049,6 +1095,9 @@ export async function groundedNarrations(
 				: "",
 			numbers.length > 0
 				? `출처 미대조 수치 씬 ${numbers.map((i) => i + 1).join(", ")}`
+				: "",
+			chartFigures.length > 0
+				? `차트 씬 미검증 수치 씬 ${chartFigures.map((i) => i + 1).join(", ")}`
 				: "",
 		].filter(Boolean);
 	};
@@ -1064,7 +1113,10 @@ export async function groundedNarrations(
 		reasons = deterministicReasons(lines);
 		if (reasons.length === 0) {
 			// 결정적 게이트 통과 → 비싼 LLM 대조는 이 지점에서만 호출한다.
-			const unsupported = await audit(g, lines.slice(0, GROUNDED_PLAN.length));
+			// 차트 씬은 기사 본문 대조 대상이 아니므로 미대조 판정에서 제외한다.
+			const unsupported = (
+				await audit(g, lines.slice(0, GROUNDED_PLAN.length))
+			).filter((i) => articleGrounded.has(i));
 			if (unsupported.length === 0) return lines.slice(0, GROUNDED_PLAN.length);
 			reasons = [
 				`출처 대조 실패 씬 ${unsupported.map((i) => i + 1).join(", ")}`,
@@ -1641,17 +1693,25 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
 			related: plan.grounding.related,
 		};
 		let narrations = plan.narrations;
+		// 재로드/승격 계획도 생성 루프와 동일하게 차트 씬은 기사-근거 게이트에서 제외하고,
+		// 차트 씬은 별도로 미검증 수치를 금지한다(일관성).
+		const legacyArticleGrounded = articleGroundedSceneIndices();
 		const modalityViolations = findGroundingModalityViolations(
 			grounding,
 			narrations,
-		);
+		).filter((index) => legacyArticleGrounded.has(index));
 		const numberViolations = findUngroundedNumberViolations(
 			grounding,
 			narrations,
-		);
-		if (modalityViolations.length > 0 || numberViolations.length > 0) {
+		).filter((index) => legacyArticleGrounded.has(index));
+		const chartFigureViolations = chartSceneFigureViolations(narrations);
+		if (
+			modalityViolations.length > 0 ||
+			numberViolations.length > 0 ||
+			chartFigureViolations.length > 0
+		) {
 			process.stdout.write(
-				`legacy plan grounding 위반(확실성 ${modalityViolations.map((index) => index + 1).join(", ") || "없음"}, 숫자 ${numberViolations.map((index) => index + 1).join(", ") || "없음"}) — full Grounding으로 나레이션을 재생성합니다.\n`,
+				`legacy plan grounding 위반(확실성 ${modalityViolations.map((index) => index + 1).join(", ") || "없음"}, 숫자 ${numberViolations.map((index) => index + 1).join(", ") || "없음"}, 차트수치 ${chartFigureViolations.map((index) => index + 1).join(", ") || "없음"}) — full Grounding으로 나레이션을 재생성합니다.\n`,
 			);
 			narrations = await groundedNarrations(grounding);
 		}
@@ -1696,10 +1756,16 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
 	});
 	if (finalViolation)
 		throw new Error(`YMYL 최종 게이트 위반: ${finalViolation}`);
+	// 차트 씬(지수 화면)은 기사 본문이 아닌 차트 자체가 근거 → 기사-근거 게이트에서 제외.
+	const articleGroundedBeats = new Set(
+		beats
+			.map((beat, index) => (beat.asset.kind === "chart" ? -1 : index))
+			.filter((index) => index >= 0),
+	);
 	const finalModalityViolations = findGroundingModalityViolations(
 		plan.grounding,
 		beats.map((beat) => beat.narration),
-	);
+	).filter((index) => articleGroundedBeats.has(index));
 	if (finalModalityViolations.length > 0)
 		throw new Error(
 			`YMYL 최종 출처 확실성 위반(씬 ${finalModalityViolations.map((index) => index + 1).join(", ")})`,
@@ -1707,10 +1773,18 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
 	const finalNumberViolations = findUngroundedNumberViolations(
 		plan.grounding,
 		beats.map((beat) => beat.narration),
-	);
+	).filter((index) => articleGroundedBeats.has(index));
 	if (finalNumberViolations.length > 0)
 		throw new Error(
 			`YMYL 최종 출처 숫자 위반(씬 ${finalNumberViolations.map((index) => index + 1).join(", ")})`,
+		);
+	// 차트 씬은 기사·차트 데이터로 검증 불가한 구체 수치를 담아선 안 된다.
+	const finalChartFigures = chartSceneFigureViolations(
+		beats.map((beat) => beat.narration),
+	);
+	if (finalChartFigures.length > 0)
+		throw new Error(
+			`YMYL 최종 차트 씬 미검증 수치(씬 ${finalChartFigures.map((index) => index + 1).join(", ")})`,
 		);
 	// 새로 생성한 grounded 계획은 groundedNarrations 루프가 이미 LLM 대조를 통과시켰으므로
 	// 중복 대조를 생략한다. 재사용/승격 계획은 이번 실행에서 검증되지 않았으니 여기서 대조한다.
@@ -1718,6 +1792,8 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
 		await assertGroundedClaimsForPlan(
 			plan,
 			beats.map((beat) => beat.narration),
+			assertGroundedEconomyClaims,
+			articleGroundedBeats,
 		);
 
 	const made: {

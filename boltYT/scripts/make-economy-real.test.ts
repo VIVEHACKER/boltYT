@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+	articleGroundedSceneIndices,
 	assertGroundedClaimsForPlan,
 	audioStretchFactor,
 	buildEconomyRealDescription,
@@ -14,6 +15,7 @@ import {
 	buildLegacyEconomyRealFingerprintV3,
 	buildSourceSnapshotHash,
 	canReuseGeneratedAssets,
+	chartSceneFigureViolations,
 	economyRealOutputPaths,
 	economyRealRenderConfigKey,
 	estimateRenderedShortsSec,
@@ -768,7 +770,8 @@ describe("groundedNarrations 재생성 루프(YMYL 게이트 fail-closed)", () =
 
 	it("LLM 대조 실패 시 위반을 피드백해 재생성하고 통과하면 반환한다", async () => {
 		let gen = 0;
-		const auditResults: number[][] = [[2], []];
+		// index 4 = payoff(card, 기사-근거 씬) — 차트 씬이 아니어야 재생성이 유발된다.
+		const auditResults: number[][] = [[4], []];
 		const out = await groundedNarrations(grounding, {
 			generate: async () => {
 				gen++;
@@ -828,5 +831,62 @@ describe("groundedNarrations 재생성 루프(YMYL 게이트 fail-closed)", () =
 			}),
 		).rejects.toThrow(/fail-closed/);
 		expect(gen).toBe(3);
+	});
+
+	it("articleGroundedSceneIndices 는 차트 씬(코스피/코스닥)을 근거 게이트에서 제외한다", () => {
+		const idx = articleGroundedSceneIndices();
+		expect(idx.has(0)).toBe(true); // hook (card)
+		expect(idx.has(1)).toBe(true); // evidence (article)
+		expect(idx.has(2)).toBe(false); // chart-kospi
+		expect(idx.has(3)).toBe(false); // chart-kosdaq
+		expect(idx.has(4)).toBe(true); // payoff (card)
+	});
+
+	it("차트 씬에 구체 수치가 있으면 미검증 수치로 재생성한다(조작 차단)", async () => {
+		let gen = 0;
+		// index 2 = chart-kospi 에 숫자 → 기사·차트로 검증 불가한 구체 수치는 금지.
+		const chartDirty = [
+			clean[0],
+			clean[1],
+			"코스피가 87654포인트를 기록했다",
+			clean[3],
+			clean[4],
+		];
+		const gens: string[][] = [chartDirty, clean];
+		const out = await groundedNarrations(grounding, {
+			generate: async () => {
+				gen++;
+				return gens.shift() ?? clean;
+			},
+			audit: async () => [],
+			log: () => {},
+		});
+		expect(out).toEqual(clean);
+		expect(gen).toBe(2);
+	});
+
+	it("chartSceneFigureViolations 는 차트 씬 숫자만 잡고 기사 씬 숫자는 무시한다", () => {
+		const narr = [
+			"삼성전자가 3조를 조달했다", // 0 hook(기사 씬) — 여기 숫자는 기사 대조 대상
+			clean[1],
+			"코스피 2500 돌파", // 2 chart-kospi — 미검증 수치 위반
+			clean[3],
+			clean[4],
+		];
+		expect(chartSceneFigureViolations(narr)).toEqual([2]);
+	});
+
+	it("차트 씬만 LLM 미대조로 지목되면 무시하고 통과한다", async () => {
+		let gen = 0;
+		const out = await groundedNarrations(grounding, {
+			generate: async () => {
+				gen++;
+				return clean;
+			},
+			audit: async () => [2, 3], // 차트 씬만 → 필터링돼 통과
+			log: () => {},
+		});
+		expect(out).toEqual(clean);
+		expect(gen).toBe(1);
 	});
 });
