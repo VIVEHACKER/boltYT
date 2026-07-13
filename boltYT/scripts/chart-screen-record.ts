@@ -46,6 +46,97 @@ export interface ChartClipOptions {
 /** Seconds of lead-in (page load + modal dismiss + chart settle) trimmed off the front. */
 const LEAD_IN_SEC = 6;
 
+/** 실측 지수 시세(그라운디드 차트 씬 나레이션 근거용). */
+export interface IndexQuote {
+	/** 네이버 폴링 코드(KOSPI/KOSDAQ). */
+	symbol: string;
+	/** 한글 지수명(코스피/코스닥). */
+	name: string;
+	/** 종가/현재 지수값. */
+	value: number;
+	/** 전일 대비 등락률(%). 음수=하락. */
+	changeRate: number;
+	/** 방향(한글, 나레이션 검증용). */
+	direction: "상승" | "하락" | "보합";
+	/** 시세 시각(ISO, KST). */
+	asOf: string;
+	/** OPEN/CLOSE 등 시장 상태. */
+	marketStatus: string;
+}
+
+/** TradingView 심볼(KRX:KOSPI) → 네이버 폴링 지수 코드(KOSPI). 지수만 지원. */
+export function naverIndexCode(symbol: string): string | null {
+	const upper = symbol.trim().toUpperCase();
+	const bare = upper.replace(/^KRX:/, "");
+	return bare === "KOSPI" || bare === "KOSDAQ" ? bare : null;
+}
+
+/** 네이버 폴링 응답 JSON → IndexQuote. 형식 오류/빈 데이터는 null(파괴적 실패 대신 폴백). */
+export function parseIndexQuote(
+	value: unknown,
+	symbol: string,
+): IndexQuote | null {
+	if (!value || typeof value !== "object") return null;
+	const datas = (value as { datas?: unknown }).datas;
+	if (!Array.isArray(datas) || datas.length === 0) return null;
+	const d = datas[0] as Record<string, unknown>;
+	const num = (raw: unknown): number | null => {
+		if (typeof raw !== "string" && typeof raw !== "number") return null;
+		const parsed = Number.parseFloat(String(raw).replace(/,/g, ""));
+		return Number.isFinite(parsed) ? parsed : null;
+	};
+	const val = num(d.closePriceRaw);
+	const rate = num(d.fluctuationsRatioRaw);
+	if (val === null || rate === null) return null;
+	const dirText =
+		typeof d.compareToPreviousPrice === "object" && d.compareToPreviousPrice
+			? (d.compareToPreviousPrice as { text?: unknown }).text
+			: undefined;
+	const direction: IndexQuote["direction"] =
+		rate > 0 || dirText === "상승"
+			? "상승"
+			: rate < 0 || dirText === "하락"
+				? "하락"
+				: "보합";
+	return {
+		symbol,
+		name: typeof d.stockName === "string" ? d.stockName : symbol,
+		value: val,
+		changeRate: rate,
+		direction,
+		asOf: typeof d.localTradedAt === "string" ? d.localTradedAt : "",
+		marketStatus: typeof d.marketStatus === "string" ? d.marketStatus : "",
+	};
+}
+
+/**
+ * KOSPI/KOSDAQ 실측 시세를 네이버 폴링 API에서 취득한다(로그인·키 불필요).
+ * 지수가 아니거나 취득 실패 시 null → 호출부는 실측 없이 중립 프레이밍으로 폴백한다.
+ */
+export async function fetchIndexQuote(
+	symbol: string,
+	fetchFn: typeof fetch = fetch,
+): Promise<IndexQuote | null> {
+	const code = naverIndexCode(symbol);
+	if (!code) return null;
+	try {
+		const res = await fetchFn(
+			`https://polling.finance.naver.com/api/realtime/domestic/index/${code}`,
+			{
+				headers: {
+					"User-Agent": "Mozilla/5.0",
+					Referer: "https://finance.naver.com/",
+				},
+				signal: AbortSignal.timeout(10_000),
+			},
+		);
+		if (!res.ok) return null;
+		return parseIndexQuote(await res.json(), code);
+	} catch {
+		return null;
+	}
+}
+
 function tvWidgetUrl(o: ChartClipOptions): string {
 	const params = new URLSearchParams({
 		symbol: o.symbol,

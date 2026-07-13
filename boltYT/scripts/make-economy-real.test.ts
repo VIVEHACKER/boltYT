@@ -15,7 +15,9 @@ import {
 	buildLegacyEconomyRealFingerprintV3,
 	buildSourceSnapshotHash,
 	canReuseGeneratedAssets,
+	chartDirectionViolations,
 	chartSceneFigureViolations,
+	chartSceneSymbols,
 	economyRealOutputPaths,
 	economyRealRenderConfigKey,
 	estimateRenderedShortsSec,
@@ -39,6 +41,7 @@ import {
 	readSourceArticle,
 	refreshGenerationPlanRenderContract,
 	requireLegacyGroundingBody,
+	resolveChartQuotes,
 	resolveEconomyRealWorkDir,
 	shortsAudioNormalizationTarget,
 } from "./make-economy-real.ts";
@@ -874,6 +877,147 @@ describe("groundedNarrations 재생성 루프(YMYL 게이트 fail-closed)", () =
 			clean[4],
 		];
 		expect(chartSceneFigureViolations(narr)).toEqual([2]);
+	});
+
+	const quote = (direction: "상승" | "하락" | "보합", changeRate = 0) => ({
+		symbol: "KOSPI",
+		name: "코스피",
+		value: 2500,
+		changeRate,
+		direction,
+		asOf: "",
+		marketStatus: "CLOSE",
+	});
+
+	it("chartSceneSymbols 는 차트 씬 index를 지수 심볼로 매핑한다", () => {
+		const map = chartSceneSymbols();
+		expect(map.get(2)).toBe("KRX:KOSPI");
+		expect(map.get(3)).toBe("KRX:KOSDAQ");
+		expect(map.has(0)).toBe(false); // hook(card)
+	});
+
+	it("chartDirectionViolations 는 실측 방향과 모순되는 씬만 잡는다", () => {
+		const quotes = new Map([
+			[2, quote("하락", -1.2)],
+			[3, quote("상승", 0.8)],
+		]);
+		const narr = [
+			clean[0],
+			clean[1],
+			"코스피가 상승했습니다", // 하락 실측과 모순
+			"코스닥도 올랐습니다", // 상승 실측과 일치
+			clean[4],
+		];
+		expect(chartDirectionViolations(narr, quotes)).toEqual([2]);
+	});
+
+	it("chartDirectionViolations 는 중립 문장을 허용하고 보합의 방향 단정을 잡는다", () => {
+		const quotes = new Map([
+			[2, quote("보합", 0)],
+			[3, quote("하락", -0.5)],
+		]);
+		const ok = [
+			clean[0],
+			clean[1],
+			"코스피도 함께 살펴봅니다", // 중립 → OK
+			"코스닥이 하락했습니다", // 하락 일치 → OK
+			clean[4],
+		];
+		expect(chartDirectionViolations(ok, quotes)).toEqual([]);
+		const bad = [
+			clean[0],
+			clean[1],
+			"코스피가 상승했습니다", // 보합인데 상승 단정 → 위반
+			clean[3],
+			clean[4],
+		];
+		expect(chartDirectionViolations(bad, quotes)).toEqual([2]);
+	});
+
+	it("groundedNarrations 는 차트 씬 실측 방향 모순을 재생성으로 교정한다", async () => {
+		const quotes = new Map([[2, quote("하락", -1.5)]]);
+		const gens: string[][] = [
+			[clean[0], clean[1], "코스피가 상승 마감했습니다", clean[3], clean[4]],
+			clean,
+		];
+		let gen = 0;
+		const out = await groundedNarrations(grounding, {
+			generate: async () => {
+				gen++;
+				return gens.shift() ?? clean;
+			},
+			audit: async () => [],
+			chartQuotes: quotes,
+			log: () => {},
+		});
+		expect(out).toEqual(clean);
+		expect(gen).toBe(2);
+	});
+
+	it("resolveChartQuotes 는 종가(CLOSE) 성공분만 담는다(실패·개장중 제외)", async () => {
+		const fetchFn = (async (url: string) => {
+			if (url.includes("/index/KOSPI"))
+				return {
+					ok: true,
+					json: async () => ({
+						datas: [
+							{
+								closePriceRaw: "2500",
+								fluctuationsRatioRaw: "1.1",
+								marketStatus: "CLOSE",
+							},
+						],
+					}),
+				} as Response;
+			return { ok: false, json: async () => ({}) } as Response; // KOSDAQ 실패
+		}) as unknown as typeof fetch;
+		const quotes = await resolveChartQuotes(fetchFn);
+		expect(quotes.get(2)?.direction).toBe("상승"); // KOSPI 종가
+		expect(quotes.has(3)).toBe(false); // KOSDAQ 실패 → 제외
+	});
+
+	it("resolveChartQuotes 는 개장중(OPEN) 시세를 방향 근거에서 제외한다", async () => {
+		const fetchFn = (async () =>
+			({
+				ok: true,
+				json: async () => ({
+					datas: [
+						{
+							closePriceRaw: "2500",
+							fluctuationsRatioRaw: "1.1",
+							marketStatus: "OPEN",
+						},
+					],
+				}),
+			}) as Response) as unknown as typeof fetch;
+		const quotes = await resolveChartQuotes(fetchFn);
+		expect(quotes.size).toBe(0); // intraday → 중립 폴백
+	});
+
+	it("chartDirectionViolations 는 실측 없는 차트 씬의 방향 단정을 잡는다(근거 없음)", () => {
+		// 씬2 quote 없음 + '상승' 단정 → 위반. 씬3 quote 없음 + 중립 → OK.
+		const noQuotes = new Map<number, ReturnType<typeof quote>>();
+		const narr = [
+			clean[0],
+			clean[1],
+			"코스피가 급등했습니다",
+			"코스닥도 살펴봅니다",
+			clean[4],
+		];
+		expect(chartDirectionViolations(narr, noQuotes)).toEqual([2]);
+	});
+
+	it("chartDirectionViolations 는 방향 공간어(오른쪽) 오탐을 내지 않는다", () => {
+		const quotes = new Map([[2, quote("하락", -1.2)]]);
+		// 하락 실측인데 '오른쪽 차트' — 공간어라 방향 아님 → 위반 아님.
+		const narr = [
+			clean[0],
+			clean[1],
+			"오른쪽 차트를 함께 살펴봅니다",
+			clean[3],
+			clean[4],
+		];
+		expect(chartDirectionViolations(narr, quotes)).toEqual([]);
 	});
 
 	it("차트 씬만 LLM 미대조로 지목되면 무시하고 통과한다", async () => {

@@ -35,7 +35,11 @@ import { remotionMotionFor } from "../src/lib/camera-movements.ts";
 import { buildPlatformMeta } from "../src/lib/platform-meta.ts";
 import { buildSceneGraphics } from "../src/remotion/scene-motion-graphics.ts";
 import { captureArticle } from "./article-screenshot.ts";
-import { recordChartClip } from "./chart-screen-record.ts";
+import {
+	fetchIndexQuote,
+	type IndexQuote,
+	recordChartClip,
+} from "./chart-screen-record.ts";
 import {
 	assertGroundedEconomyClaims,
 	auditGroundedEconomyClaims,
@@ -1039,13 +1043,87 @@ export function chartSceneFigureViolations(narrations: string[]): number[] {
 		.filter((index) => index >= 0);
 }
 
+/** 차트 씬 index → 지수 심볼(KRX:KOSPI 등). */
+export function chartSceneSymbols(): Map<number, string> {
+	const map = new Map<number, string>();
+	GROUNDED_PLAN.forEach((beat, index) => {
+		if (beat.asset.kind === "chart") map.set(index, beat.asset.symbol);
+	});
+	return map;
+}
+
+/**
+ * 차트 씬의 실측 지수 시세를 취득한다(그라운디드 나레이션이 당일 방향을 사실로 서술할
+ * 근거). 취득 실패한 씬은 Map 에서 빠지고, 호출부는 그 씬을 중립 프레이밍으로 폴백한다.
+ */
+export async function resolveChartQuotes(
+	fetchFn: typeof fetch = fetch,
+): Promise<Map<number, IndexQuote>> {
+	const quotes = new Map<number, IndexQuote>();
+	for (const [index, symbol] of chartSceneSymbols()) {
+		const quote = await fetchIndexQuote(symbol, fetchFn);
+		// 종가(CLOSE)만 방향 근거로 쓴다. 개장중·장전·휴일의 intraday/전일 값은
+		// '오늘 종가' 방향으로 오표기될 수 있어 제외 → 그 씬은 중립 프레이밍으로 폴백.
+		if (quote && quote.marketStatus === "CLOSE") quotes.set(index, quote);
+	}
+	return quotes;
+}
+
+// 시장 '방향' 표현만 매칭한다. '오른쪽'·'내려다보다' 같은 공간/비방향 단어가 오탐되지
+// 않도록 방향 동사·명사형만 좁게 잡는다(codex P2).
+const RISE_WORDS = /상승|올랐|올라섰|올라갔|오름세|급등|반등|강세|상향|플러스/;
+const FALL_WORDS =
+	/하락|내렸|내려갔|내려앉|급락|약세|하향|마이너스|떨어졌|밀려났|미끄러졌/;
+
+/**
+ * 차트 씬 나레이션의 방향 표현을 검증한다(재생성 유발). 실측이 있는 씬은 방향이 실측과
+ * 모순되면 위반, 실측이 없는 차트 씬은 방향어 자체가 근거 없는 단정이라 위반(중립만 허용).
+ * 방향어를 안 쓰는 중립 문장은 통과. 예측·권유는 별도 게이트(looksLikeAdvice)가 담당한다.
+ */
+export function chartDirectionViolations(
+	narrations: string[],
+	quotes: Map<number, IndexQuote>,
+): number[] {
+	const violations: number[] = [];
+	for (const [index] of chartSceneSymbols()) {
+		const line = narrations[index] ?? "";
+		const saysRise = RISE_WORDS.test(line);
+		const saysFall = FALL_WORDS.test(line);
+		if (!saysRise && !saysFall) continue; // 중립 문장은 허용
+		const quote = quotes.get(index);
+		if (!quote) {
+			// 실측 근거 없는 차트 씬의 방향 단정 → 위반.
+			violations.push(index);
+			continue;
+		}
+		const contradicts =
+			(quote.direction === "상승" && saysFall) ||
+			(quote.direction === "하락" && saysRise) ||
+			(quote.direction === "보합" && (saysRise || saysFall));
+		if (contradicts) violations.push(index);
+	}
+	return violations;
+}
+
 export interface GroundedNarrationDeps {
 	/** 프롬프트 → 나레이션 배열(기본: api-proxy Claude). 테스트 주입용. */
 	generate?: (prompt: string) => Promise<string[]>;
 	/** 나레이션 → 출처 미대조 씬 index(기본: LLM 팩트체커). 테스트 주입용. */
 	audit?: (g: Grounding, narrations: string[]) => Promise<number[]>;
+	/** 차트 씬 실측 지수 시세(당일 방향을 사실로 서술할 근거). 없으면 중립 프레이밍. */
+	chartQuotes?: Map<number, IndexQuote>;
 	maxAttempts?: number;
 	log?: (msg: string) => void;
+}
+
+/** 차트 씬 실측 시세를 프롬프트에 넣을 안내 문자열로 만든다. */
+export function chartQuoteGuidance(quotes: Map<number, IndexQuote>): string {
+	if (quotes.size === 0) return "";
+	const lines = [...quotes.entries()].map(
+		([index, q]) =>
+			`- ${index + 1}번 씬(${q.name}): 오늘 ${q.direction}(전일대비 ${q.changeRate}%). 방향은 이 사실과 일치시키되, 구체 수치는 화면 차트에 맡기고 문장에 숫자를 넣지 마라. 예측·권유는 금지.`,
+	);
+	return `\n지수 차트 씬 실측(오늘 종가 기준, 방향만 사실로 언급 가능):\n${lines.join("\n")}`;
 }
 
 /**
@@ -1058,8 +1136,14 @@ export async function groundedNarrations(
 	g: Grounding,
 	deps: GroundedNarrationDeps = {},
 ): Promise<string[]> {
+	const chartQuotes = deps.chartQuotes ?? new Map<number, IndexQuote>();
+	const chartGuidance = chartQuoteGuidance(chartQuotes);
+	// 실측 시세가 있으면 방향을 사실로 언급 허용(숫자는 여전히 금지), 없으면 방향도 단정 금지.
+	const chartRule = chartGuidance
+		? "코스피·코스닥 지수 차트 씬은 숫자(구체 수치)를 넣지 마라. 아래 '실측'이 제공된 지수 차트 씬만 그 방향을 사실로 언급하고, 실측이 없는 지수 차트 씬은 방향을 단정하지 말고 중립 문장으로 써라(예측·권유 금지)."
+		: "코스피·코스닥 지수 차트 씬(위 역할 중 지수 화면 항목)은 화면의 지수 흐름을 가리키는 중립 문장으로 쓰고, 숫자(구체 수치)를 넣지 않으며 등락 방향을 단정하지 않는다.";
 	const roles = GROUNDED_PLAN.map((b, i) => `${i + 1}. ${b.role}`).join("\n");
-	const usr = `${groundingContext(g)}\n\n위 자료의 '사실에만' 근거해, 세로 숏폼 경제 뉴스 해설의 ${GROUNDED_PLAN.length}개 씬 나레이션을 쓴다. 각 씬은 한국어 1문장, 35~55자(약 8~10초), 짧고 임팩트 있는 구어체로 쓴다. 전체 음성은 45~60초가 되게 하고 아래 역할·순서를 그대로 따르며 각 항목 1문장씩 작성한다:\n${roles}\n기사에서 기대·전망·예정·추진·가능성으로 표현한 기업 이벤트는 나레이션에서도 같은 불확실성 수준과 표현을 반드시 유지한다. 예: '40조 조달 추진'을 '40조를 조달합니다'로 확정하지 말고 '40조 조달을 추진합니다'로 쓴다.\n투자 조언·종목 추천·매수매도 권유·가격 예측·기사에 없는 수치 창작 절대 금지(YMYL).\n코스피·코스닥 지수 차트 씬(위 역할 중 지수 화면 항목)은 화면의 지수 흐름을 가리키는 중립 문장으로 쓰고, 숫자(구체 수치)를 넣지 않으며 등락 방향을 단정하지 않는다.\nJSON: {"beats":[{"narration":"..."}]}`;
+	const usr = `${groundingContext(g)}\n\n위 자료의 '사실에만' 근거해, 세로 숏폼 경제 뉴스 해설의 ${GROUNDED_PLAN.length}개 씬 나레이션을 쓴다. 각 씬은 한국어 1문장, 35~55자(약 8~10초), 짧고 임팩트 있는 구어체로 쓴다. 전체 음성은 45~60초가 되게 하고 아래 역할·순서를 그대로 따르며 각 항목 1문장씩 작성한다:\n${roles}\n기사에서 기대·전망·예정·추진·가능성으로 표현한 기업 이벤트는 나레이션에서도 같은 불확실성 수준과 표현을 반드시 유지한다. 예: '40조 조달 추진'을 '40조를 조달합니다'로 확정하지 말고 '40조 조달을 추진합니다'로 쓴다.\n투자 조언·종목 추천·매수매도 권유·가격 예측·기사에 없는 수치 창작 절대 금지(YMYL).\n${chartRule}${chartGuidance}\nJSON: {"beats":[{"narration":"..."}]}`;
 	const generate =
 		deps.generate ??
 		(async (prompt: string): Promise<string[]> => {
@@ -1087,6 +1171,7 @@ export async function groundedNarrations(
 			articleGrounded.has(i),
 		);
 		const chartFigures = chartSceneFigureViolations(selected);
+		const chartDirection = chartDirectionViolations(selected, chartQuotes);
 		return [
 			lines.length < GROUNDED_PLAN.length ? "씬 개수 미달" : "",
 			adviceIndex >= 0 ? `투자조언 씬 ${adviceIndex + 1}` : "",
@@ -1098,6 +1183,9 @@ export async function groundedNarrations(
 				: "",
 			chartFigures.length > 0
 				? `차트 씬 미검증 수치 씬 ${chartFigures.map((i) => i + 1).join(", ")}`
+				: "",
+			chartDirection.length > 0
+				? `차트 씬 실측 방향 모순 씬 ${chartDirection.map((i) => i + 1).join(", ")}`
 				: "",
 		].filter(Boolean);
 	};
@@ -1584,7 +1672,9 @@ async function createGenerationPlan(
 			? []
 			: relatedArticles(items, article, new Set<string>()),
 	};
-	const narrations = await groundedNarrations(grounding);
+	// 차트 씬은 실측 지수 시세를 근거로 당일 방향을 사실로 언급할 수 있다(취득 실패 시 중립).
+	const chartQuotes = await resolveChartQuotes();
+	const narrations = await groundedNarrations(grounding, { chartQuotes });
 	return fingerprintGenerationPlan(
 		{
 			mode: "grounded",
