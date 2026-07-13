@@ -22,6 +22,7 @@ import {
 	findYmylViolation,
 	firstExistingPath,
 	generationPlanMatchesManifest,
+	groundedNarrations,
 	hookVisualContractFailures,
 	isMainModule,
 	isStrongRenderQcAcceptable,
@@ -723,5 +724,109 @@ describe("MeloTTS 탐색 / import guard", () => {
 			isMainModule(pathToFileURL(file).href, "/workspace/scripts/test.ts"),
 		).toBe(false);
 		expect(isMainModule(pathToFileURL(file).href, undefined)).toBe(false);
+	});
+});
+
+describe("groundedNarrations 재생성 루프(YMYL 게이트 fail-closed)", () => {
+	const grounding = {
+		primary: {
+			title: "삼성전자 공장 가동",
+			link: "https://n.news.naver.com/x",
+			description: "요약",
+			pubDate: "",
+		},
+		// 본문에 modality 마커(기대/전망/추진 등) 없음 → 확실성 게이트는 항상 통과.
+		body: "삼성전자가 신규 공장 가동을 시작했다 생산량이 늘었다고 회사가 밝혔다 시장 관계자들이 논평했다",
+		related: [],
+	};
+	// 숫자·투자조언 없음 → 결정적 게이트 통과.
+	const clean = [
+		"삼성전자가 공장 가동을 시작했다",
+		"생산량이 늘었다고 회사가 밝혔다",
+		"시장이 반응했다",
+		"전문가들이 분석했다",
+		"투자자들이 주목했다",
+	];
+
+	it("결정적·LLM 게이트를 모두 통과하면 첫 시도에 반환한다", async () => {
+		let gen = 0;
+		let aud = 0;
+		const out = await groundedNarrations(grounding, {
+			generate: async () => {
+				gen++;
+				return clean;
+			},
+			audit: async () => {
+				aud++;
+				return [];
+			},
+		});
+		expect(out).toEqual(clean);
+		expect(gen).toBe(1);
+		expect(aud).toBe(1);
+	});
+
+	it("LLM 대조 실패 시 위반을 피드백해 재생성하고 통과하면 반환한다", async () => {
+		let gen = 0;
+		const auditResults: number[][] = [[2], []];
+		const out = await groundedNarrations(grounding, {
+			generate: async () => {
+				gen++;
+				return clean;
+			},
+			audit: async () => auditResults.shift() ?? [],
+			log: () => {},
+		});
+		expect(out).toEqual(clean);
+		expect(gen).toBe(2);
+	});
+
+	it("본문에 없는 수치는 숫자 게이트가 잡아 재생성하고, 그 시도엔 LLM 대조를 부르지 않는다", async () => {
+		let aud = 0;
+		const gens: string[][] = [
+			["삼성전자가 87654억을 조달했다", ...clean.slice(1)],
+			clean,
+		];
+		const out = await groundedNarrations(grounding, {
+			generate: async () => gens.shift() ?? clean,
+			audit: async () => {
+				aud++;
+				return [];
+			},
+			log: () => {},
+		});
+		expect(out).toEqual(clean);
+		expect(aud).toBe(1);
+	});
+
+	it("결정적 게이트(투자조언) 실패 시 그 시도에선 비싼 LLM 대조를 호출하지 않는다", async () => {
+		let aud = 0;
+		const gens: string[][] = [["지금 사야 합니다", ...clean.slice(1)], clean];
+		const out = await groundedNarrations(grounding, {
+			generate: async () => gens.shift() ?? clean,
+			audit: async () => {
+				aud++;
+				return [];
+			},
+			log: () => {},
+		});
+		expect(out).toEqual(clean);
+		expect(aud).toBe(1);
+	});
+
+	it("maxAttempts 내에 통과 못하면 fail-closed 로 throw 한다(미근거 나레이션 렌더 금지)", async () => {
+		let gen = 0;
+		await expect(
+			groundedNarrations(grounding, {
+				generate: async () => {
+					gen++;
+					return clean;
+				},
+				audit: async () => [1],
+				maxAttempts: 3,
+				log: () => {},
+			}),
+		).rejects.toThrow(/fail-closed/);
+		expect(gen).toBe(3);
 	});
 });

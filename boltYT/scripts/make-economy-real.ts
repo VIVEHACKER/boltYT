@@ -38,6 +38,7 @@ import { captureArticle } from "./article-screenshot.ts";
 import { recordChartClip } from "./chart-screen-record.ts";
 import {
 	assertGroundedEconomyClaims,
+	auditGroundedEconomyClaims,
 	DEFAULT_FEEDS,
 	ECON_SYSTEM,
 	fetchArticleBody,
@@ -997,62 +998,84 @@ async function realSamsungArticleUrl(): Promise<string> {
  * YMYL: 투자조언 + 출처 확실성(기대/추진을 완료 사실로 승격 금지) 이중 사후 게이트.
  * 개수/YMYL/확실성 위반 시 교정 지시로 정확히 1회 재생성 후에도 불만족이면 fail-closed.
  */
-async function groundedNarrations(g: Grounding): Promise<string[]> {
+const MAX_GROUNDED_ATTEMPTS = 3;
+
+export interface GroundedNarrationDeps {
+	/** 프롬프트 → 나레이션 배열(기본: api-proxy Claude). 테스트 주입용. */
+	generate?: (prompt: string) => Promise<string[]>;
+	/** 나레이션 → 출처 미대조 씬 index(기본: LLM 팩트체커). 테스트 주입용. */
+	audit?: (g: Grounding, narrations: string[]) => Promise<number[]>;
+	maxAttempts?: number;
+	log?: (msg: string) => void;
+}
+
+/**
+ * grounded 나레이션을 생성하고 YMYL 게이트 4종(조언·출처확실성·출처숫자·LLM대조)을 모두
+ * 통과할 때까지 위반 씬을 피드백해 재생성한다(최대 maxAttempts). 결정적(로컬) 게이트를 먼저
+ * 검사하고, 통과한 경우에만 비싼 LLM 대조를 호출한다(비용 절약). 마지막 시도까지 실패하면
+ * throw 로 fail-closed 를 유지한다 — 미근거 나레이션은 절대 렌더로 넘기지 않는다.
+ */
+export async function groundedNarrations(
+	g: Grounding,
+	deps: GroundedNarrationDeps = {},
+): Promise<string[]> {
 	const roles = GROUNDED_PLAN.map((b, i) => `${i + 1}. ${b.role}`).join("\n");
 	const usr = `${groundingContext(g)}\n\n위 자료의 '사실에만' 근거해, 세로 숏폼 경제 뉴스 해설의 ${GROUNDED_PLAN.length}개 씬 나레이션을 쓴다. 각 씬은 한국어 1문장, 35~55자(약 8~10초), 짧고 임팩트 있는 구어체로 쓴다. 전체 음성은 45~60초가 되게 하고 아래 역할·순서를 그대로 따르며 각 항목 1문장씩 작성한다:\n${roles}\n기사에서 기대·전망·예정·추진·가능성으로 표현한 기업 이벤트는 나레이션에서도 같은 불확실성 수준과 표현을 반드시 유지한다. 예: '40조 조달 추진'을 '40조를 조달합니다'로 확정하지 말고 '40조 조달을 추진합니다'로 쓴다.\n투자 조언·종목 추천·매수매도 권유·가격 예측·기사에 없는 수치 창작 절대 금지(YMYL).\nJSON: {"beats":[{"narration":"..."}]}`;
-	const attempt = async (prompt: string): Promise<string[]> => {
-		const parsed = (await proxyChatJSON(ECON_SYSTEM, prompt)) as {
-			beats?: { narration?: string }[];
-		};
-		return (Array.isArray(parsed.beats) ? parsed.beats : [])
-			.map((b) => (b?.narration ?? "").trim())
-			.filter(Boolean);
-	};
-	const validate = (lines: string[]) => {
+	const generate =
+		deps.generate ??
+		(async (prompt: string): Promise<string[]> => {
+			const parsed = (await proxyChatJSON(ECON_SYSTEM, prompt)) as {
+				beats?: { narration?: string }[];
+			};
+			return (Array.isArray(parsed.beats) ? parsed.beats : [])
+				.map((b) => (b?.narration ?? "").trim())
+				.filter(Boolean);
+		});
+	const audit = deps.audit ?? auditGroundedEconomyClaims;
+	const maxAttempts = Math.max(1, deps.maxAttempts ?? MAX_GROUNDED_ATTEMPTS);
+	const log = deps.log ?? ((msg: string) => process.stdout.write(msg));
+
+	/** 결정적(로컬) 게이트 위반 사유. 빈 배열이면 통과. */
+	const deterministicReasons = (lines: string[]): string[] => {
 		const selected = lines.slice(0, GROUNDED_PLAN.length);
-		return {
-			incomplete: lines.length < GROUNDED_PLAN.length,
-			adviceIndex: selected.findIndex(looksLikeAdvice),
-			modalityViolations: findGroundingModalityViolations(g, selected),
-		};
+		const adviceIndex = selected.findIndex(looksLikeAdvice);
+		const modality = findGroundingModalityViolations(g, selected);
+		const numbers = findUngroundedNumberViolations(g, selected);
+		return [
+			lines.length < GROUNDED_PLAN.length ? "씬 개수 미달" : "",
+			adviceIndex >= 0 ? `투자조언 씬 ${adviceIndex + 1}` : "",
+			modality.length > 0
+				? `출처 확실성 승격 씬 ${modality.map((i) => i + 1).join(", ")}`
+				: "",
+			numbers.length > 0
+				? `출처 미대조 수치 씬 ${numbers.map((i) => i + 1).join(", ")}`
+				: "",
+		].filter(Boolean);
 	};
 
-	let lines = await attempt(usr);
-	let validation = validate(lines);
-	if (
-		validation.incomplete ||
-		validation.adviceIndex >= 0 ||
-		validation.modalityViolations.length > 0
-	) {
-		const reasons = [
-			validation.incomplete ? "씬 개수 미달" : "",
-			validation.adviceIndex >= 0
-				? `투자조언 씬 ${validation.adviceIndex + 1}`
-				: "",
-			validation.modalityViolations.length > 0
-				? `출처 확실성 승격 씬 ${validation.modalityViolations.map((index) => index + 1).join(", ")}`
-				: "",
-		]
-			.filter(Boolean)
-			.join(" / ");
-		process.stdout.write(`   grounded 나레이션 교정 재생성(${reasons})...\n`);
-		const correctivePrompt = `${usr}\n\n이전 출력은 다음 검증에 실패했다: ${reasons}. 이전 출력: ${JSON.stringify(lines)}\n전체 ${GROUNDED_PLAN.length}개 씬을 다시 작성하라. 특히 출처가 기대·전망·예정·추진·가능성으로 표현한 조달·상장·승인·발행·유입 등 기업 이벤트를 완료/확정형으로 바꾸지 말고 동일한 불확실성 표현을 문장 안에 명시하라.`;
-		lines = await attempt(correctivePrompt);
-		validation = validate(lines);
+	let lines: string[] = [];
+	let reasons: string[] = [];
+	for (let attempt = 0; attempt < maxAttempts; attempt++) {
+		const prompt =
+			attempt === 0
+				? usr
+				: `${usr}\n\n이전 출력은 다음 검증에 실패했다: ${reasons.join(" / ")}. 이전 출력: ${JSON.stringify(lines)}\n전체 ${GROUNDED_PLAN.length}개 씬을 다시 작성하라. 지적된 씬은 기사 본문이 직접 뒷받침하는 사실·수치만 쓰고, 본문에 없는 수치·주장·완료형 이벤트는 절대 만들지 마라. 기대·전망·예정·추진·가능성은 같은 불확실성 표현을 유지하라.`;
+		lines = await generate(prompt);
+		reasons = deterministicReasons(lines);
+		if (reasons.length === 0) {
+			// 결정적 게이트 통과 → 비싼 LLM 대조는 이 지점에서만 호출한다.
+			const unsupported = await audit(g, lines.slice(0, GROUNDED_PLAN.length));
+			if (unsupported.length === 0) return lines.slice(0, GROUNDED_PLAN.length);
+			reasons = [
+				`출처 대조 실패 씬 ${unsupported.map((i) => i + 1).join(", ")}`,
+			];
+		}
+		if (attempt < maxAttempts - 1)
+			log(`   grounded 나레이션 교정 재생성(${reasons.join(" / ")})...\n`);
 	}
-	if (validation.incomplete)
-		throw new Error(
-			`grounded 나레이션 불완전(${lines.length}/${GROUNDED_PLAN.length}씬) — 재실행 권장`,
-		);
-	if (validation.adviceIndex >= 0)
-		throw new Error(
-			`YMYL 위반 나레이션(씬 ${validation.adviceIndex + 1}) — 재실행 권장(fail-closed)`,
-		);
-	if (validation.modalityViolations.length > 0)
-		throw new Error(
-			`YMYL 출처 확실성 게이트 실패(씬 ${validation.modalityViolations.map((index) => index + 1).join(", ")}) — 기대/추진을 확정 사실로 바꿀 수 없습니다.`,
-		);
-	return lines.slice(0, GROUNDED_PLAN.length);
+	throw new Error(
+		`grounded 나레이션이 ${maxAttempts}회 시도에도 YMYL 출처 게이트를 통과하지 못했습니다(${reasons.join(" / ")}) — fail-closed(재실행 권장)`,
+	);
 }
 
 /** grounded 비트 조립 — 역할 골격 + LLM 나레이션 + 실제 기사 URL. */
@@ -1602,6 +1625,12 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
 	} else {
 		plan = await createGenerationPlan(options, cwd);
 	}
+	// createGenerationPlan(grounded)은 groundedNarrations 루프에서 LLM 출처 대조를 이미
+	// 통과시킨다. 아래 최종 게이트에서 같은 나레이션을 또 LLM 대조하면 중복 비용이고,
+	// 비결정성으로 재실패하면 루프가 어렵게 통과시킨 결과를 무효화한다. 그래서 새로 생성한
+	// 계획은 최종 LLM 대조를 생략하고(결정적 게이트는 아래에서 그대로 재확인), 재사용/승격
+	// 계획만 여기서 대조한다.
+	const planFreshlyGenerated = !reusePlannedAssets;
 	if (refreshGroundingSnapshot) {
 		const body = requireLegacyGroundingBody(
 			await fetchArticleBody(plan.article.link),
@@ -1683,10 +1712,13 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
 		throw new Error(
 			`YMYL 최종 출처 숫자 위반(씬 ${finalNumberViolations.map((index) => index + 1).join(", ")})`,
 		);
-	await assertGroundedClaimsForPlan(
-		plan,
-		beats.map((beat) => beat.narration),
-	);
+	// 새로 생성한 grounded 계획은 groundedNarrations 루프가 이미 LLM 대조를 통과시켰으므로
+	// 중복 대조를 생략한다. 재사용/승격 계획은 이번 실행에서 검증되지 않았으니 여기서 대조한다.
+	if (!planFreshlyGenerated)
+		await assertGroundedClaimsForPlan(
+			plan,
+			beats.map((beat) => beat.narration),
+		);
 
 	const made: {
 		imageUrl: string;
